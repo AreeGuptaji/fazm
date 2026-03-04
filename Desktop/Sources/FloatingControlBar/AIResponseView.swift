@@ -320,6 +320,13 @@ struct AIResponseView: View {
                 .onSubmit {
                     sendFollowUp()
                 }
+                .onChange(of: state.pendingFollowUpText) {
+                    if !state.pendingFollowUpText.isEmpty {
+                        followUpText = state.pendingFollowUpText
+                        state.pendingFollowUpText = ""
+                        isFollowUpFocused = true
+                    }
+                }
 
             Button(action: { sendFollowUp() }) {
                 Image(systemName: "arrow.up.circle.fill")

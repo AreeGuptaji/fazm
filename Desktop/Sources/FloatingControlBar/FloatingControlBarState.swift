@@ -48,6 +48,9 @@ class FloatingControlBarState: NSObject, ObservableObject {
     @Published var isVoiceFollowUp: Bool = false
     @Published var voiceFollowUpTranscript: String = ""
 
+    /// Pre-filled text for the follow-up input (set by PTT, consumed by AIResponseView)
+    @Published var pendingFollowUpText: String = ""
+
     // Model selection
     @Published var selectedModel: String = "claude-sonnet-4-6"
 

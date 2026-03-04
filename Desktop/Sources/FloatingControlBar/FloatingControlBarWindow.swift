@@ -833,7 +833,7 @@ class FloatingControlBarManager {
         window.orderFrontRegardless()
     }
 
-    /// Open AI input with a pre-filled query and auto-send (used by PTT).
+    /// Open AI input with a pre-filled transcription from PTT (inserts into input field without sending).
     func openAIInputWithQuery(_ query: String) {
         guard let window = window else { return }
 
@@ -861,6 +861,9 @@ class FloatingControlBarManager {
             }
         }
 
+        // Activate the app so the window can become key and accept keyboard input.
+        NSApp.activate(ignoringOtherApps: true)
+
         if !window.isVisible {
             show()
         }
@@ -875,23 +878,20 @@ class FloatingControlBarManager {
         // center instead of where it was before the chat opened.
         window.savePreChatCenterIfNeeded()
 
-        // Set up state — go straight to response view (skip input view to avoid resize flicker)
-        window.state.showingAIConversation = true
-        window.state.showingAIResponse = true
-        window.state.isAILoading = true
+        // Show the input view with the transcription pre-filled (user can edit before sending)
         window.state.aiInputText = query
-        window.state.displayedQuery = query
-        window.state.currentAIMessage = nil
-        window.resizeToResponseHeightPublic(animated: true)
+        window.showAIConversation()
+        // Override the empty text that showAIConversation sets
+        window.state.aiInputText = query
         window.orderFrontRegardless()
 
-        // Auto-send the query
-        Task { @MainActor in
-            await self.sendAIQuery(query, barWindow: window, provider: provider)
+        // Focus the input field so user can immediately edit or press Enter to send
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            window.focusInputField()
         }
     }
 
-    /// Send a follow-up query in the existing AI conversation (used by PTT follow-up).
+    /// Insert a PTT transcription into the follow-up input field (user can edit before sending).
     func sendFollowUpQuery(_ query: String) {
         guard let window = window, window.state.showingAIResponse else {
             // No active conversation — fall back to new conversation
@@ -899,22 +899,14 @@ class FloatingControlBarManager {
             return
         }
 
-        // Archive current exchange
-        let currentQuery = window.state.displayedQuery
-        if let currentMessage = window.state.currentAIMessage, !currentQuery.isEmpty, !currentMessage.text.isEmpty {
-            window.state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+        // Insert transcription into the follow-up input field
+        window.state.pendingFollowUpText = query
+        window.makeKeyAndOrderFront(nil)
+
+        // Focus the follow-up input field
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            window.focusInputField()
         }
-
-        // Cancel existing streaming response if still in progress
-        chatCancellable?.cancel()
-        chatCancellable = nil
-
-        // Set up new query
-        window.state.displayedQuery = query
-        window.state.currentAIMessage = nil
-        window.state.isAILoading = true
-
-        window.onSendQuery?(query)
     }
 
     /// Access the bar state for PTT updates.

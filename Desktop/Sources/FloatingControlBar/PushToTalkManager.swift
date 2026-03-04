@@ -389,10 +389,10 @@ class PushToTalkManager: ObservableObject {
     }
 
     if wasFollowUp {
-      log("PushToTalkManager: sending follow-up query (\(query.count) chars): \(query)")
+      log("PushToTalkManager: inserting follow-up transcription (\(query.count) chars): \(query)")
       FloatingControlBarManager.shared.sendFollowUpQuery(query)
     } else {
-      log("PushToTalkManager: sending query (\(query.count) chars): \(query)")
+      log("PushToTalkManager: inserting transcription into input (\(query.count) chars): \(query)")
       FloatingControlBarManager.shared.openAIInputWithQuery(query)
     }
   }
