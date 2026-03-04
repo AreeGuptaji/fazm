@@ -228,11 +228,13 @@ struct PostOnboardingTutorialView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 24)
             .padding(.top, 16)
             .padding(.bottom, 12)
+            .frame(width: 320)
             .floatingBackground(cornerRadius: 16)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
@@ -244,23 +246,34 @@ struct PostOnboardingTutorialView: View {
                 Text("Press and hold Right ⌘ to talk")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(FazmColors.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("Your voice becomes your cursor")
                     .font(.system(size: 12))
                     .foregroundColor(FazmColors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .transition(.opacity)
 
         case .speaking:
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 ActiveListeningIndicator()
                     .frame(height: 28)
-                Text("Say: Go to Google and search for fazm.ai")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(FazmColors.textPrimary)
-                    .multilineTextAlignment(.center)
+
+                VStack(spacing: 4) {
+                    Text("Say:")
+                        .font(.system(size: 12))
+                        .foregroundColor(FazmColors.textTertiary)
+
+                    SpeakingPromptText(text: "Go to Google and search for fazm.ai")
+                }
+
                 Text("Then release ⌘ to send")
                     .font(.system(size: 12))
                     .foregroundColor(FazmColors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .transition(.opacity)
 
@@ -275,9 +288,42 @@ struct PostOnboardingTutorialView: View {
                 Text("Right ⌘ → speak → release, anytime")
                     .font(.system(size: 12))
                     .foregroundColor(FazmColors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .transition(.opacity)
         }
+    }
+}
+
+// MARK: - SpeakingPromptText
+
+struct SpeakingPromptText: View {
+    let text: String
+    @State private var glowPhase: CGFloat = 0
+
+    var body: some View {
+        Text("\"\(text)\"")
+            .font(.system(size: 15, weight: .bold))
+            .foregroundColor(.white)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .shadow(color: FazmColors.purplePrimary.opacity(0.6), radius: 4 + glowPhase * 4, x: 0, y: 0)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(FazmColors.purplePrimary.opacity(0.12 + glowPhase * 0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(FazmColors.purplePrimary.opacity(0.3 + glowPhase * 0.2), lineWidth: 1)
+            )
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                    glowPhase = 1
+                }
+            }
     }
 }
 
