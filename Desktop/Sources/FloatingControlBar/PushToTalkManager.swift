@@ -218,7 +218,7 @@ class PushToTalkManager: ObservableObject {
 
 
     startAudioTranscription()
-    log("PushToTalkManager: started listening (hold mode, followUp=\(isFollowUp), openedChat=\(pttOpenedChat))")
+    log("PushToTalkManager: started listening (hold mode, openedChat=\(pttOpenedChat))")
   }
 
   private func enterLockedListening() {
@@ -252,7 +252,7 @@ class PushToTalkManager: ObservableObject {
     }
 
     updateBarState()
-    log("PushToTalkManager: entered locked listening mode (followUp=\(isFollowUp), openedChat=\(pttOpenedChat))")
+    log("PushToTalkManager: entered locked listening mode (openedChat=\(pttOpenedChat))")
   }
 
   private func stopListening() {

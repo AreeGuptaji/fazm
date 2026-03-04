@@ -327,6 +327,12 @@ struct AIResponseView: View {
                         isFollowUpFocused = true
                     }
                 }
+                .onChange(of: state.aiInputText) {
+                    // Sync PTT live transcript into follow-up field
+                    if state.isVoiceListening && !state.aiInputText.isEmpty && state.aiInputText != followUpText {
+                        followUpText = state.aiInputText
+                    }
+                }
 
             Button(action: { sendFollowUp() }) {
                 Image(systemName: "arrow.up.circle.fill")
