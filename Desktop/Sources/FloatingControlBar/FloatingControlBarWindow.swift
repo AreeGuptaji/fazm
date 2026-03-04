@@ -775,6 +775,22 @@ class FloatingControlBarManager {
             }
 
         self.window = barWindow
+
+        // Debug: replay post-onboarding tutorial via distributed notification
+        // Trigger from terminal: `defaults write com.omi.computer-macos hasSeenPostOnboardingTutorial -bool false && /usr/bin/notifyutil -p com.omi.replayTutorial`
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.omi.replayTutorial"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, let barState = self.barState else { return }
+            log("FloatingControlBarManager: Replaying post-onboarding tutorial")
+            PostOnboardingTutorialManager.shared.dismiss()
+            UserDefaults.standard.set(false, forKey: "hasSeenPostOnboardingTutorial")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                PostOnboardingTutorialManager.shared.showIfNeeded(barState: barState)
+            }
+        }
     }
 
     /// Whether the floating bar window is currently visible.
