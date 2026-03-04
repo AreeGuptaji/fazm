@@ -77,6 +77,19 @@ class PostOnboardingTutorialManager {
         positionBelowBar(tutorialWindow)
         viewModel.startPulse()
 
+        // Re-position when step changes (content size changes)
+        viewModel.$step
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, let window = self.window else { return }
+                // Small delay to let SwiftUI layout update
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    guard let self, let window = self.window else { return }
+                    self.positionBelowBar(window)
+                }
+            }
+            .store(in: &cancellables)
+
         tutorialWindow.alphaValue = 0
         tutorialWindow.orderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
@@ -86,7 +99,9 @@ class PostOnboardingTutorialManager {
     }
 
     private func positionBelowBar(_ tutorialWindow: NSWindow) {
-        let windowSize = NSSize(width: 320, height: 160)
+        // Let SwiftUI determine the ideal content size
+        let fittingSize = tutorialWindow.contentView?.fittingSize ?? NSSize(width: 320, height: 160)
+        let windowSize = NSSize(width: max(fittingSize.width, 320), height: max(fittingSize.height, 120))
 
         if let barFrame = FloatingControlBarManager.shared.barWindowFrame {
             let x = barFrame.midX - windowSize.width / 2
@@ -148,9 +163,8 @@ class PostOnboardingTutorialManager {
 
 class PostOnboardingTutorialWindow: NSWindow {
     init(viewModel: TutorialViewModel) {
-        let size = NSSize(width: 320, height: 160)
         super.init(
-            contentRect: NSRect(origin: .zero, size: size),
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 320, height: 160)),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -170,7 +184,6 @@ class PostOnboardingTutorialWindow: NSWindow {
                 _ = self  // prevent unused capture warning
             }
         }))
-        hostingView.frame = NSRect(origin: .zero, size: size)
         self.contentView = hostingView
     }
 
