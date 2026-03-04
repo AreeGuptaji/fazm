@@ -21,7 +21,7 @@ struct SettingsSearchItem: Identifiable {
 
     static let allSearchableItems: [SettingsSearchItem] = [
         // General
-        SettingsSearchItem(name: "Ask omi", subtitle: "Show or hide the floating chat bar", keywords: ["floating bar", "chat bar"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.askomi"),
+        SettingsSearchItem(name: "Ask Fazm", subtitle: "Show or hide the floating chat bar", keywords: ["floating bar", "chat bar"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.askomi"),
         SettingsSearchItem(name: "Font Size", subtitle: "Adjust text size across the app", keywords: ["text size", "zoom", "scale", "reset"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.fontsize"),
         SettingsSearchItem(name: "Reset Window Size", subtitle: "Restore the default window dimensions", keywords: ["resize", "window", "default size"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.resetwindow"),
 
@@ -41,20 +41,20 @@ struct SettingsSearchItem: Identifiable {
         SettingsSearchItem(name: "Auto-Install Updates", subtitle: "Automatically download and install updates when available", keywords: ["auto install", "automatic install", "download updates", "install updates"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.autoinstall"),
         SettingsSearchItem(name: "Update Channel", subtitle: "Choose between stable and beta update channels", keywords: ["channel", "beta", "staging", "stable", "release channel"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.channel"),
         SettingsSearchItem(name: "Version Info", subtitle: "Current app version and build number", keywords: ["version", "build", "app version", "build number"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.version"),
-        SettingsSearchItem(name: "Report an Issue", subtitle: "Help us improve omi", keywords: ["bug", "feedback", "report", "issue"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.reportissue"),
+        SettingsSearchItem(name: "Report an Issue", subtitle: "Help us improve Fazm", keywords: ["bug", "feedback", "report", "issue"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.reportissue"),
 
         // Advanced subsections
-        SettingsSearchItem(name: "Ask omi Floating Bar", subtitle: "Configure shortcuts and floating bar behavior", keywords: ["floating bar", "shortcuts", "push to talk"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi"),
-        SettingsSearchItem(name: "AI Model", subtitle: "Choose the AI model for Ask omi conversations", keywords: ["model", "ai", "sonnet", "opus", "claude"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.model"),
-        SettingsSearchItem(name: "Background Style", subtitle: "Toggle between solid and transparent background", keywords: ["background", "solid", "transparent", "blur"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.background"),
-        SettingsSearchItem(name: "Draggable Floating Bar", subtitle: "Allow repositioning the floating bar by dragging it", keywords: ["drag", "move", "reposition", "draggable"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.draggable"),
-        SettingsSearchItem(name: "Ask omi Shortcut", subtitle: "Global shortcut to open Ask omi from anywhere", keywords: ["shortcut", "hotkey", "keyboard", "global shortcut"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.shortcut"),
-        SettingsSearchItem(name: "Push to Talk", subtitle: "Hold a key to speak, release to send your question to AI", keywords: ["push to talk", "ptt", "hold to talk", "microphone key"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.ptt"),
-        SettingsSearchItem(name: "Transcription Mode", subtitle: "Choose how voice input is processed", keywords: ["transcription", "mode", "voice", "dictation"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.transcriptionmode"),
-        SettingsSearchItem(name: "Double-tap for Locked Mode", subtitle: "Double-tap the push-to-talk key to keep listening hands-free", keywords: ["double tap", "locked mode", "hands free", "listening"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.doubletap"),
-        SettingsSearchItem(name: "Push-to-Talk Sounds", subtitle: "Play audio feedback when starting and ending voice input", keywords: ["sounds", "audio feedback", "ptt sounds"], section: .advanced, advancedSubsection: .askOmiFloatingBar, icon: "sparkles", settingId: "advanced.askomi.pttsounds"),
+        SettingsSearchItem(name: "Ask Fazm Floating Bar", subtitle: "Configure shortcuts and floating bar behavior", keywords: ["floating bar", "shortcuts", "push to talk"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm"),
+        SettingsSearchItem(name: "AI Model", subtitle: "Choose the AI model for Ask Fazm conversations", keywords: ["model", "ai", "sonnet", "opus", "claude"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.model"),
+        SettingsSearchItem(name: "Background Style", subtitle: "Toggle between solid and transparent background", keywords: ["background", "solid", "transparent", "blur"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.background"),
+        SettingsSearchItem(name: "Draggable Floating Bar", subtitle: "Allow repositioning the floating bar by dragging it", keywords: ["drag", "move", "reposition", "draggable"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.draggable"),
+        SettingsSearchItem(name: "Ask Fazm Shortcut", subtitle: "Global shortcut to open Ask Fazm from anywhere", keywords: ["shortcut", "hotkey", "keyboard", "global shortcut"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.shortcut"),
+        SettingsSearchItem(name: "Push to Talk", subtitle: "Hold a key to speak, release to send your question to AI", keywords: ["push to talk", "ptt", "hold to talk", "microphone key"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.ptt"),
+        SettingsSearchItem(name: "Transcription Mode", subtitle: "Choose how voice input is processed", keywords: ["transcription", "mode", "voice", "dictation"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.transcriptionmode"),
+        SettingsSearchItem(name: "Double-tap for Locked Mode", subtitle: "Double-tap the push-to-talk key to keep listening hands-free", keywords: ["double tap", "locked mode", "hands free", "listening"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.doubletap"),
+        SettingsSearchItem(name: "Push-to-Talk Sounds", subtitle: "Play audio feedback when starting and ending voice input", keywords: ["sounds", "audio feedback", "ptt sounds"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.pttsounds"),
         SettingsSearchItem(name: "Multiple Chat Sessions", subtitle: "Create separate chat threads", keywords: ["multi chat", "threads"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.multichat"),
-        SettingsSearchItem(name: "Launch at Login", subtitle: "Start omi automatically when you log in", keywords: ["startup", "login", "boot"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.launchatlogin"),
+        SettingsSearchItem(name: "Launch at Login", subtitle: "Start Fazm automatically when you log in", keywords: ["startup", "login", "boot"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.launchatlogin"),
         SettingsSearchItem(name: "Report Issue", subtitle: "Send app logs and report a problem", keywords: ["bug", "feedback", "logs", "report"], section: .advanced, advancedSubsection: .troubleshooting, icon: "wrench.and.screwdriver", settingId: "advanced.troubleshooting.reportissue"),
         SettingsSearchItem(name: "Reset Onboarding", subtitle: "Restart setup wizard and reset permissions", keywords: ["setup", "wizard", "permissions", "reset"], section: .advanced, advancedSubsection: .troubleshooting, icon: "wrench.and.screwdriver", settingId: "advanced.troubleshooting.resetonboarding"),
     ]
@@ -93,7 +93,7 @@ struct SettingsSidebar: View {
             // Settings title
             Text("Settings")
                 .scaledFont(size: 22, weight: .bold)
-                .foregroundColor(OmiColors.textPrimary)
+                .foregroundColor(FazmColors.textPrimary)
                 .padding(.horizontal, 16)
                 .padding(.top, 20)
                 .padding(.bottom, 12)
@@ -116,7 +116,7 @@ struct SettingsSidebar: View {
                                     withAnimation(.easeInOut(duration: 0.15)) {
                                         selectedSection = section
                                         if section == .advanced && selectedAdvancedSubsection == nil {
-                                            selectedAdvancedSubsection = .askOmiFloatingBar
+                                            selectedAdvancedSubsection = .askFazmFloatingBar
                                         }
                                     }
                                 }
@@ -150,20 +150,20 @@ struct SettingsSidebar: View {
             Spacer()
         }
         .frame(width: expandedWidth)
-        .background(OmiColors.backgroundPrimary)
+        .background(FazmColors.backgroundPrimary)
     }
 
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .scaledFont(size: 13)
-                .foregroundColor(isSearchFocused ? OmiColors.purplePrimary : OmiColors.textTertiary)
+                .foregroundColor(isSearchFocused ? FazmColors.purplePrimary : FazmColors.textTertiary)
                 .animation(.easeInOut(duration: 0.15), value: isSearchFocused)
 
             TextField("Search settings...", text: $searchQuery)
                 .textFieldStyle(.plain)
                 .scaledFont(size: 13)
-                .foregroundColor(OmiColors.textPrimary)
+                .foregroundColor(FazmColors.textPrimary)
                 .focused($isSearchFocused)
 
             if !searchQuery.isEmpty {
@@ -172,7 +172,7 @@ struct SettingsSidebar: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .scaledFont(size: 12)
-                        .foregroundColor(OmiColors.textTertiary)
+                        .foregroundColor(FazmColors.textTertiary)
                 }
                 .buttonStyle(.plain)
             }
@@ -181,10 +181,10 @@ struct SettingsSidebar: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(OmiColors.backgroundTertiary)
+                .fill(FazmColors.backgroundTertiary)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSearchFocused ? OmiColors.purplePrimary.opacity(0.5) : Color.clear, lineWidth: 1)
+                        .stroke(isSearchFocused ? FazmColors.purplePrimary.opacity(0.5) : Color.clear, lineWidth: 1)
                 )
         )
     }
@@ -195,7 +195,7 @@ struct SettingsSidebar: View {
                 if filteredSearchItems.isEmpty {
                     Text("No results")
                         .scaledFont(size: 13)
-                        .foregroundColor(OmiColors.textTertiary)
+                        .foregroundColor(FazmColors.textTertiary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 20)
                 } else {
@@ -206,7 +206,7 @@ struct SettingsSidebar: View {
                                 if let sub = item.advancedSubsection {
                                     selectedAdvancedSubsection = sub
                                 } else if item.section == .advanced {
-                                    selectedAdvancedSubsection = .askOmiFloatingBar
+                                    selectedAdvancedSubsection = .askFazmFloatingBar
                                 }
                             }
                             searchQuery = ""
@@ -246,12 +246,12 @@ struct SettingsSidebarItem: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .scaledFont(size: 17)
-                    .foregroundColor(isSelected ? OmiColors.textPrimary : OmiColors.textTertiary)
+                    .foregroundColor(isSelected ? FazmColors.textPrimary : FazmColors.textTertiary)
                     .frame(width: iconWidth)
 
                 Text(section.rawValue)
                     .scaledFont(size: 14, weight: isSelected ? .medium : .regular)
-                    .foregroundColor(isSelected ? OmiColors.textPrimary : OmiColors.textSecondary)
+                    .foregroundColor(isSelected ? FazmColors.textPrimary : FazmColors.textSecondary)
 
                 Spacer()
             }
@@ -261,8 +261,8 @@ struct SettingsSidebarItem: View {
             .background(
                 RoundedRectangle(cornerRadius: 10)
                     .fill(isSelected
-                          ? OmiColors.backgroundTertiary.opacity(0.8)
-                          : (isHovered ? OmiColors.backgroundTertiary.opacity(0.5) : Color.clear))
+                          ? FazmColors.backgroundTertiary.opacity(0.8)
+                          : (isHovered ? FazmColors.backgroundTertiary.opacity(0.5) : Color.clear))
             )
         }
         .buttonStyle(.plain)
@@ -290,12 +290,12 @@ struct SettingsSubsectionItem: View {
 
                 Image(systemName: subsection.icon)
                     .scaledFont(size: 14)
-                    .foregroundColor(isSelected ? OmiColors.textPrimary : OmiColors.textTertiary)
+                    .foregroundColor(isSelected ? FazmColors.textPrimary : FazmColors.textTertiary)
                     .frame(width: 16)
 
                 Text(subsection.rawValue)
                     .scaledFont(size: 13, weight: isSelected ? .medium : .regular)
-                    .foregroundColor(isSelected ? OmiColors.textPrimary : OmiColors.textSecondary)
+                    .foregroundColor(isSelected ? FazmColors.textPrimary : FazmColors.textSecondary)
 
                 Spacer()
             }
@@ -305,8 +305,8 @@ struct SettingsSubsectionItem: View {
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(isSelected
-                          ? OmiColors.backgroundTertiary.opacity(0.6)
-                          : (isHovered ? OmiColors.backgroundTertiary.opacity(0.3) : Color.clear))
+                          ? FazmColors.backgroundTertiary.opacity(0.6)
+                          : (isHovered ? FazmColors.backgroundTertiary.opacity(0.3) : Color.clear))
             )
         }
         .buttonStyle(.plain)
@@ -328,17 +328,17 @@ struct SettingsSearchResultRow: View {
             HStack(spacing: 10) {
                 Image(systemName: item.icon)
                     .scaledFont(size: 14)
-                    .foregroundColor(OmiColors.textTertiary)
+                    .foregroundColor(FazmColors.textTertiary)
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name)
                         .scaledFont(size: 13, weight: .medium)
-                        .foregroundColor(OmiColors.textPrimary)
+                        .foregroundColor(FazmColors.textPrimary)
 
                     Text(item.breadcrumb)
                         .scaledFont(size: 11)
-                        .foregroundColor(OmiColors.textTertiary)
+                        .foregroundColor(FazmColors.textTertiary)
                 }
 
                 Spacer()
@@ -348,7 +348,7 @@ struct SettingsSearchResultRow: View {
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isHovered ? OmiColors.backgroundTertiary.opacity(0.5) : Color.clear)
+                    .fill(isHovered ? FazmColors.backgroundTertiary.opacity(0.5) : Color.clear)
             )
         }
         .buttonStyle(.plain)
@@ -370,7 +370,7 @@ struct SettingHighlightModifier: ViewModifier {
             .id(settingId)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isHighlighted ? OmiColors.purplePrimary.opacity(0.12) : Color.clear)
+                    .fill(isHighlighted ? FazmColors.purplePrimary.opacity(0.12) : Color.clear)
                     .animation(.easeInOut(duration: 0.3), value: isHighlighted)
                     .allowsHitTesting(false)
             )
@@ -389,7 +389,7 @@ struct SettingHighlightModifier: ViewModifier {
 #Preview {
     SettingsSidebar(
         selectedSection: .constant(.advanced),
-        selectedAdvancedSubsection: .constant(.askOmiFloatingBar),
+        selectedAdvancedSubsection: .constant(.askFazmFloatingBar),
         highlightedSettingId: .constant(nil)
     )
     .preferredColorScheme(.dark)

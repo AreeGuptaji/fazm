@@ -92,7 +92,7 @@ enum ChatContentBlock: Identifiable {
 
     /// Human-friendly display name for a tool
     static func displayName(for toolName: String) -> String {
-        // Strip MCP prefix (e.g., "mcp__omi-tools__execute_sql" → "execute_sql")
+        // Strip MCP prefix (e.g., "mcp__fazm-tools__execute_sql" → "execute_sql")
         let cleanName: String
         if toolName.hasPrefix("mcp__") {
             cleanName = String(toolName.split(separator: "__").last ?? Substring(toolName))
@@ -316,6 +316,10 @@ A screenshot may be attached — use it silently only if relevant. Never mention
     /// The UI should observe this and present BrowserExtensionSetup.
     @Published var needsBrowserExtensionSetup = false
 
+    /// The user's message text that was interrupted by browser extension setup.
+    /// After setup completes, the UI should call retryPendingMessage() to re-send it.
+    var pendingRetryMessage: String?
+
     /// Whether the user is currently viewing the default chat (syncs with Flutter app)
     @Published var isInDefaultChat = true
 
@@ -337,20 +341,20 @@ A screenshot may be attached — use it silently only if relevant. Never mention
     /// When true, user can create multiple chat sessions
     @AppStorage("multiChatEnabled") var multiChatEnabled = false
 
-    // MARK: - Bridge (ACP-only, passApiKey controls OMI vs user's account)
+    // MARK: - Bridge (ACP-only, passApiKey controls Fazm vs user's account)
     // NOTE: initialized lazily so it reads the persisted bridgeMode from UserDefaults,
-    // not always defaulting to Omi mode on cold start.
+    // not always defaulting to Fazm mode on cold start.
     private lazy var acpBridge: ACPBridge = {
-        let isOmi = (UserDefaults.standard.string(forKey: "chatBridgeMode") ?? BridgeMode.omiAI.rawValue) != BridgeMode.userClaude.rawValue
-        return ACPBridge(passApiKey: isOmi)
+        let isFazm = (UserDefaults.standard.string(forKey: "chatBridgeMode") ?? BridgeMode.fazmAI.rawValue) != BridgeMode.userClaude.rawValue
+        return ACPBridge(passApiKey: isFazm)
     }()
     private var acpBridgeStarted = false
 
     enum BridgeMode: String {
-        case omiAI = "agentSDK"
+        case fazmAI = "agentSDK"
         case userClaude = "claudeCode"
     }
-    @AppStorage("chatBridgeMode") var bridgeMode: String = BridgeMode.omiAI.rawValue
+    @AppStorage("chatBridgeMode") var bridgeMode: String = BridgeMode.fazmAI.rawValue
 
     /// Whether the ACP bridge requires authentication (shown as sheet in UI)
     @Published var isClaudeAuthRequired = false
@@ -360,13 +364,13 @@ A screenshot may be attached — use it silently only if relevant. Never mention
     @Published var claudeAuthUrl: String?
     /// Whether the user has a cached Claude OAuth token
     @Published var isClaudeConnected = false
-    /// Cumulative tokens used in the current session via Omi account
+    /// Cumulative tokens used in the current session via Fazm account
     @Published var sessionTokensUsed: Int = 0
-    /// Cumulative USD cost spent using the Omi account, persisted across sessions.
+    /// Cumulative USD cost spent using the Fazm account, persisted across sessions.
     /// Used to enforce the $50 threshold for auto-switching to the user's Claude account.
-    @AppStorage("omiAICumulativeCostUsd") var omiAICumulativeCostUsd: Double = 0.0
-    /// Set to true when the $50 Omi account usage threshold is reached, triggering an alert.
-    @Published var showOmiThresholdAlert = false
+    @AppStorage("fazmAICumulativeCostUsd") var fazmAICumulativeCostUsd: Double = 0.0
+    /// Set to true when the $50 Fazm account usage threshold is reached, triggering an alert.
+    @Published var showFazmThresholdAlert = false
 
     private let messagesPageSize = 50
     private let maxMessagesInMemory = 200
@@ -602,12 +606,12 @@ A screenshot may be attached — use it silently only if relevant. Never mention
         }
     }
 
-    /// Switch between bridge modes (Omi AI vs user's Claude account)
+    /// Switch between bridge modes (Fazm AI vs user's Claude account)
     func switchBridgeMode(to mode: BridgeMode) async {
         // Compare against the actual running bridge state, not bridgeMode (@AppStorage updates
         // immediately when the Picker changes, so bridgeMode already equals `mode` by the time
         // this function is called — the old string comparison always exits early).
-        guard (mode == .omiAI) != acpBridge.passApiKey else { return }
+        guard (mode == .fazmAI) != acpBridge.passApiKey else { return }
         let oldMode = bridgeMode
         log("ChatProvider: Switching bridge mode from \(bridgeMode) to \(mode.rawValue)")
 
@@ -617,7 +621,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
 
         // Switch mode and recreate bridge with appropriate passApiKey
         bridgeMode = mode.rawValue
-        acpBridge = ACPBridge(passApiKey: mode == .omiAI)
+        acpBridge = ACPBridge(passApiKey: mode == .fazmAI)
         AnalyticsManager.shared.chatBridgeModeChanged(from: oldMode, to: mode.rawValue)
 
         // Check Claude connection status when switching to user's Claude account
@@ -713,8 +717,8 @@ A screenshot may be attached — use it silently only if relevant. Never mention
         // 4. Update state
         isClaudeConnected = false
 
-        // 5. Switch back to Omi AI mode and recreate bridge with API key
-        bridgeMode = BridgeMode.omiAI.rawValue
+        // 5. Switch back to Fazm AI mode and recreate bridge with API key
+        bridgeMode = BridgeMode.fazmAI.rawValue
         acpBridge = ACPBridge(passApiKey: true)
     }
 
@@ -1148,7 +1152,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
 
     /// Formats raw DDL into a compact, LLM-friendly schema block
     private func formatSchema(tables: [(name: String, sql: String)]) -> String {
-        var lines: [String] = ["**Database schema (omi.db):**", ""]
+        var lines: [String] = ["**Database schema (fazm.db):**", ""]
 
         for (name, sql) in tables {
             // Skip internal/FTS tables
@@ -1378,18 +1382,18 @@ A screenshot may be attached — use it silently only if relevant. Never mention
 
     /// Initialize chat: fetch sessions and load messages
     func initialize() async {
-        // Seed cumulative Omi AI cost from backend now that auth is ready (background, no latency)
+        // Seed cumulative Fazm AI cost from backend now that auth is ready (background, no latency)
         Task.detached(priority: .background) { [weak self] in
             guard let serverCost = await APIClient.shared.fetchTotalOmiAICost() else { return }
             guard let self else { return }
             await MainActor.run {
                 // Always trust the server value — it's the authoritative total
-                self.omiAICumulativeCostUsd = serverCost
-                log("ChatProvider: Seeded Omi AI cumulative cost from backend: $\(String(format: "%.4f", serverCost))")
+                self.fazmAICumulativeCostUsd = serverCost
+                log("ChatProvider: Seeded Fazm AI cumulative cost from backend: $\(String(format: "%.4f", serverCost))")
                 // Auto-switch if already over threshold on startup
-                if self.bridgeMode == BridgeMode.omiAI.rawValue && serverCost >= 50.0 {
-                    log("ChatProvider: Omi AI cost already at $\(String(format: "%.2f", serverCost)) on startup — switching to user Claude account")
-                    self.showOmiThresholdAlert = true
+                if self.bridgeMode == BridgeMode.fazmAI.rawValue && serverCost >= 50.0 {
+                    log("ChatProvider: Fazm AI cost already at $\(String(format: "%.2f", serverCost)) on startup — switching to user Claude account")
+                    self.showFazmThresholdAlert = true
                     Task { await self.switchBridgeMode(to: .userClaude) }
                 }
             }
@@ -1750,6 +1754,14 @@ A screenshot may be attached — use it silently only if relevant. Never mention
         // Result flows back normally through the bridge with partial text
     }
 
+    /// Re-send the message that was interrupted by browser extension setup.
+    func retryPendingMessage() {
+        guard let text = pendingRetryMessage else { return }
+        pendingRetryMessage = nil
+        log("ChatProvider: Retrying pending message after browser extension setup")
+        Task { await sendMessage(text) }
+    }
+
     /// Send a follow-up message while the agent is still running.
     /// Interrupts the current query and chains a new one with full context.
     func sendFollowUp(_ text: String) async {
@@ -1821,9 +1833,9 @@ A screenshot may be attached — use it silently only if relevant. Never mention
             return
         }
 
-        // Guard: Block query if Omi account $50 usage threshold already reached
-        if bridgeMode == BridgeMode.omiAI.rawValue && omiAICumulativeCostUsd >= 50.0 {
-            showOmiThresholdAlert = true
+        // Guard: Block query if Fazm account $50 usage threshold already reached
+        if bridgeMode == BridgeMode.fazmAI.rawValue && fazmAICumulativeCostUsd >= 50.0 {
+            showFazmThresholdAlert = true
             Task { await self.switchBridgeMode(to: .userClaude) }
             return
         }
@@ -1846,6 +1858,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
 
         isSending = true
         errorMessage = nil
+        pendingRetryMessage = trimmedText
 
         // Save user message to backend and add to UI.
         // (skip for follow-ups — sendFollowUp already did both)
@@ -1941,7 +1954,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
             let toolCallHandler: ACPBridge.ToolCallHandler = { callId, name, input in
                 let toolCall = ToolCall(name: name, arguments: input, thoughtSignature: nil)
                 let result = await ChatToolExecutor.execute(toolCall)
-                log("OMI tool \(name) executed for callId=\(callId)")
+                log("Fazm tool \(name) executed for callId=\(callId)")
                 return result
             }
             let toolActivityHandler: ACPBridge.ToolActivityHandler = { [weak self] name, status, toolUseId, input in
@@ -1965,7 +1978,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                                 // Bring the app to the foreground so the setup sheet is visible
                                 // (the failed browser attempt may have opened Chrome, stealing focus)
                                 NSApp.activate(ignoringOtherApps: true)
-                                for window in NSApp.windows where window.title.hasPrefix("Omi") {
+                                for window in NSApp.windows where window.title.hasPrefix("Fazm") {
                                     window.makeKeyAndOrderFront(nil)
                                 }
                             }
@@ -2052,6 +2065,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
             // backend copy into the local message rather than appending a duplicate.
             isSending = false
             isStopping = false
+            pendingRetryMessage = nil  // Successful completion — no retry needed
 
             // Save AI response to backend. aiMessageId is captured above so we can
             // locate the right message even if the user has started a new query by
@@ -2108,8 +2122,8 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                 messageLength: responseLength
             )
 
-            let isOmiMode = bridgeMode == BridgeMode.omiAI.rawValue
-            let accountType = isOmiMode ? "omi" : "personal"
+            let isFazmMode = bridgeMode == BridgeMode.fazmAI.rawValue
+            let accountType = isFazmMode ? "fazm" : "personal"
             let r = queryResult
             Task.detached(priority: .background) {
                 await APIClient.shared.recordLlmUsage(
@@ -2122,12 +2136,12 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                     account: accountType
                 )
             }
-            if isOmiMode {
+            if isFazmMode {
                 sessionTokensUsed += queryResult.inputTokens + queryResult.outputTokens
-                omiAICumulativeCostUsd += queryResult.costUsd
-                // Auto-switch to the user's Claude account when the $50 Omi usage threshold is reached
-                if omiAICumulativeCostUsd >= 50.0 {
-                    showOmiThresholdAlert = true
+                fazmAICumulativeCostUsd += queryResult.costUsd
+                // Auto-switch to the user's Claude account when the $50 Fazm usage threshold is reached
+                if fazmAICumulativeCostUsd >= 50.0 {
+                    showFazmThresholdAlert = true
                     Task { await self.switchBridgeMode(to: .userClaude) }
                 }
             }

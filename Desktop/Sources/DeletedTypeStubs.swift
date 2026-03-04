@@ -9,6 +9,22 @@ import AVFoundation
 
 // MARK: - Audio & Transcription
 
+/// Speaker segment for diarized transcription
+struct SpeakerSegment: Identifiable {
+    var id: String { "\(speaker)-\(start)" }
+    var speaker: Int
+    var text: String
+    var start: Double
+    var end: Double
+}
+
+/// Result of finalizing a conversation
+enum FinishConversationResult {
+    case saved
+    case discarded
+    case error(String)
+}
+
 enum AudioSource: String {
     case microphone
     case bleDevice
@@ -238,9 +254,9 @@ struct TaskActionItem: Identifiable, Codable, Equatable {
     var dueAt: Date?
 }
 
-// MARK: - OmiApp Model (Chat apps)
+// MARK: - InstalledApp Model (Chat apps)
 
-struct OmiApp: Identifiable, Codable, Equatable {
+struct InstalledApp: Identifiable, Codable, Equatable {
     var id: String
     var name: String
     var image: String
@@ -409,7 +425,7 @@ class ScreenCaptureService {
         process.waitUntilExit()
     }
     static func resetScreenCapturePermission() -> Bool {
-        let bundleId = Bundle.main.bundleIdentifier ?? "com.omi.computer-macos"
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.fazm.app"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
         process.arguments = ["reset", "ScreenCapture", bundleId]
@@ -902,7 +918,7 @@ class TaskChatCoordinator: ObservableObject {
 
 @MainActor
 class AppProvider: ObservableObject {
-    @Published var chatApps: [OmiApp] = []
+    @Published var chatApps: [InstalledApp] = []
     func fetchApps() async {}
 }
 
@@ -1217,5 +1233,4 @@ struct UserStats {
     var memoriesTotal: Int = 0
 }
 
-// OmiDeviceImage is defined in SidebarView.swift
 // LaunchAtLoginManager is defined in LaunchAtLoginManager.swift
