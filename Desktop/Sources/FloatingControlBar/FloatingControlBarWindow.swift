@@ -670,6 +670,10 @@ class FloatingControlBarManager {
     private var durationCancellable: AnyCancellable?
     private var chatCancellable: AnyCancellable?
     private var chatProvider: ChatProvider?
+    private var workspaceObserver: Any?
+
+    /// PID of the last active app before Fazm. Used to capture that app's window for screenshots.
+    private(set) var lastActiveAppPID: pid_t = 0
 
     /// Whether the user has enabled the Ask Fazm bar (persisted across launches).
     /// Defaults to true for new users.
@@ -686,7 +690,23 @@ class FloatingControlBarManager {
         }
     }
 
-    private init() {}
+    private init() {
+        // Track the last active app (before Fazm) so we can screenshot its window
+        workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
+            self?.lastActiveAppPID = app.processIdentifier
+        }
+        // Initialize with current frontmost app if it's not us
+        if let frontApp = NSWorkspace.shared.frontmostApplication,
+           frontApp.bundleIdentifier != Bundle.main.bundleIdentifier {
+            lastActiveAppPID = frontApp.processIdentifier
+        }
+    }
 
     /// Create the floating bar window and wire up AppState bindings.
     func setup(appState: AppState, chatProvider: ChatProvider) {
@@ -922,11 +942,18 @@ class FloatingControlBarManager {
     // MARK: - AI Query
 
     private func sendAIQuery(_ message: String, barWindow: FloatingControlBarWindow, provider: ChatProvider) async {
-        // Hide the bar, capture a clean screenshot, then restore — same path for both typed and PTT
+        // Capture the last active app's window (not the full desktop)
+        let targetPID = self.lastActiveAppPID
         barWindow.orderOut(nil)
         try? await Task.sleep(nanoseconds: 150_000_000) // 150ms for window to disappear
         let screenshotData = await Task.detached { () -> Data? in
-            guard let url = ScreenCaptureManager.captureScreen() else { return nil }
+            let url: URL?
+            if targetPID != 0 {
+                url = ScreenCaptureManager.captureAppWindow(pid: targetPID)
+            } else {
+                url = ScreenCaptureManager.captureScreen()
+            }
+            guard let url else { return nil }
             return try? Data(contentsOf: url)
         }.value
         barWindow.makeKeyAndOrderFront(nil)
