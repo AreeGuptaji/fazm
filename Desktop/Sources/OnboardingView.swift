@@ -7,13 +7,10 @@ struct OnboardingView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var chatProvider: ChatProvider
     var onComplete: (() -> Void)? = nil
-    @AppStorage("onboardingStep") private var currentStep = 0
     @StateObject private var graphViewModel = MemoryGraphViewModel()
     @State private var graphHasData = false
     @State private var showGraphHints = false
     @State private var hintsHovered = false
-
-    let steps = ["Video", "Chat"]
 
     var body: some View {
         ZStack {
@@ -42,60 +39,20 @@ struct OnboardingView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            // If currentStep is beyond the new 2-step flow (e.g. user was on old step 3+),
-            // clamp to step 1 (chat) so they don't get stuck
-            if currentStep > 1 {
-                currentStep = 1
-            }
-        }
         .task {
-            // Pre-warm the ACP bridge while the user watches the intro video.
-            // Without this, the first chat message waits 4-6s for the Node.js
-            // bridge to cold-start. By starting it here, it's ready by the time
-            // the user clicks "Continue" and reaches the chat step.
             await chatProvider.warmupBridge()
         }
     }
 
     private var onboardingContent: some View {
-        Group {
-            if currentStep == 0 {
-                // Step 0: Full-window video
-                ZStack {
-                    OnboardingVideoView()
-                        .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                        .frame(maxWidth: 960)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-
-                    VStack {
-                        Spacer()
-                        Button(action: {
-                            AnalyticsManager.shared.onboardingStepCompleted(step: 0, stepName: "Video")
-                            currentStep = 1
-                        }) {
-                            Text("Continue")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: 220)
-                                .padding(.vertical, 12)
-                                .background(FazmColors.purplePrimary)
-                                .cornerRadius(12)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.bottom, 32)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                // Step 1: Interactive AI Chat + Live Knowledge Graph
-                HStack(spacing: 0) {
+        // Interactive AI Chat + Live Knowledge Graph
+        HStack(spacing: 0) {
                     OnboardingChatView(
                         appState: appState,
                         chatProvider: chatProvider,
                         graphViewModel: graphViewModel,
                         onComplete: {
-                            AnalyticsManager.shared.onboardingStepCompleted(step: 1, stepName: "Chat")
+                            AnalyticsManager.shared.onboardingStepCompleted(step: 0, stepName: "Chat")
                             if let onComplete = onComplete {
                                 onComplete()
                             }
@@ -159,8 +116,6 @@ struct OnboardingView: View {
                         }
                     }
                 }
-            }
-        }
     }
 
     private func graphHintItem(icon: String, label: String) -> some View {
@@ -183,7 +138,7 @@ struct OnboardingView: View {
     /// Skip onboarding — complete with minimal setup
     private func handleSkip() {
         log("OnboardingView: User skipped onboarding chat")
-        AnalyticsManager.shared.onboardingStepCompleted(step: 1, stepName: "Chat_Skipped")
+        AnalyticsManager.shared.onboardingStepCompleted(step: 0, stepName: "Chat_Skipped")
         AnalyticsManager.shared.onboardingCompleted()
 
         // Stop the AI if it's still running
