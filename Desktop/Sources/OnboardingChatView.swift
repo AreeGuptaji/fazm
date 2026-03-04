@@ -69,86 +69,22 @@ enum OnboardingChatPersistence {
 
     // MARK: - Message Persistence (SQLite)
 
-    private static let onboardingTaskId = "__onboarding__"
+    private static let context = "__onboarding__"
 
-    /// Save a chat message to the local database
     static func saveMessage(_ message: ChatMessage) async {
-        guard let dbQueue = await RewindDatabase.shared.getDatabaseQueue() else { return }
-        let sender = message.sender == .user ? "user" : "ai"
-        let now = Date()
-        do {
-            try await dbQueue.write { db in
-                try db.execute(
-                    sql: """
-                        INSERT OR REPLACE INTO task_chat_messages
-                        (taskId, messageId, sender, messageText, createdAt, updatedAt, backendSynced)
-                        VALUES (?, ?, ?, ?, ?, ?, 0)
-                    """,
-                    arguments: [onboardingTaskId, message.id, sender, message.text, message.createdAt, now]
-                )
-            }
-        } catch {
-            log("OnboardingChatPersistence: Failed to save message: \(error)")
-        }
+        await ChatMessageStore.saveMessage(message, context: context)
     }
 
-    /// Update a previously saved AI message with its final text
     static func updateMessage(id: String, text: String) async {
-        guard let dbQueue = await RewindDatabase.shared.getDatabaseQueue() else { return }
-        do {
-            try await dbQueue.write { db in
-                try db.execute(
-                    sql: "UPDATE task_chat_messages SET messageText = ?, updatedAt = ? WHERE messageId = ?",
-                    arguments: [text, Date(), id]
-                )
-            }
-        } catch {
-            log("OnboardingChatPersistence: Failed to update message: \(error)")
-        }
+        await ChatMessageStore.updateMessage(id: id, text: text)
     }
 
-    /// Load all onboarding messages from the local database
     static func loadMessages() async -> [ChatMessage] {
-        guard let dbQueue = await RewindDatabase.shared.getDatabaseQueue() else { return [] }
-        do {
-            return try await dbQueue.read { db in
-                let rows = try Row.fetchAll(db, sql: """
-                    SELECT messageId, sender, messageText, createdAt
-                    FROM task_chat_messages
-                    WHERE taskId = ?
-                    ORDER BY createdAt ASC
-                """, arguments: [onboardingTaskId])
-
-                return rows.map { row in
-                    ChatMessage(
-                        id: row["messageId"],
-                        text: row["messageText"],
-                        createdAt: row["createdAt"],
-                        sender: (row["sender"] as String) == "user" ? .user : .ai,
-                        isStreaming: false,
-                        isSynced: true
-                    )
-                }
-            }
-        } catch {
-            log("OnboardingChatPersistence: Failed to load messages: \(error)")
-            return []
-        }
+        await ChatMessageStore.loadMessages(context: context)
     }
 
-    /// Delete all onboarding messages from the local database
     static func clearMessages() async {
-        guard let dbQueue = await RewindDatabase.shared.getDatabaseQueue() else { return }
-        do {
-            try await dbQueue.write { db in
-                try db.execute(
-                    sql: "DELETE FROM task_chat_messages WHERE taskId = ?",
-                    arguments: [onboardingTaskId]
-                )
-            }
-        } catch {
-            log("OnboardingChatPersistence: Failed to clear messages: \(error)")
-        }
+        await ChatMessageStore.clearMessages(context: context)
     }
 
     /// Clear all persisted onboarding data
