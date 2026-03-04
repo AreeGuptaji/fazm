@@ -3,7 +3,8 @@
     "Fixed focus time tracking to show actual minutes instead of counting each session as 1 minute",
     "Focus assistant now uses your goals, tasks, and memories for smarter distraction detection",
     "Added Focus Analysis Test Runner for validating focus detection prompts",
-    "Added interactive tutorial after onboarding that teaches Right \u2318 push-to-talk"
+    "Added interactive tutorial after onboarding that teaches Right \u2318 push-to-talk",
+    "After onboarding, the main window closes and only the floating bar with tutorial is shown"
   ],
   "releases": [
     {

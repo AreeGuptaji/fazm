@@ -43,6 +43,23 @@ struct DesktopHomeView: View {
                         if let barState = FloatingControlBarManager.shared.barState {
                             PushToTalkManager.shared.setup(barState: barState)
                         }
+
+                        // After onboarding, close the main window — just show floating bar + tutorial
+                        if UserDefaults.standard.bool(forKey: "onboardingJustCompleted") {
+                            UserDefaults.standard.set(false, forKey: "onboardingJustCompleted")
+                            log("DesktopHomeView: Post-onboarding — closing main window, showing floating bar only")
+                            // Ensure floating bar is visible post-onboarding
+                            if !FloatingControlBarManager.shared.isEnabled {
+                                FloatingControlBarManager.shared.show()
+                            }
+                            DispatchQueue.main.async {
+                                for window in NSApp.windows {
+                                    if window.title.hasPrefix("Fazm") {
+                                        window.orderOut(nil)
+                                    }
+                                }
+                            }
+                        }
                     }
                     .task {
                         await viewModelContainer.loadAllData()
