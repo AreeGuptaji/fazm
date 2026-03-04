@@ -140,7 +140,7 @@ class ShortcutSettings: ObservableObject {
            let key = PTTKey(rawValue: saved) {
             self.pttKey = key
         } else {
-            self.pttKey = .option
+            self.pttKey = .rightCommand
         }
         if let saved = UserDefaults.standard.string(forKey: "shortcut_askFazmKey"),
            let key = AskFazmKey(rawValue: saved) {
