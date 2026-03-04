@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Overlay shown on the floating bar when PTT finishes with no speech detected.
-/// Displays a mic picker so the user can switch to a working input device.
+/// Overlay shown when PTT finishes with no speech detected.
+/// Displays a mic picker and live audio level so the user can verify their mic works.
 struct SilenceOverlayView: View {
-    @EnvironmentObject var state: FloatingControlBarState
     @ObservedObject private var deviceManager = AudioDeviceManager.shared
+    var onDismiss: () -> Void
 
     var body: some View {
         VStack(spacing: 10) {
@@ -12,12 +12,12 @@ struct SilenceOverlayView: View {
                 Image(systemName: "mic.slash.fill")
                     .foregroundColor(.orange)
                     .font(.system(size: 13))
-                Text("No speech detected")
-                    .scaledFont(size: 13, weight: .medium)
+                Text("Didn't catch that — try a different mic?")
+                    .scaledFont(size: 12, weight: .medium)
                     .foregroundColor(.white)
                 Spacer()
                 Button {
-                    state.dismissSilenceOverlay()
+                    onDismiss()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .semibold))
@@ -43,6 +43,9 @@ struct SilenceOverlayView: View {
                 .tint(.white)
                 .scaledFont(size: 12)
             }
+
+            AudioLevelBarsSettingsView(level: deviceManager.currentAudioLevel)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
         .background(
@@ -54,5 +57,7 @@ struct SilenceOverlayView: View {
                 )
         )
         .padding(8)
+        .onAppear { deviceManager.startLevelMonitoring() }
+        .onDisappear { deviceManager.stopLevelMonitoring() }
     }
 }

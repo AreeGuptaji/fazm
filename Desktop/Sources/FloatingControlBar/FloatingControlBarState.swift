@@ -61,6 +61,11 @@ class FloatingControlBarState: NSObject, ObservableObject {
     func showSilenceOverlay() {
         silenceOverlayDismissWork?.cancel()
         isSilenceOverlayVisible = true
+
+        if let barFrame = FloatingControlBarManager.shared.barWindowFrame {
+            SilenceOverlayWindow.shared.show(below: barFrame)
+        }
+
         let work = DispatchWorkItem { [weak self] in
             Task { @MainActor in
                 self?.dismissSilenceOverlay()
@@ -74,6 +79,7 @@ class FloatingControlBarState: NSObject, ObservableObject {
         silenceOverlayDismissWork?.cancel()
         silenceOverlayDismissWork = nil
         isSilenceOverlayVisible = false
+        SilenceOverlayWindow.shared.dismiss()
     }
 
     // Model selection
