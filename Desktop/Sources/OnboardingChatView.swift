@@ -895,6 +895,13 @@ struct OnboardingChatView: View {
                             }
                         }
                     },
+                    onTextBlockBoundary: { @Sendable in
+                        Task { @MainActor in
+                            if !explorationText.isEmpty && !explorationText.hasSuffix("\n\n") {
+                                explorationText += explorationText.hasSuffix("\n") ? "\n" : "\n\n"
+                            }
+                        }
+                    },
                     onToolCall: { @Sendable _, name, input in
                         let toolCall = ToolCall(name: name, arguments: input, thoughtSignature: nil)
                         let result = await ChatToolExecutor.execute(toolCall)
