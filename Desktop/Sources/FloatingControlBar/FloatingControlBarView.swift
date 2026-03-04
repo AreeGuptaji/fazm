@@ -200,16 +200,16 @@ struct FloatingControlBarView: View {
 
     private var voiceListeningView: some View {
         HStack(spacing: 8) {
-            // Pulsing mic icon
-            Circle()
-                .fill(Color.red)
-                .frame(width: 10, height: 10)
-                .scaleEffect(state.isVoiceListening ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: state.isVoiceListening)
-
-            Image(systemName: "mic.fill")
-                .scaledFont(size: 14, weight: .semibold)
-                .foregroundColor(.white)
+            // Animated audio level bars
+            AudioLevelBarsView(
+                level: state.voiceAudioLevel,
+                barCount: 5,
+                barWidth: 3,
+                spacing: 2,
+                maxHeight: 20,
+                minHeight: 3,
+                color: .white
+            )
 
             if state.isVoiceLocked {
                 Text("LOCKED")

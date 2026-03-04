@@ -118,6 +118,7 @@ struct SettingsContentView: View {
 
     // Launch at login manager
     @ObservedObject private var launchAtLoginManager = LaunchAtLoginManager.shared
+    @ObservedObject private var audioDeviceManager = AudioDeviceManager.shared
 
     enum SettingsSection: String, CaseIterable {
         case general = "General"
@@ -305,6 +306,52 @@ struct SettingsContentView: View {
                     }
                 }
             }
+
+            // Microphone
+            settingsCard(settingId: "general.microphone") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mic.fill")
+                            .scaledFont(size: 16, weight: .medium)
+                            .foregroundColor(FazmColors.purplePrimary)
+                            .frame(width: 12)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Microphone")
+                                .scaledFont(size: 16, weight: .semibold)
+                                .foregroundColor(FazmColors.textPrimary)
+                            Text("Select which microphone to use for Push to Talk.")
+                                .scaledFont(size: 13)
+                                .foregroundColor(FazmColors.textTertiary)
+                        }
+
+                        Spacer()
+                    }
+
+                    Picker("", selection: Binding(
+                        get: { audioDeviceManager.selectedDeviceUID ?? "" },
+                        set: { audioDeviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
+                    )) {
+                        Text("System Default")
+                            .tag("")
+                        ForEach(audioDeviceManager.devices) { device in
+                            Text(device.name + (device.isDefault ? " (Default)" : ""))
+                                .tag(device.uid)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Input Level")
+                            .scaledFont(size: 12)
+                            .foregroundColor(FazmColors.textTertiary)
+                        AudioLevelBarsSettingsView(level: audioDeviceManager.currentAudioLevel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .onAppear { audioDeviceManager.startLevelMonitoring() }
+            .onDisappear { audioDeviceManager.stopLevelMonitoring() }
 
         }
     }

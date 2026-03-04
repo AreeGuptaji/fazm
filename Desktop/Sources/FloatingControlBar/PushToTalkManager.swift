@@ -490,7 +490,11 @@ class PushToTalkManager: ObservableObject {
               self.transcriptionService?.sendAudio(audioData)
             }
           },
-          onAudioLevel: { _ in }
+          onAudioLevel: { [weak self] level in
+            Task { @MainActor in
+              self?.barState?.voiceAudioLevel = level
+            }
+          }
         )
         log("PushToTalkManager: mic capture started (batch=\(batchMode))")
       } catch {
@@ -551,6 +555,7 @@ class PushToTalkManager: ObservableObject {
     barState.isVoiceLocked = (state == .lockedListening)
     if state == .idle {
       barState.voiceTranscript = ""
+      barState.voiceAudioLevel = 0.0
     }
 
     // Skip resize when in follow-up mode or expanded AI conversation (already at full size)
