@@ -598,7 +598,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
 
         // Open app item
-        let openItem = NSMenuItem(title: "Open \(displayName)", action: #selector(openFazmFromMenu), keyEquivalent: "o")
+        let openItem = NSMenuItem(title: "Open Settings", action: #selector(openFazmFromMenu), keyEquivalent: "o")
         openItem.target = self
         menu.addItem(openItem)
 

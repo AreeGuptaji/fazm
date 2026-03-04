@@ -42,7 +42,6 @@ struct DesktopHomeView: View {
                         // Set up push-to-talk voice input
                         if let barState = FloatingControlBarManager.shared.barState {
                             PushToTalkManager.shared.setup(barState: barState)
-                            PostOnboardingTutorialManager.shared.showIfNeeded(barState: barState)
                         }
                     }
                     .task {

@@ -789,6 +789,11 @@ class FloatingControlBarManager {
         window?.makeKeyAndOrderFront(nil)
         log("FloatingControlBarManager: show() done, frame=\(window?.frame ?? .zero)")
 
+        // Show post-onboarding tutorial if needed
+        if let barState = self.barState {
+            PostOnboardingTutorialManager.shared.showIfNeeded(barState: barState)
+        }
+
         // Auto-focus input if AI conversation is open
         if let window = window, window.state.showingAIConversation && !window.state.showingAIResponse {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
