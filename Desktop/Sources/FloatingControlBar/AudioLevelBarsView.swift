@@ -30,7 +30,7 @@ struct AudioLevelBarsView: View {
         // Each bar gets a different multiplier for organic look
         let offsets: [Float] = [0.7, 1.0, 0.85, 0.95, 0.75, 0.9, 0.8, 0.65]
         let offset = offsets[index % offsets.count]
-        let scaled = CGFloat(min(1.0, level * offset * 2.5))
+        let scaled = CGFloat(min(1.0, level * offset * 1.4))
         return max(minHeight, scaled * maxHeight)
     }
 

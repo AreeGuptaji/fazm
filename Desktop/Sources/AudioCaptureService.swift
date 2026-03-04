@@ -475,11 +475,16 @@ class AudioCaptureService: @unchecked Sendable {
             // Apply soft noise floor - subtract noise but don't hard cutoff
             let cleanedRms = max(0.0, rms - noiseFloor)
 
+            // Apply perceptual scaling - raw RMS from normal speech is very low (~0.02-0.05),
+            // so we boost with gain + power curve to make the meter more responsive.
+            // pow(x, 0.5) expands quiet signals, gain of 3x shifts the range up.
+            let perceptualLevel = min(Float(1.0), pow(cleanedRms * 3.0, 0.5))
+
             // Smoothing: if current level is higher, jump to it; if lower, decay gradually
             // This matches how system audio naturally behaves and feels more responsive
-            if cleanedRms > smoothedLevel {
+            if perceptualLevel > smoothedLevel {
                 // Rising: follow immediately for responsiveness
-                smoothedLevel = cleanedRms
+                smoothedLevel = perceptualLevel
             } else {
                 // Falling: decay gradually for smooth animation
                 smoothedLevel = smoothedLevel * decayRate

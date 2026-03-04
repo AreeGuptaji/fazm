@@ -990,6 +990,11 @@ class FloatingControlBarManager {
         window?.resizeForPTTState(expanded: expanded)
     }
 
+    /// Close the AI conversation panel (used by PTT when no transcript was captured).
+    func closeAIConversation() {
+        window?.closeAIConversation()
+    }
+
     // MARK: - AI Query
 
     private func sendAIQuery(_ message: String, barWindow: FloatingControlBarWindow, provider: ChatProvider) async {

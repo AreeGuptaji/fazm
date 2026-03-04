@@ -45,6 +45,9 @@ class PushToTalkManager: ObservableObject {
   private var batchAudioBuffer = Data()
   private let batchAudioLock = NSLock()
 
+  // Tracks whether PTT opened the chat panel (so we sync transcript to aiInputText)
+  private var pttOpenedChat: Bool = false
+
   // Live mode: timeout for waiting on final transcript after CloseStream
   private var liveFinalizationTimeout: DispatchWorkItem?
 
@@ -211,12 +214,24 @@ class PushToTalkManager: ObservableObject {
       barState?.voiceFollowUpTranscript = ""
     }
 
+    // If the chat panel isn't open yet, open it immediately so PTT
+    // behaves the same whether the chat was already open or not.
+    if !isFollowUp && barState?.showingAIConversation != true {
+      pttOpenedChat = true
+      FloatingControlBarManager.shared.openAIInput()
+    } else if !isFollowUp {
+      // Chat is showing input (not response) — just track that we're syncing to it
+      pttOpenedChat = true
+    } else {
+      pttOpenedChat = false
+    }
+
     AnalyticsManager.shared.floatingBarPTTStarted(mode: isFollowUp ? "follow_up_hold" : "hold")
     updateBarState()
 
 
     startAudioTranscription()
-    log("PushToTalkManager: started listening (hold mode, followUp=\(isFollowUp))")
+    log("PushToTalkManager: started listening (hold mode, followUp=\(isFollowUp), openedChat=\(pttOpenedChat))")
   }
 
   private func enterLockedListening() {
@@ -238,6 +253,16 @@ class PushToTalkManager: ObservableObject {
       barState?.voiceFollowUpTranscript = ""
     }
 
+    // If the chat panel isn't open yet, open it immediately
+    if !isFollowUp && barState?.showingAIConversation != true {
+      pttOpenedChat = true
+      FloatingControlBarManager.shared.openAIInput()
+    } else if !isFollowUp {
+      pttOpenedChat = true
+    } else {
+      pttOpenedChat = false
+    }
+
     AnalyticsManager.shared.floatingBarPTTStarted(mode: isFollowUp ? "follow_up_locked" : "locked")
 
     // If we were already listening from the first tap, keep going.
@@ -251,7 +276,7 @@ class PushToTalkManager: ObservableObject {
     }
 
     updateBarState()
-    log("PushToTalkManager: entered locked listening mode (followUp=\(isFollowUp))")
+    log("PushToTalkManager: entered locked listening mode (followUp=\(isFollowUp), openedChat=\(pttOpenedChat))")
   }
 
   private func stopListening() {
@@ -263,6 +288,7 @@ class PushToTalkManager: ObservableObject {
     state = .idle
     transcriptSegments = []
     lastInterimText = ""
+    pttOpenedChat = false
     batchAudioLock.lock()
     batchAudioBuffer = Data()
     batchAudioLock.unlock()
@@ -375,16 +401,23 @@ class PushToTalkManager: ObservableObject {
     barState?.isVoiceFollowUp = false
     barState?.voiceFollowUpTranscript = ""
 
+    let wasPttOpenedChat = pttOpenedChat
+
     // Reset state — skip PTT collapse resize when we have a query,
     // because openAIInputWithQuery will resize to the correct size.
-    // Also skip resize when in follow-up mode (panel is already at response size).
+    // Also skip resize when in follow-up mode or PTT opened chat (panel is already at chat size).
     state = .idle
     transcriptSegments = []
     lastInterimText = ""
-    updateBarState(skipResize: hasQuery || wasFollowUp)
+    updateBarState(skipResize: hasQuery || wasFollowUp || wasPttOpenedChat)
 
     guard hasQuery else {
       log("PushToTalkManager: no transcript to send")
+      if wasPttOpenedChat {
+        // PTT opened the chat but no transcript — close it
+        pttOpenedChat = false
+        FloatingControlBarManager.shared.closeAIConversation()
+      }
       barState?.showSilenceOverlay()
       return
     }
@@ -392,6 +425,11 @@ class PushToTalkManager: ObservableObject {
     if wasFollowUp {
       log("PushToTalkManager: inserting follow-up transcription (\(query.count) chars): \(query)")
       FloatingControlBarManager.shared.sendFollowUpQuery(query)
+    } else if pttOpenedChat {
+      // PTT already opened the chat and synced live transcript — just finalize the text
+      log("PushToTalkManager: finalizing PTT transcript in open chat (\(query.count) chars): \(query)")
+      barState?.aiInputText = query
+      pttOpenedChat = false
     } else {
       log("PushToTalkManager: inserting transcription into input (\(query.count) chars): \(query)")
       FloatingControlBarManager.shared.openAIInputWithQuery(query)
@@ -531,9 +569,12 @@ class PushToTalkManager: ObservableObject {
     }
     barState?.voiceTranscript = liveText
 
-    // Also update follow-up transcript if in follow-up mode
+    // Sync live transcript to the appropriate input field
     if barState?.isVoiceFollowUp == true {
       barState?.voiceFollowUpTranscript = liveText
+    } else if pttOpenedChat {
+      // PTT opened the chat — sync live transcript directly into the input field
+      barState?.aiInputText = liveText
     }
 
     // In finalizing state, a final segment means Deepgram is done — send immediately
@@ -558,8 +599,8 @@ class PushToTalkManager: ObservableObject {
       barState.voiceAudioLevel = 0.0
     }
 
-    // Skip resize when in follow-up mode or expanded AI conversation (already at full size)
-    guard !skipResize && !barState.isVoiceFollowUp && !barState.showingAIConversation else { return }
+    // Skip resize when PTT opened the chat, in follow-up mode, or expanded AI conversation
+    guard !skipResize && !pttOpenedChat && !barState.isVoiceFollowUp && !barState.showingAIConversation else { return }
     if barState.isVoiceListening && !wasListening {
       FloatingControlBarManager.shared.resizeForPTT(expanded: true)
     } else if !barState.isVoiceListening && wasListening {
