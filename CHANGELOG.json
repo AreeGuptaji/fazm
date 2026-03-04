@@ -9,7 +9,8 @@
     "Fixed floating bar chat not closing when clicking outside the app",
     "Push-to-Talk now opens the chat panel immediately, showing live transcription in the input field",
     "Chat messages from Ask Fazm floating bar are now persisted locally",
-    "Fixed silence overlay being clipped inside the floating bar \u2014 now appears as a separate panel with live audio level meter"
+    "Fixed silence overlay being clipped inside the floating bar \u2014 now appears as a separate panel with live audio level meter",
+    "Removed unnecessary System Audio and Bluetooth permission requests"
   ],
   "releases": [
     {
