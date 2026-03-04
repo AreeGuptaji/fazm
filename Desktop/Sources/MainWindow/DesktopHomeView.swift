@@ -79,7 +79,8 @@ struct DesktopHomeView: View {
             BrowserExtensionSetup(
                 onComplete: {
                     showBrowserExtensionSetup = false
-                    viewModelContainer.chatProvider.retryPendingMessage()
+                    // Route retry through the floating bar so it re-expands and wires up streaming
+                    FloatingControlBarManager.shared.retryPendingQuery()
                 },
                 onDismiss: { showBrowserExtensionSetup = false },
                 chatProvider: viewModelContainer.chatProvider
