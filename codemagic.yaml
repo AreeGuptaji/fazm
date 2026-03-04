@@ -10,9 +10,8 @@ workflows:
   #   appstore_credentials:
   #     APP_STORE_CONNECT_PRIVATE_KEY, APP_STORE_CONNECT_KEY_IDENTIFIER,
   #     APP_STORE_CONNECT_ISSUER_ID (for notarization)
-  #     MACOS_DEVELOPER_ID_P12 — base64 .p12 (Developer ID Application: Based Hardware INC 9536L8KLMP)
+  #     MACOS_DEVELOPER_ID_P12 — base64 .p12 (Developer ID Application: Matthew Diakonov S6DP5HF77G)
   #     MACOS_DEVELOPER_ID_P12_PASSWORD
-  #     MACOS_DEVELOPER_ID_PROFILE — base64 provisioning profile
   #
   #   fazm_secrets:
   #     SPARKLE_PRIVATE_KEY             — EdDSA private key for Sparkle auto-update signing
@@ -85,17 +84,6 @@ workflows:
           fi
           echo "SIGN_IDENTITY=$SIGN_IDENTITY" >> $CM_ENV
           echo "Found signing identity: $SIGN_IDENTITY"
-
-      - name: Install provisioning profile
-        script: |
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          echo "$MACOS_DEVELOPER_ID_PROFILE" | base64 --decode > /tmp/developer_id.provisionprofile
-          cp /tmp/developer_id.provisionprofile Desktop/embedded.provisionprofile
-          security cms -D -i /tmp/developer_id.provisionprofile > /tmp/profile.plist
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist)
-          cp /tmp/developer_id.provisionprofile \
-            "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.provisionprofile"
-          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
 
       - name: Build acp-bridge (TypeScript → JavaScript)
         script: |
@@ -277,10 +265,6 @@ workflows:
             "$APP_BUNDLE/Contents/Info.plist"
 
           printf "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
-
-          # Embed provisioning profile
-          [ -f "Desktop/embedded.provisionprofile" ] && \
-            cp Desktop/embedded.provisionprofile "$APP_BUNDLE/Contents/embedded.provisionprofile"
 
           # Write runtime .env from FAZM_APP_ENV secret
           echo "$FAZM_APP_ENV" | base64 --decode > "$APP_BUNDLE/Contents/Resources/.env"
