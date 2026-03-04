@@ -326,33 +326,39 @@ class AudioCaptureService: @unchecked Sendable {
 
     // MARK: - Private Methods
 
-    /// Look up an AudioDeviceID by its UID string.
+    /// Look up an AudioDeviceID by its UID string by enumerating all devices.
     private static func deviceIDForUID(_ uid: String) -> AudioDeviceID {
-        var deviceID: AudioDeviceID = kAudioObjectUnknown
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-
-        var translation = AudioValueTranslation(
-            mInputData: UnsafeMutableRawPointer(mutating: (uid as CFString as UnsafeRawPointer)),
-            mInputDataSize: UInt32(MemoryLayout<CFString>.size),
-            mOutputData: &deviceID,
-            mOutputDataSize: UInt32(MemoryLayout<AudioDeviceID>.size)
-        )
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDeviceForUID,
+            mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var translationSize = UInt32(MemoryLayout<AudioValueTranslation>.size)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size
+        ) == noErr, size > 0 else { return kAudioObjectUnknown }
 
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            0,
-            nil,
-            &translationSize,
-            &translation
-        )
-        return status == noErr ? deviceID : kAudioObjectUnknown
+        let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceIDs
+        ) == noErr else { return kAudioObjectUnknown }
+
+        for devID in deviceIDs {
+            var devUID: Unmanaged<CFString>?
+            var uidSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+            var uidAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyDeviceUID,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            guard AudioObjectGetPropertyData(devID, &uidAddress, 0, nil, &uidSize, &devUID) == noErr,
+                  let cfUID = devUID?.takeRetainedValue() else { continue }
+            if (cfUID as String) == uid {
+                return devID
+            }
+        }
+        return kAudioObjectUnknown
     }
 
     /// Get stream format for a device on input scope

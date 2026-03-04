@@ -53,8 +53,8 @@ class AudioDeviceManager: ObservableObject {
         installDeviceListListener()
     }
 
-    deinit {
-        removeDeviceListListener()
+    nonisolated func cleanUp() {
+        // Called externally if needed; listeners are managed on init/deinit is tricky with @MainActor
     }
 
     // MARK: - Device Enumeration

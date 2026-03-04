@@ -320,11 +320,6 @@ class PushToTalkManager: ObservableObject {
 
       barState?.voiceTranscript = "Transcribing..."
 
-      // Debug: save audio to file for inspection
-      let debugPath = "/tmp/ptt_debug_\(Int(Date().timeIntervalSince1970)).raw"
-      try? audioData.write(to: URL(fileURLWithPath: debugPath))
-      log("PushToTalkManager: saved \(audioData.count) bytes to \(debugPath)")
-
       Task {
         do {
           let language = AssistantSettings.shared.effectiveTranscriptionLanguage
@@ -390,6 +385,7 @@ class PushToTalkManager: ObservableObject {
 
     guard hasQuery else {
       log("PushToTalkManager: no transcript to send")
+      barState?.showSilenceOverlay()
       return
     }
 
@@ -481,6 +477,7 @@ class PushToTalkManager: ObservableObject {
       guard let self else { return }
       do {
         try await capture.startCapture(
+          deviceUID: AudioDeviceManager.shared.effectiveDeviceUID,
           onAudioChunk: { [weak self] audioData in
             guard let self else { return }
             if batchMode {

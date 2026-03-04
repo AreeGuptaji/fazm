@@ -82,6 +82,18 @@ struct FloatingControlBarView: View {
                 .padding(4)
             }
         }
+        .overlay(alignment: .bottom) {
+            if state.isSilenceOverlayVisible {
+                SilenceOverlayView()
+                    .environmentObject(state)
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.95).combined(with: .opacity),
+                            removal: .opacity
+                        )
+                    )
+            }
+        }
         .clipped()
         .onHover { hovering in
             // Resize window BEFORE updating SwiftUI state on expand so the expanded

@@ -51,6 +51,28 @@ class FloatingControlBarState: NSObject, ObservableObject {
     /// Pre-filled text for the follow-up input (set by PTT, consumed by AIResponseView)
     @Published var pendingFollowUpText: String = ""
 
+    // Silence detection overlay
+    @Published var isSilenceOverlayVisible: Bool = false
+    private var silenceOverlayDismissWork: DispatchWorkItem?
+
+    func showSilenceOverlay() {
+        silenceOverlayDismissWork?.cancel()
+        isSilenceOverlayVisible = true
+        let work = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                self?.dismissSilenceOverlay()
+            }
+        }
+        silenceOverlayDismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: work)
+    }
+
+    func dismissSilenceOverlay() {
+        silenceOverlayDismissWork?.cancel()
+        silenceOverlayDismissWork = nil
+        isSilenceOverlayVisible = false
+    }
+
     // Model selection
     @Published var selectedModel: String = "claude-sonnet-4-6"
 

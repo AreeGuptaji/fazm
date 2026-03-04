@@ -3,6 +3,7 @@ import SwiftUI
 /// Settings section for keyboard shortcuts and push-to-talk configuration.
 struct ShortcutsSettingsSection: View {
     @ObservedObject private var settings = ShortcutSettings.shared
+    @ObservedObject private var deviceManager = AudioDeviceManager.shared
     @Binding var highlightedSettingId: String?
 
     init(highlightedSettingId: Binding<String?> = .constant(nil)) {
@@ -16,6 +17,7 @@ struct ShortcutsSettingsSection: View {
             draggableBarCard
             askFazmKeyCard
             pttKeyCard
+            microphoneCard
             pttTranscriptionModeCard
             doubleTapCard
             pttSoundsCard
@@ -223,6 +225,66 @@ struct ShortcutsSettingsSection: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var microphoneCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Microphone")
+                    .scaledFont(size: 16, weight: .semibold)
+                    .foregroundColor(FazmColors.textPrimary)
+                Text("Select which microphone to use for Push to Talk.")
+                    .scaledFont(size: 13)
+                    .foregroundColor(FazmColors.textSecondary)
+            }
+
+            Picker("", selection: Binding(
+                get: { deviceManager.selectedDeviceUID ?? "" },
+                set: { deviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
+            )) {
+                Text("System Default")
+                    .tag("")
+                ForEach(deviceManager.devices) { device in
+                    Text(device.name + (device.isDefault ? " (Default)" : ""))
+                        .tag(device.uid)
+                }
+            }
+            .pickerStyle(.menu)
+
+            // Live audio level bar
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Input Level")
+                    .scaledFont(size: 12)
+                    .foregroundColor(FazmColors.textSecondary)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(FazmColors.backgroundTertiary.opacity(0.8))
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(audioLevelGradient)
+                            .frame(width: max(0, geo.size.width * CGFloat(deviceManager.currentAudioLevel)))
+                            .animation(.easeOut(duration: 0.08), value: deviceManager.currentAudioLevel)
+                    }
+                }
+                .frame(height: 8)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(FazmColors.backgroundTertiary.opacity(0.5))
+        )
+        .onAppear { deviceManager.startLevelMonitoring() }
+        .onDisappear { deviceManager.stopLevelMonitoring() }
+        .modifier(SettingHighlightModifier(settingId: "advanced.askomi.microphone", highlightedSettingId: $highlightedSettingId))
+    }
+
+    private var audioLevelGradient: LinearGradient {
+        LinearGradient(
+            colors: [.green, .yellow, .red],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
     }
 
     private var pttTranscriptionModeCard: some View {

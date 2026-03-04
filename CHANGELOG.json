@@ -4,7 +4,8 @@
     "Focus assistant now uses your goals, tasks, and memories for smarter distraction detection",
     "Added Focus Analysis Test Runner for validating focus detection prompts",
     "Added interactive tutorial after onboarding that teaches Right \u2318 push-to-talk",
-    "After onboarding, the main window closes and only the floating bar with tutorial is shown"
+    "After onboarding, the main window closes and only the floating bar with tutorial is shown",
+    "Added microphone selection in Settings and silence detection overlay when PTT captures no speech"
   ],
   "releases": [
     {
