@@ -631,7 +631,7 @@ struct ChatPrompts {
     - For cross-device access, data is encrypted and stored in a private cloud — only the user can access it.
     - No data is sold or shared with third parties. Full privacy policy at fazm.ai/privacy.
 
-    The user just signed in. You know:
+    The user just opened the app. What you know about them (may be empty if no sign-in):
     - Full name: {user_name}
     - First name: {user_given_name}
     - Email: {user_email}
@@ -664,11 +664,11 @@ struct ChatPrompts {
 
     Follow these steps in order:
 
-    STEP 1 — GREET + CONFIRM NAME
-    Say hi to {user_given_name} and confirm the name. Example: "Hey {user_given_name}! That's what I should call you, right?"
+    STEP 1 — GREET + ASK NAME
+    If the user's name is known (non-empty above), say hi and confirm: "Hey {user_given_name}! That's what I should call you, right?"
     Use `ask_followup` with options like ["Yes!", "Call me something else"].
-    If they want a different name, ask what they prefer and call `set_user_preferences(name: "...")`.
-    If confirmed, move on.
+    If the user's name is EMPTY or unknown, just ask plainly (NO ask_followup — the user will type their name): "Hey! What's your name?"
+    WAIT for the user to type their name. Then call `set_user_preferences(name: "...")`.
     Then call `save_knowledge_graph` with just the user's name as a person node. This seeds the live graph with their name at the center.
 
     STEP 1.5 — LANGUAGE PREFERENCE
@@ -700,8 +700,9 @@ struct ChatPrompts {
     Then call `ask_followup` with 2-4 quick-reply options that are meaningful answers to YOUR question.
     - If they appear to have a job/company: ask about their current focus, with specific options based on discoveries.
     - If no job info: ask what they mainly use their computer for, with general options.
-    Example: ask_followup(question: "What are you mainly working on right now?", options: ["Building [product]", "Design + frontend", "Something else"])
-    The user can also type their own answer in the input field — you don't need to add a "Something else" option.
+    Example: ask_followup(question: "What are you mainly working on right now?", options: ["Building [product]", "Design + frontend"])
+    NEVER include generic filler options like "Something else", "Other", "None of the above". Every option must be a specific, meaningful answer.
+    The user can already type their own answer in the input field — the UI highlights this automatically.
     WAIT for the user to reply (click a button or type).
     After the user replies, call `save_knowledge_graph` with any new context from their response.
 
@@ -824,16 +825,12 @@ struct ChatPrompts {
 
     // MARK: - Onboarding Exploration (Parallel Background Session)
 
-    /// System prompt for the parallel exploration session that runs after scan_files completes.
-    /// This runs on a separate ACPBridge (Opus) while the main onboarding chat continues (Sonnet).
-    /// It queries indexed_files, builds a rich knowledge graph, and writes a user profile summary.
-    static let onboardingExploration = """
+    /// System prompt for the parallel knowledge graph exploration session.
+    /// Runs on a separate ACPBridge after scan_files completes. Focused exclusively on building the graph.
+    static let onboardingGraphExploration = """
     You are a background analysis agent for Fazm, a macOS AI assistant. You are running silently in the background while the user completes onboarding in a separate chat. Do NOT address the user or ask questions — this is a non-interactive session.
 
-    The user's files have just been indexed into the `indexed_files` table. Your job:
-    1. Run SQL queries to understand the user's digital life
-    2. Build a rich knowledge graph from what you find
-    3. Write a concise profile summary
+    The user's files have just been indexed into the `indexed_files` table. Your ONLY job is to query the database and build a rich knowledge graph.
 
     The user's name is {user_name}.
 
@@ -858,26 +855,23 @@ struct ChatPrompts {
     9. Conversation topics: SELECT title, category FROM transcription_sessions WHERE title IS NOT NULL ORDER BY startedAt DESC LIMIT 10
     10. Memories: SELECT content, category FROM memories WHERE deleted = 0 ORDER BY createdAt DESC LIMIT 15
 
-    STEP 2 — KNOWLEDGE GRAPH (20-50 nodes)
-    After gathering data, call `save_knowledge_graph` ONCE with a comprehensive graph. Include:
-    - The user as the central person node
-    - Programming languages they use (node_type: "concept")
-    - Frameworks and tools (node_type: "thing")
-    - Projects discovered from build files (node_type: "thing")
-    - Applications they use (node_type: "thing")
-    - Skills inferred from their stack (node_type: "concept")
+    STEP 2 — BUILD KNOWLEDGE GRAPH (MANDATORY — 20-50 nodes)
+    This is the entire purpose of this session. You MUST call `save_knowledge_graph` with a comprehensive graph.
+    DO NOT skip this step. DO NOT just write text output. You MUST call the tool.
+
+    Call `save_knowledge_graph` ONCE with ALL nodes and ALL edges in a single call. Include:
+    - The user as the central person node (id: "{user_id}", node_type: "person")
+    - Programming languages they use (node_type: "concept") — e.g. Python, Swift, TypeScript, Rust
+    - Frameworks and tools (node_type: "thing") — e.g. React, Django, Docker, VS Code
+    - Projects discovered from build files (node_type: "thing") — name them from folder paths
+    - Applications they use (node_type: "thing") — from /Applications scan
+    - Skills inferred from their stack (node_type: "concept") — e.g. "iOS Development", "Machine Learning"
     - Organizations if evident from paths (node_type: "organization")
-    - Connect everything with meaningful edges: uses, knows, works_on, built_with, part_of, member_of, skilled_in
+    - Connect EVERY node to at least one other node with meaningful edges: uses, knows, works_on, built_with, part_of, member_of, skilled_in
 
-    STEP 3 — PROFILE SUMMARY
-    After saving the graph, write a 3-5 paragraph profile summary. Cover:
-    - Technical identity: primary languages, frameworks, and tools
-    - Active projects: what they're building based on project files and recent activity
-    - Work style: what their app usage and file organization says about them
-    - Skills & expertise: what level of expertise their stack suggests
-    - Interests: non-work indicators from documents, media, etc.
+    Aim for 30-50 nodes with 30-50 edges. More is better. Be specific — name actual technologies, projects, and apps.
 
-    Write in third person ("They use...", "Their primary stack..."). Be specific — name actual technologies, projects, and patterns you found. Don't speculate beyond what the data shows.
+    After calling save_knowledge_graph, output "Graph complete." and stop.
 
     <tools>
     You have 2 tools:
@@ -891,7 +885,58 @@ struct ChatPrompts {
     **save_knowledge_graph**: Save entities and relationships to the knowledge graph.
     - Parameters: nodes (array of {id, label, node_type, aliases}), edges (array of {source_id, target_id, label})
     - node_type: person, organization, place, thing, or concept
-    - Call ONCE with all nodes and edges
+    - MUST be called exactly once with all nodes and edges. This is MANDATORY.
+    </tools>
+    """
+
+    /// System prompt for the parallel profile text exploration session.
+    /// Runs on a separate ACPBridge after scan_files completes. Focused on writing a user profile summary.
+    static let onboardingProfileExploration = """
+    You are a background analysis agent for Fazm, a macOS AI assistant. You are running silently in the background while the user completes onboarding in a separate chat. Do NOT address the user or ask questions — this is a non-interactive session.
+
+    The user's files have just been indexed into the `indexed_files` table. Your job is to query the database and write a detailed user profile summary.
+
+    The user's name is {user_name}.
+
+    {database_schema}
+
+    IMPORTANT: Only use table and column names from the schema above. Do NOT guess column names — if a column isn't listed, it doesn't exist.
+
+    STEP 1 — SQL EXPLORATION (5-12 queries)
+    Use `execute_sql` to run these queries one at a time:
+
+    **File index queries (indexed_files table):**
+    1. File type distribution: SELECT fileType, COUNT(*) as count FROM indexed_files GROUP BY fileType ORDER BY count DESC LIMIT 15
+    2. Programming languages (by extension): SELECT fileExtension, COUNT(*) as count FROM indexed_files WHERE fileType = 'code' GROUP BY fileExtension ORDER BY count DESC LIMIT 20
+    3. Project indicators: SELECT filename, path FROM indexed_files WHERE filename IN ('package.json', 'Cargo.toml', 'Podfile', 'go.mod', 'requirements.txt', 'pyproject.toml', 'build.gradle', 'pom.xml', 'CMakeLists.txt', 'Package.swift', 'pubspec.yaml', 'Gemfile', 'composer.json', 'mix.exs', 'Makefile', 'docker-compose.yml', 'Dockerfile') LIMIT 40
+    4. Recently modified files: SELECT filename, path, fileType, modifiedAt FROM indexed_files ORDER BY modifiedAt DESC LIMIT 20
+    5. Installed applications: SELECT filename FROM indexed_files WHERE folder = '/Applications' AND fileExtension = 'app' ORDER BY filename LIMIT 50
+    6. Document types: SELECT fileExtension, COUNT(*) as count FROM indexed_files WHERE fileType IN ('document', 'spreadsheet', 'presentation') GROUP BY fileExtension ORDER BY count DESC LIMIT 15
+
+    **Activity data queries (may be empty for new users — skip if no results):**
+    7. Recent screen activity: SELECT appName, COUNT(*) as count FROM screenshots GROUP BY appName ORDER BY count DESC LIMIT 15
+    8. Recent observations: SELECT appName, currentActivity, contextSummary FROM observations ORDER BY createdAt DESC LIMIT 10
+    9. Conversation topics: SELECT title, category FROM transcription_sessions WHERE title IS NOT NULL ORDER BY startedAt DESC LIMIT 10
+    10. Memories: SELECT content, category FROM memories WHERE deleted = 0 ORDER BY createdAt DESC LIMIT 15
+
+    STEP 2 — PROFILE SUMMARY
+    After gathering data, write a 3-5 paragraph profile summary. Cover:
+    - Technical identity: primary languages, frameworks, and tools
+    - Active projects: what they're building based on project files and recent activity
+    - Work style: what their app usage and file organization says about them
+    - Skills & expertise: what level of expertise their stack suggests
+    - Interests: non-work indicators from documents, media, etc.
+
+    Write in third person ("They use...", "Their primary stack..."). Be specific — name actual technologies, projects, and patterns you found. Don't speculate beyond what the data shows.
+
+    <tools>
+    You have 1 tool:
+
+    **execute_sql**: Run a SQL query on the local database.
+    - Parameters: query (required, string)
+    - Returns query results as formatted text
+    - Only SELECT queries are allowed
+    - IMPORTANT: Only query tables and columns listed in the database schema above
     </tools>
     """
 
@@ -901,20 +946,10 @@ struct ChatPrompts {
     /// Used alongside dynamically-queried sqlite_master DDL to build the schema section.
     /// Key = table name, value = short description for the prompt.
     static let tableAnnotations: [String: String] = [
-        "screenshots": "captured screen frames with OCR text",
-        "action_items": "tasks (bidirectional sync with backend)",
-        "transcription_sessions": "voice recordings / conversations",
-        "transcription_segments": "transcript text with speaker/timing",
-        "proactive_extractions": "memories, advice, tasks extracted from screenshots",
-        "focus_sessions": "focus tracking",
-        "live_notes": "AI-generated notes during recording",
         "memories": "user facts, preferences, personal details (age, relationships, habits, interests) — PRIMARY source for personal questions",
-        "ai_user_profiles": "daily AI-generated user profile summaries",
+        "ai_user_profiles": "AI-generated user profile summaries",
         "indexed_files": "file metadata index from ~/Downloads, ~/Documents, ~/Desktop — path, filename, extension, fileType (document/code/image/video/audio/spreadsheet/presentation/archive/data/other), sizeBytes, folder, depth, timestamps",
         "goals": "user goals with progress tracking",
-        "staged_tasks": "AI-extracted task candidates pending user review",
-        "task_chat_messages": "Claude Code agent ↔ user chat history, one thread per task (action item)",
-        "observations": "per-screenshot AI observations used to detect tasks and activities",
         "local_kg_nodes": "knowledge graph nodes — entities (people, orgs, places, things, concepts) extracted from user files",
         "local_kg_edges": "knowledge graph edges — relationships between entities",
     ]
@@ -923,57 +958,6 @@ struct ChatPrompts {
     /// Used by formatSchema() to annotate each column with a human-readable hint.
     /// Key = table name, value = (column name → description).
     static let columnAnnotations: [String: [String: String]] = [
-        "screenshots": [
-            "timestamp": "When the screenshot was captured",
-            "appName": "Active application name at capture time",
-            "windowTitle": "Active window title at capture time",
-            "ocrText": "Full OCR-extracted text from the screen",
-            "focusStatus": "Whether user was focused or distracted (focused/distracted)",
-            "skippedForBattery": "OCR was skipped on battery; text may be missing",
-        ],
-        "action_items": [
-            "description": "The task text shown to the user",
-            "completed": "Whether the task is marked done",
-            "deleted": "Soft-delete flag",
-            "source": "Origin: screenshot | conversation | fazm | manual",
-            "conversationId": "Backend conversation ID if extracted from a voice session",
-            "priority": "high | medium | low",
-            "category": "AI-assigned category label",
-            "tagsJson": "JSON array of tag strings",
-            "deletedBy": "Who deleted it: user | ai_dedup",
-            "dueAt": "Optional due date/time",
-            "screenshotId": "FK to screenshots — screen context at extraction time",
-            "confidence": "Extraction confidence 0–1",
-            "sourceApp": "App that was active when task was extracted",
-            "windowTitle": "Window title at extraction time",
-            "contextSummary": "AI summary of what was happening on screen",
-            "currentActivity": "Short label of user activity at capture time",
-            "metadataJson": "Arbitrary extra metadata JSON",
-            "sortOrder": "Manual user-defined sort position",
-            "indentLevel": "Nesting level 0–3 for subtasks",
-            "relevanceScore": "AI-scored relevance 0–100; higher = more important",
-            "scoredAt": "When relevanceScore was last computed",
-            "agentStatus": "AI agent execution state: pending | processing | editing | completed | failed",
-            "agentSessionName": "tmux session name for the running agent",
-            "agentPrompt": "Prompt that was sent to the Claude agent",
-            "agentPlan": "Claude agent's response / execution plan",
-            "agentStartedAt": "When the agent started working on this task",
-            "agentCompletedAt": "When the agent finished",
-            "agentEditedFilesJson": "JSON array of file paths the agent modified",
-            "chatSessionId": "Firestore session ID for the task-scoped sidebar chat",
-            "recurrenceRule": "Recurrence pattern: daily | weekdays | weekly | biweekly | monthly",
-            "recurrenceParentId": "backendId of the parent recurring task template",
-        ],
-        "task_chat_messages": [
-            "taskId": "FK to action_items.backendId — which task this message belongs to",
-            "acpSessionId": "ACP session ID for conversation continuity across restarts",
-            "messageId": "Stable UUID for this message (dedup key)",
-            "sender": "user | ai",
-            "messageText": "Plain text content of the message",
-            "contentBlocksJson": "JSON-encoded Claude content blocks: text, toolCall, thinking",
-            "createdAt": "When the message was sent",
-            "updatedAt": "Last modification time",
-        ],
         "memories": [
             "content": "The remembered fact, preference, or personal detail",
             "category": "system | interesting | manual",
@@ -997,85 +981,6 @@ struct ChatPrompts {
             "isDismissed": "Whether the user dismissed this memory",
             "deleted": "Soft-delete flag",
         ],
-        "transcription_sessions": [
-            "startedAt": "When recording began",
-            "finishedAt": "When recording ended (null if still recording)",
-            "source": "Recording source: desktop | fazm | phone | etc",
-            "language": "BCP-47 language code (e.g. en, fr)",
-            "timezone": "IANA timezone of the device at recording time",
-            "inputDeviceName": "Audio input device name",
-            "status": "recording | pending_upload | uploading | completed | failed",
-            "retryCount": "Number of upload retry attempts",
-            "lastError": "Last upload error message if status=failed",
-            "title": "AI-generated session title",
-            "overview": "AI-generated session summary",
-            "emoji": "AI-assigned emoji representing the session",
-            "category": "AI-assigned topic category",
-            "actionItemsJson": "JSON array of tasks extracted by backend",
-            "eventsJson": "JSON array of calendar events detected",
-            "geolocationJson": "Location data if available",
-            "photosJson": "Referenced photo metadata",
-            "appsResultsJson": "App integrations results",
-            "conversationStatus": "User-set status label for the conversation",
-            "discarded": "True if user discarded/deleted this session",
-            "deleted": "Soft-delete flag",
-            "isLocked": "True if user has locked the session from edits",
-            "starred": "True if user starred/favorited this session",
-            "folderId": "Folder the session is organized into",
-        ],
-        "transcription_segments": [
-            "sessionId": "FK to transcription_sessions",
-            "speaker": "Speaker index (0, 1, 2…) within this session",
-            "text": "Transcribed text for this segment",
-            "startTime": "Segment start time in seconds from session start",
-            "endTime": "Segment end time in seconds from session start",
-            "segmentOrder": "Sequential order within the session",
-            "segmentId": "Backend segment ID",
-            "speakerLabel": "Human-readable speaker label if identified",
-            "isUser": "True if this speaker is the primary user",
-            "personId": "Identified person ID if speaker was recognized",
-        ],
-        "live_notes": [
-            "sessionId": "FK to transcription_sessions — which session this note belongs to",
-            "text": "Note text content",
-            "timestamp": "When the note was created",
-            "isAiGenerated": "True if AI generated; false if user typed manually",
-            "segmentStartOrder": "First segment order this note references",
-            "segmentEndOrder": "Last segment order this note references",
-        ],
-        "proactive_extractions": [
-            "screenshotId": "FK to screenshots — source screen",
-            "type": "memory | task | advice",
-            "content": "The extracted text content",
-            "category": "Topic category assigned by AI",
-            "confidence": "Extraction confidence 0–1",
-            "reasoning": "AI explanation for this extraction",
-            "sourceApp": "App active at extraction time",
-            "contextSummary": "AI summary of screen context",
-            "priority": "Priority if type=task: high | medium | low",
-            "isRead": "Whether user has seen this extraction",
-            "isDismissed": "Whether user dismissed it",
-        ],
-        "focus_sessions": [
-            "screenshotId": "FK to screenshots",
-            "status": "focused | distracted",
-            "appOrSite": "App or website being used",
-            "windowTitle": "Window title at the time",
-            "description": "AI description of what the user was doing",
-            "message": "Motivational or coaching message for the user",
-            "durationSeconds": "How long the focus/distraction period lasted",
-        ],
-        "observations": [
-            "screenshotId": "FK to screenshots",
-            "appName": "App that was active",
-            "contextSummary": "AI-generated summary of what was happening",
-            "currentActivity": "Short activity label",
-            "hasTask": "Whether a task was found in this screenshot",
-            "taskTitle": "Task title if hasTask=true",
-            "sourceCategory": "High-level category (work/personal/social/etc)",
-            "sourceSubcategory": "More specific subcategory",
-            "metadataJson": "Additional structured metadata",
-        ],
         "goals": [
             "title": "Short goal name shown in UI",
             "goalDescription": "Longer description of the goal",
@@ -1088,27 +993,6 @@ struct ChatPrompts {
             "isActive": "Whether goal is currently being tracked",
             "completedAt": "When the goal was completed (null if in progress)",
             "deleted": "Soft-delete flag",
-        ],
-        "staged_tasks": [
-            "description": "Task text proposed by AI",
-            "completed": "Whether promoted task was completed",
-            "deleted": "Soft-delete flag",
-            "source": "Origin: screenshot | conversation | fazm",
-            "conversationId": "Backend conversation ID if from voice",
-            "priority": "high | medium | low",
-            "category": "AI-assigned category",
-            "tagsJson": "JSON array of tag strings",
-            "deletedBy": "user | ai_dedup",
-            "dueAt": "Proposed due date",
-            "screenshotId": "FK to screenshots",
-            "confidence": "Extraction confidence 0–1",
-            "sourceApp": "App active at extraction",
-            "windowTitle": "Window title at extraction",
-            "contextSummary": "AI summary of screen context",
-            "currentActivity": "Activity label at extraction time",
-            "metadataJson": "Extra metadata JSON",
-            "relevanceScore": "AI relevance score 0–100",
-            "scoredAt": "When relevanceScore was computed",
         ],
         "ai_user_profiles": [
             "profileText": "Full AI-generated profile summary text",
@@ -1133,7 +1017,14 @@ struct ChatPrompts {
     static let excludedTablePrefixes = ["sqlite_", "grdb_"]
     /// Any table whose name contains "_fts" is an FTS virtual or internal table — exclude all.
     /// Specific infra tables also excluded.
-    static let excludedTables: Set<String> = ["migration_status", "task_dedup_log"]
+    static let excludedTables: Set<String> = [
+        "migration_status", "task_dedup_log",
+        // Legacy OMI tables no longer used in Fazm
+        "action_items", "screenshots", "focus_sessions",
+        "live_notes", "observations", "proactive_extractions",
+        "staged_tasks", "task_chat_messages",
+        "transcription_segments", "transcription_sessions",
+    ]
 
     /// Infrastructure columns to strip from schema — file paths, binary blobs, sync state, internal flags.
     /// New migrations are still picked up automatically; only these specific names are hidden.
@@ -1148,7 +1039,6 @@ struct ChatPrompts {
 
     /// Static suffix appended after the dynamic schema
     static let schemaFooter = """
-    FTS tables: screenshots_fts(ocrText, windowTitle, appName), action_items_fts(description)
     Full DDL for any table: SELECT sql FROM sqlite_master WHERE name='table_name'
     """
 
@@ -1448,9 +1338,18 @@ struct ChatPromptBuilder {
     }
 
     /// Build the onboarding exploration system prompt (parallel background session)
-    static func buildOnboardingExploration(userName: String, databaseSchema: String = "") -> String {
+    static func buildOnboardingGraphExploration(userName: String, databaseSchema: String = "") -> String {
         var prompt = build(
-            template: ChatPrompts.onboardingExploration,
+            template: ChatPrompts.onboardingGraphExploration,
+            userName: userName
+        )
+        prompt = prompt.replacingOccurrences(of: "{database_schema}", with: databaseSchema)
+        return prompt
+    }
+
+    static func buildOnboardingProfileExploration(userName: String, databaseSchema: String = "") -> String {
+        var prompt = build(
+            template: ChatPrompts.onboardingProfileExploration,
             userName: userName
         )
         prompt = prompt.replacingOccurrences(of: "{database_schema}", with: databaseSchema)
