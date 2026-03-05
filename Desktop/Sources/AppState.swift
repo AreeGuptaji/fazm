@@ -22,6 +22,7 @@ class AppState: ObservableObject {
     var screenRecordingGrantAttempts = 0  // Track how many times user clicked Grant without success
     @Published var hasAccessibilityPermission = false
     @Published var isAccessibilityBroken = false  // TCC says yes but AX calls actually fail (common after macOS updates/app re-signs)
+    private var lastAccessibilityApiDisabledLogged = false  // Dedup apiDisabled log spam
 
     /// True if notifications are enabled but won't show visual banners
     var isNotificationBannerDisabled: Bool {
@@ -388,8 +389,6 @@ class AppState: ObservableObject {
                     case .alert: "ALERT"
                     @unknown default: "unknown"
                 }
-                log("Notification settings: auth=\(authStatus), alertStyle=\(alertStyleName), sound=\(settings.soundSetting.rawValue), badge=\(settings.badgeSetting.rawValue)")
-
                 // Track notification settings in analytics only when they change
                 let soundEnabled = settings.soundSetting == .enabled
                 let badgeEnabled = settings.badgeSetting == .enabled
@@ -399,6 +398,7 @@ class AppState: ObservableObject {
                                       badgeEnabled != self.lastNotificationBadgeEnabled
 
                 if settingsChanged {
+                    log("Notification settings: auth=\(authStatus), alertStyle=\(alertStyleName), sound=\(settings.soundSetting.rawValue), badge=\(settings.badgeSetting.rawValue)")
                     AnalyticsManager.shared.notificationSettingsChecked(
                         authStatus: authStatus,
                         alertStyle: alertStyleName,
@@ -506,6 +506,7 @@ class AppState: ObservableObject {
                 log("ACCESSIBILITY_CHECK: Permission granted (bundleId=\(bundleId))")
             }
 
+            lastAccessibilityApiDisabledLogged = false  // Reset so we log again if it regresses
             // TCC says yes — verify with an actual AX call
             let broken = !testAccessibilityPermission()
             if broken != isAccessibilityBroken {
@@ -566,7 +567,10 @@ class AppState: ObservableObject {
             return true
         case .apiDisabled:
             // System-wide AX is disabled — unambiguous, no confirmation needed
-            log("ACCESSIBILITY_CHECK: AXError.apiDisabled — permission stuck (tested against pid \(frontApp.processIdentifier), app: \(frontApp.localizedName ?? "unknown"))")
+            if !lastAccessibilityApiDisabledLogged {
+                log("ACCESSIBILITY_CHECK: AXError.apiDisabled — permission stuck (tested against pid \(frontApp.processIdentifier), app: \(frontApp.localizedName ?? "unknown"))")
+                lastAccessibilityApiDisabledLogged = true
+            }
             return false
         case .cannotComplete:
             // cannotComplete is ambiguous: it can mean our permission is broken, OR that the

@@ -522,7 +522,10 @@ struct OnboardingChatView: View {
                 // Start bridge eagerly so it's ready by the time we need to send
                 async let bridgeWarmup: () = chatProvider.warmupBridge()
 
-                // Ensure DB is ready before loading messages
+                // Ensure DB is ready before loading messages — must configure with
+                // the signed-in user's ID so we open the correct database file
+                let userId = UserDefaults.standard.string(forKey: "auth_userId")
+                AppDatabase.shared.configure(userId: userId)
                 try? await AppDatabase.shared.initialize()
 
                 // Load previous messages from local database
