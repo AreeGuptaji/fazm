@@ -195,38 +195,54 @@ struct SettingsContentView: View {
 
     private var generalSection: some View {
         VStack(spacing: 20) {
-            // Ask Fazm floating bar toggle
-            settingsCard(settingId: "general.askomi") {
-                HStack(spacing: 16) {
-                    Circle()
-                        .fill(showAskFazmBar ? FazmColors.success : FazmColors.textTertiary.opacity(0.3))
-                        .frame(width: 12, height: 12)
-                        .shadow(color: showAskFazmBar ? FazmColors.success.opacity(0.5) : .clear, radius: 6)
+            // Microphone
+            settingsCard(settingId: "general.microphone") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mic.fill")
+                            .scaledFont(size: 16, weight: .medium)
+                            .foregroundColor(FazmColors.purplePrimary)
+                            .frame(width: 12)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Ask Fazm")
-                            .scaledFont(size: 16, weight: .semibold)
-                            .foregroundColor(FazmColors.textPrimary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Microphone")
+                                .scaledFont(size: 16, weight: .semibold)
+                                .foregroundColor(FazmColors.textPrimary)
+                            Text("Select which microphone to use for Push to Talk.")
+                                .scaledFont(size: 13)
+                                .foregroundColor(FazmColors.textTertiary)
+                        }
 
-                        Text(showAskFazmBar ? "Floating bar is visible (⌘\\)" : "Floating bar is hidden (⌘\\)")
-                            .scaledFont(size: 13)
-                            .foregroundColor(FazmColors.textTertiary)
+                        Spacer()
                     }
 
-                    Spacer()
-
-                    Toggle("", isOn: $showAskFazmBar)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                        .onChange(of: showAskFazmBar) { _, newValue in
-                            if newValue {
-                                FloatingControlBarManager.shared.show()
-                            } else {
-                                FloatingControlBarManager.shared.hide()
+                    HStack(spacing: 10) {
+                        Picker("", selection: Binding(
+                            get: { audioDeviceManager.selectedDeviceUID ?? "" },
+                            set: { audioDeviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
+                        )) {
+                            Text("System Default")
+                                .tag("")
+                            ForEach(audioDeviceManager.devices) { device in
+                                Text(device.name + (device.isDefault ? " (Default)" : ""))
+                                    .tag(device.uid)
                             }
                         }
+                        .pickerStyle(.menu)
+
+                        AudioLevelBarsSettingsView(level: audioDeviceManager.currentAudioLevel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(FazmColors.backgroundTertiary.opacity(0.5))
+                    )
                 }
             }
+            .onAppear { audioDeviceManager.startLevelMonitoring() }
+            .onDisappear { audioDeviceManager.stopLevelMonitoring() }
 
             // Font Size
             settingsCard(settingId: "general.fontsize") {
@@ -309,55 +325,6 @@ struct SettingsContentView: View {
                     }
                 }
             }
-
-            // Microphone
-            settingsCard(settingId: "general.microphone") {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "mic.fill")
-                            .scaledFont(size: 16, weight: .medium)
-                            .foregroundColor(FazmColors.purplePrimary)
-                            .frame(width: 12)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Microphone")
-                                .scaledFont(size: 16, weight: .semibold)
-                                .foregroundColor(FazmColors.textPrimary)
-                            Text("Select which microphone to use for Push to Talk.")
-                                .scaledFont(size: 13)
-                                .foregroundColor(FazmColors.textTertiary)
-                        }
-
-                        Spacer()
-                    }
-
-                    HStack(spacing: 10) {
-                        Picker("", selection: Binding(
-                            get: { audioDeviceManager.selectedDeviceUID ?? "" },
-                            set: { audioDeviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
-                        )) {
-                            Text("System Default")
-                                .tag("")
-                            ForEach(audioDeviceManager.devices) { device in
-                                Text(device.name + (device.isDefault ? " (Default)" : ""))
-                                    .tag(device.uid)
-                            }
-                        }
-                        .pickerStyle(.menu)
-
-                        AudioLevelBarsSettingsView(level: audioDeviceManager.currentAudioLevel)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(FazmColors.backgroundTertiary.opacity(0.5))
-                    )
-                }
-            }
-            .onAppear { audioDeviceManager.startLevelMonitoring() }
-            .onDisappear { audioDeviceManager.stopLevelMonitoring() }
 
             // Background Style
             settingsCard(settingId: "general.background") {
@@ -1141,6 +1108,39 @@ struct SettingsContentView: View {
 
     private var preferencesSubsection: some View {
         VStack(spacing: 20) {
+            // Ask Fazm floating bar toggle
+            settingsCard(settingId: "advanced.preferences.askomi") {
+                HStack(spacing: 16) {
+                    Circle()
+                        .fill(showAskFazmBar ? FazmColors.success : FazmColors.textTertiary.opacity(0.3))
+                        .frame(width: 12, height: 12)
+                        .shadow(color: showAskFazmBar ? FazmColors.success.opacity(0.5) : .clear, radius: 6)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ask Fazm")
+                            .scaledFont(size: 16, weight: .semibold)
+                            .foregroundColor(FazmColors.textPrimary)
+
+                        Text(showAskFazmBar ? "Floating bar is visible (\u{2318}\\)" : "Floating bar is hidden (\u{2318}\\)")
+                            .scaledFont(size: 13)
+                            .foregroundColor(FazmColors.textTertiary)
+                    }
+
+                    Spacer()
+
+                    Toggle("", isOn: $showAskFazmBar)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .onChange(of: showAskFazmBar) { _, newValue in
+                            if newValue {
+                                FloatingControlBarManager.shared.show()
+                            } else {
+                                FloatingControlBarManager.shared.hide()
+                            }
+                        }
+                }
+            }
+
             // Multiple Chat Sessions toggle
             settingsCard(settingId: "advanced.preferences.multichat") {
                 HStack(spacing: 16) {
@@ -1615,7 +1615,7 @@ struct SettingsContentView: View {
     SettingsPage(
         appState: AppState(),
         selectedSection: .constant(.advanced),
-        selectedAdvancedSubsection: .constant(.askFazmFloatingBar),
+        selectedAdvancedSubsection: .constant(.aiChat),
         highlightedSettingId: .constant(nil)
     )
 }
