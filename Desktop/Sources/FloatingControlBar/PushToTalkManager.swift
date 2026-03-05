@@ -325,7 +325,8 @@ class PushToTalkManager: ObservableObject {
           let language = AssistantSettings.shared.effectiveTranscriptionLanguage
           let transcript = try await TranscriptionService.batchTranscribe(
             audioData: audioData,
-            language: language
+            language: language,
+            vocabulary: AssistantSettings.shared.effectiveVocabulary
           )
           if let transcript, !transcript.isEmpty {
             self.transcriptSegments = [transcript]

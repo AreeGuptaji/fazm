@@ -510,6 +510,7 @@ extension TranscriptionService {
     static func batchTranscribe(
         audioData: Data,
         language: String = "en",
+        vocabulary: [String] = [],
         apiKey: String? = nil
     ) async throws -> String? {
         guard let key = apiKey ?? (getenv("DEEPGRAM_API_KEY").flatMap { String(validatingUTF8: $0) }) else {
@@ -528,6 +529,9 @@ extension TranscriptionService {
             URLQueryItem(name: "sample_rate", value: "16000"),
             URLQueryItem(name: "channels", value: "1"),
         ]
+        for term in vocabulary {
+            components.queryItems?.append(URLQueryItem(name: "keyterm", value: term))
+        }
 
         guard let url = components.url else {
             throw TranscriptionError.connectionFailed(NSError(domain: "Invalid URL", code: -1))
