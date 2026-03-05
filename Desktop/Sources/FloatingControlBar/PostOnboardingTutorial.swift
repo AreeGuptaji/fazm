@@ -133,11 +133,24 @@ class PostOnboardingTutorialManager {
                     }
                 case .speaking:
                     if !isListening {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.viewModel.step = .done
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                            self?.dismiss()
+                        // Wait briefly, then check if silence overlay appeared (no speech detected).
+                        // If so, go back to pressKey step instead of completing.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak barState] in
+                            guard let self, let barState else { return }
+                            if barState.isSilenceOverlayVisible {
+                                // No speech detected — reset tutorial to try again
+                                self.viewModel.startPulse()
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    self.viewModel.step = .pressKey
+                                }
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    self.viewModel.step = .done
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                                    self?.dismiss()
+                                }
+                            }
                         }
                     }
                 case .done:
