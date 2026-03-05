@@ -13,8 +13,8 @@ workflows:
   #     MACOS_DEVELOPER_ID_P12 — base64 .p12 (Developer ID Application: Matthew Diakonov S6DP5HF77G)
   #     MACOS_DEVELOPER_ID_P12_PASSWORD
   #
-  #   desktop_secrets:
-  #     OMI_DESKTOP_APP_ENV             — base64-encoded .env.app (runtime secrets bundled into .app)
+  #   fazm_secrets:
+  #     FAZM_APP_ENV                    — base64-encoded .env.app (runtime secrets bundled into .app)
   #     GCP_SERVICE_ACCOUNT_KEY         — base64 GCP service account JSON
   #     RELEASE_SECRET                  — shared secret for release registration API
   #     APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY
@@ -29,7 +29,7 @@ workflows:
     environment:
       groups:
         - appstore_credentials
-        - desktop_secrets
+        - fazm_secrets
       vars:
         BINARY_NAME: "Fazm"
         APP_NAME: "Fazm"
