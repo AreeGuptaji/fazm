@@ -187,8 +187,7 @@ struct SettingsContentView: View {
             showAskFazmBar = FloatingControlBarManager.shared.isVisible
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToFloatingBarSettings)) { _ in
-            selectedSection = .advanced
-            selectedAdvancedSubsection = .askFazmFloatingBar
+            selectedSection = .general
         }
     }
 
