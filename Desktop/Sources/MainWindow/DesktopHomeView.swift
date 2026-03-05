@@ -148,10 +148,11 @@ struct DesktopHomeView: View {
         }
         // Handle navigation from floating bar gear icon
         .onReceive(NotificationCenter.default.publisher(for: .navigateToFloatingBarSettings)) { _ in
-            selectedSettingsSection = .general
+            selectedSettingsSection = .shortcuts
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToAIChatSettings)) { _ in
-            selectedSettingsSection = .aiChat
+            selectedSettingsSection = .advanced
+            selectedAdvancedSubsection = .aiChat
         }
     }
 }
