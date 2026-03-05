@@ -1,4 +1,61 @@
 import SwiftUI
+import AppKit
+
+/// Manages a standalone centered window for BrowserExtensionSetup.
+final class BrowserExtensionSetupWindowController {
+    static let shared = BrowserExtensionSetupWindowController()
+    private var window: NSWindow?
+    private var hostingView: NSHostingView<AnyView>?
+
+    func show(chatProvider: ChatProvider?, onComplete: @escaping () -> Void) {
+        // If already showing, just bring to front
+        if let existing = window, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let controller = self
+        let setupView = BrowserExtensionSetup(
+            onComplete: {
+                onComplete()
+                controller.close()
+            },
+            onDismiss: {
+                controller.close()
+            },
+            chatProvider: chatProvider
+        )
+
+        let hostingView = NSHostingView(rootView: AnyView(setupView))
+        hostingView.setFrameSize(hostingView.fittingSize)
+
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.backgroundColor = .clear
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        self.window = window
+        self.hostingView = hostingView
+    }
+
+    func close() {
+        window?.orderOut(nil)
+        window = nil
+        hostingView = nil
+    }
+}
 
 /// Standalone multi-phase onboarding view for setting up the Playwright MCP Chrome extension.
 /// Can be presented as a sheet, overlay, or full page from any context.

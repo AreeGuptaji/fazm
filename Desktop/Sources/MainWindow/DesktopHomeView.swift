@@ -10,7 +10,6 @@ struct DesktopHomeView: View {
     @State private var highlightedSettingId: String? = nil
 
     // Sheet triggers (driven by ChatProvider @Published flags)
-    @State private var showBrowserExtensionSetup = false
     @State private var showClaudeAuth = false
 
     var body: some View {
@@ -74,19 +73,7 @@ struct DesktopHomeView: View {
         .frame(minWidth: 900, minHeight: 600)
         .preferredColorScheme(.dark)
         .tint(FazmColors.purplePrimary)
-        // Browser extension setup (triggered when browser tool called without token)
-        .sheet(isPresented: $showBrowserExtensionSetup) {
-            BrowserExtensionSetup(
-                onComplete: {
-                    showBrowserExtensionSetup = false
-                    // Route retry through the floating bar so it re-expands and wires up streaming
-                    FloatingControlBarManager.shared.retryPendingQuery()
-                },
-                onDismiss: { showBrowserExtensionSetup = false },
-                chatProvider: viewModelContainer.chatProvider
-            )
-            .fixedSize()
-        }
+        // Browser extension setup handled below via .onReceive
         // Claude auth (triggered when ACP bridge needs OAuth)
         .sheet(isPresented: $showClaudeAuth) {
             ClaudeAuthSheet(
@@ -101,8 +88,13 @@ struct DesktopHomeView: View {
         // Observe ChatProvider flags
         .onReceive(viewModelContainer.chatProvider.$needsBrowserExtensionSetup) { needs in
             if needs {
-                showBrowserExtensionSetup = true
                 viewModelContainer.chatProvider.needsBrowserExtensionSetup = false
+                BrowserExtensionSetupWindowController.shared.show(
+                    chatProvider: viewModelContainer.chatProvider,
+                    onComplete: {
+                        FloatingControlBarManager.shared.retryPendingQuery()
+                    }
+                )
             }
         }
         .onReceive(viewModelContainer.chatProvider.$isClaudeAuthRequired) { needs in

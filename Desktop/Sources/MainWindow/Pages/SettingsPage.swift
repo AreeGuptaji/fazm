@@ -870,19 +870,16 @@ struct SettingsContentView: View {
         .sheet(isPresented: $showFileViewer) {
             fileViewerSheet
         }
-        .sheet(isPresented: $showBrowserSetup) {
-            BrowserExtensionSetup(
-                onComplete: {
-                    showBrowserSetup = false
-                    playwrightExtensionToken = UserDefaults.standard.string(forKey: "playwrightExtensionToken") ?? ""
-                },
-                onDismiss: {
-                    showBrowserSetup = false
-                    playwrightExtensionToken = UserDefaults.standard.string(forKey: "playwrightExtensionToken") ?? ""
-                },
-                chatProvider: chatProvider
-            )
-            .fixedSize()
+        .onChange(of: showBrowserSetup) { _, show in
+            if show {
+                showBrowserSetup = false
+                BrowserExtensionSetupWindowController.shared.show(
+                    chatProvider: chatProvider,
+                    onComplete: {
+                        playwrightExtensionToken = UserDefaults.standard.string(forKey: "playwrightExtensionToken") ?? ""
+                    }
+                )
+            }
         }
     }
 
