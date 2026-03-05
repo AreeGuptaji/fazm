@@ -6,6 +6,14 @@ struct SilenceOverlayView: View {
     @ObservedObject private var deviceManager = AudioDeviceManager.shared
     var onDismiss: () -> Void
 
+    private var selectedDeviceName: String {
+        if let uid = deviceManager.selectedDeviceUID,
+           let device = deviceManager.devices.first(where: { $0.uid == uid }) {
+            return device.name
+        }
+        return "System Default"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 6) {
@@ -29,20 +37,34 @@ struct SilenceOverlayView: View {
             }
 
             if !deviceManager.devices.isEmpty {
-                Picker("Microphone", selection: Binding(
-                    get: { deviceManager.selectedDeviceUID ?? "" },
-                    set: { deviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
-                )) {
-                    Text("System Default")
-                        .tag("")
-                    ForEach(deviceManager.devices) { device in
-                        Text(device.name)
-                            .tag(device.uid)
+                Menu {
+                    Button("System Default") {
+                        deviceManager.selectedDeviceUID = nil
                     }
+                    Divider()
+                    ForEach(deviceManager.devices) { device in
+                        Button(device.name) {
+                            deviceManager.selectedDeviceUID = device.uid
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 10))
+                        Text(selectedDeviceName)
+                            .scaledFont(size: 12)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
                 }
-                .pickerStyle(.menu)
-                .tint(.white)
-                .scaledFont(size: 12)
+                .menuStyle(.borderlessButton)
             }
 
             AudioLevelBarsSettingsView(level: deviceManager.currentAudioLevel)

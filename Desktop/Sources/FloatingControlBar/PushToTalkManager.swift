@@ -202,6 +202,9 @@ class PushToTalkManager: ObservableObject {
     finalizeWorkItem?.cancel()
     finalizeWorkItem = nil
 
+    // Dismiss silence overlay if it's showing from a previous PTT attempt
+    barState?.dismissSilenceOverlay()
+
     // Play start-of-PTT sound
     if ShortcutSettings.shared.pttSoundsEnabled {
       let sound = NSSound(named: "Funk")
@@ -391,7 +394,11 @@ class PushToTalkManager: ObservableObject {
         pttOpenedChat = false
         FloatingControlBarManager.shared.closeAIConversation()
       }
-      barState?.showSilenceOverlay()
+      // Only show silence overlay if PTT was held for at least 3 seconds
+      let holdDuration = ProcessInfo.processInfo.systemUptime - lastOptionDownTime
+      if holdDuration >= 3.0 {
+        barState?.showSilenceOverlay()
+      }
       return
     }
 
