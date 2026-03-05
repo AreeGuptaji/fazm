@@ -16,7 +16,8 @@
     "Added Dictionary settings tab for custom transcription vocabulary",
     "Chat no longer collapses when clicking away while AI is streaming a response",
     "Fixed floating bar flickering when sending chat messages",
-    "Fixed PTT transcript overwriting existing text in follow-up input instead of appending"
+    "Fixed PTT transcript overwriting existing text in follow-up input instead of appending",
+    "Improved microphone settings: input level is now inline with mic picker and restarts correctly when switching microphones"
   ],
   "releases": [
     {

@@ -21,7 +21,13 @@ class AudioDeviceManager: ObservableObject {
 
     @Published var devices: [AudioDevice] = []
     @Published var selectedDeviceUID: String? {
-        didSet { UserDefaults.standard.set(selectedDeviceUID, forKey: Self.selectedDeviceUDKey) }
+        didSet {
+            UserDefaults.standard.set(selectedDeviceUID, forKey: Self.selectedDeviceUDKey)
+            if isMonitoringLevel {
+                stopLevelMonitoring()
+                startLevelMonitoring()
+            }
+        }
     }
     @Published var currentAudioLevel: Float = 0.0
 

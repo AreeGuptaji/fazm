@@ -332,26 +332,29 @@ struct SettingsContentView: View {
                         Spacer()
                     }
 
-                    Picker("", selection: Binding(
-                        get: { audioDeviceManager.selectedDeviceUID ?? "" },
-                        set: { audioDeviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
-                    )) {
-                        Text("System Default")
-                            .tag("")
-                        ForEach(audioDeviceManager.devices) { device in
-                            Text(device.name + (device.isDefault ? " (Default)" : ""))
-                                .tag(device.uid)
+                    HStack(spacing: 10) {
+                        Picker("", selection: Binding(
+                            get: { audioDeviceManager.selectedDeviceUID ?? "" },
+                            set: { audioDeviceManager.selectedDeviceUID = $0.isEmpty ? nil : $0 }
+                        )) {
+                            Text("System Default")
+                                .tag("")
+                            ForEach(audioDeviceManager.devices) { device in
+                                Text(device.name + (device.isDefault ? " (Default)" : ""))
+                                    .tag(device.uid)
+                            }
                         }
-                    }
-                    .pickerStyle(.menu)
+                        .pickerStyle(.menu)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Input Level")
-                            .scaledFont(size: 12)
-                            .foregroundColor(FazmColors.textTertiary)
                         AudioLevelBarsSettingsView(level: audioDeviceManager.currentAudioLevel)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(FazmColors.backgroundTertiary.opacity(0.5))
+                    )
                 }
             }
             .onAppear { audioDeviceManager.startLevelMonitoring() }
