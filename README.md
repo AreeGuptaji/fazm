@@ -4,7 +4,7 @@ The fastest AI computer agent. Controls your browser, writes code, handles docum
 
 **Free to start. Fully open source. Fully local.**
 
-🌐 [fazm.ai](https://fazm.ai)
+🌐 [fazm.ai](https://fazm.ai/gh)
 
 ## Demos
 
