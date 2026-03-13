@@ -488,6 +488,14 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             state.showingAIResponse = true
             state.clearLastConversation()
             resizeToResponseHeight(animated: true)
+        } else if !state.chatHistory.isEmpty {
+            // History was pre-loaded from ChatProvider (fresh app launch) — show response view
+            // with conversation history and follow-up input
+            state.displayedQuery = ""
+            state.currentAIMessage = nil
+            state.isAILoading = false
+            state.showingAIResponse = true
+            resizeToResponseHeight(animated: true)
         }
     }
 
@@ -948,9 +956,9 @@ class FloatingControlBarManager {
         }
 
         // Ask AI opens the input panel
-        barWindow.onAskAI = { [weak barWindow] in
-            barWindow?.showAIConversation()
-            barWindow?.makeKeyAndOrderFront(nil)
+        // Ask AI routes through the manager so it can load history from ChatProvider
+        barWindow.onAskAI = { [weak self] in
+            self?.openAIInput()
         }
 
         // Hide persists the preference so bar stays hidden across restarts
@@ -1133,9 +1141,28 @@ class FloatingControlBarManager {
         }
 
         AnalyticsManager.shared.floatingBarAskFazmOpened(source: "shortcut")
+
+        // Load conversation history from ChatProvider (survives app restart, unlike lastConversation)
+        if window.state.lastConversation == nil, let provider = self.chatProvider, !provider.messages.isEmpty {
+            window.state.loadHistory(from: provider.messages)
+        }
+
+        // Re-wire onSendQuery for the shared provider
+        if let provider = self.chatProvider {
+            window.onSendQuery = { [weak self, weak window, weak provider] message in
+                guard let self = self, let window = window, let provider = provider else { return }
+                Task { @MainActor in
+                    await self.sendAIQuery(message, barWindow: window, provider: provider)
+                }
+            }
+        }
+
         if !window.isVisible {
             show()
         }
+
+        // If there's existing conversation history (from provider or lastConversation),
+        // showAIConversation will auto-resume it. Otherwise shows blank input.
         window.showAIConversation()
         window.orderFrontRegardless()
     }
@@ -1157,11 +1184,13 @@ class FloatingControlBarManager {
         window.state.showingAIResponse = false
         window.state.aiInputText = ""
         window.state.currentAIMessage = nil
-        window.state.chatHistory = []
         window.state.isVoiceFollowUp = false
         window.state.voiceFollowUpTranscript = ""
 
         guard let provider = self.chatProvider else { return }
+
+        // Pre-populate chat history from provider so previous conversation is visible
+        window.state.loadHistory(from: provider.messages)
 
         // Re-wire the onSendQuery to use the shared provider
         window.onSendQuery = { [weak self, weak window, weak provider] message in
