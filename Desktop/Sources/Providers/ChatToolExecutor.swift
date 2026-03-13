@@ -32,8 +32,6 @@ class ChatToolExecutor {
         case "execute_sql":
             return await executeSQL(toolCall.arguments)
 
-        case "get_daily_recap":
-            return await executeDailyRecap(toolCall.arguments)
 
         case "complete_task":
             return await executeCompleteTask(toolCall.arguments)
@@ -311,57 +309,6 @@ class ChatToolExecutor {
         }
 
         return "OK: \(changes) row(s) affected"
-    }
-
-    // MARK: - Daily Recap
-
-    /// Get a pre-formatted daily activity recap
-    private static func executeDailyRecap(_ args: [String: Any]) async -> String {
-        let daysAgo = max(0, (args["days_ago"] as? Int) ?? 1)
-        let dateLabel = daysAgo == 0 ? "Today" : daysAgo == 1 ? "Yesterday" : "Past \(daysAgo) days"
-
-        guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else {
-            return "Error: database not available"
-        }
-
-        // For today (daysAgo=0), upper bound is now; for past days, upper bound is start of today
-        let upperBound = daysAgo == 0
-            ? "datetime('now', 'localtime')"
-            : "datetime('now', 'start of day', 'localtime')"
-
-        do {
-            return try await dbQueue.read { db in
-                // Format compact markdown
-                var out = "# \(dateLabel) Recap\n\n"
-
-                // Recent chat messages
-                let messages = try Row.fetchAll(db, sql: """
-                    SELECT sender, messageText, createdAt FROM chat_messages
-                    WHERE createdAt >= datetime('now', 'start of day', '-\(daysAgo) day', 'localtime')
-                        AND createdAt < \(upperBound)
-                    ORDER BY createdAt DESC
-                    LIMIT 50
-                    """)
-
-                out += "## Chat Messages (\(messages.count))\n"
-                if messages.isEmpty {
-                    out += "No chat messages found.\n"
-                } else {
-                    for msg in messages {
-                        let role = msg["sender"] as? String ?? "unknown"
-                        let text = msg["messageText"] as? String ?? ""
-                        let preview = text.count > 120 ? String(text.prefix(120)) + "..." : text
-                        out += "- **\(role)**: \(preview)\n"
-                    }
-                }
-
-                log("Tool get_daily_recap: \(messages.count) messages")
-                return out
-            }
-        } catch {
-            logError("Tool get_daily_recap failed", error: error)
-            return "Error: \(error.localizedDescription)"
-        }
     }
 
     // MARK: - Task Tools
