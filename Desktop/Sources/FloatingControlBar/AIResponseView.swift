@@ -45,13 +45,15 @@ struct AIResponseView: View {
                             chatExchangeView(exchange)
                         }
 
-                        // Current question (hidden when empty, e.g. tutorial guide messages)
+                        // Current question (hidden when empty, e.g. tutorial guide messages or history-only mode)
                         if !userInput.isEmpty {
                             questionBar
                         }
 
-                        // Current response
-                        currentContentView
+                        // Current response (hidden when just showing history with no active query)
+                        if !userInput.isEmpty || currentMessage != nil {
+                            currentContentView
+                        }
 
                         // Voice follow-up indicator (shown inline when PTT is active during conversation)
                         if isVoiceFollowUp {
@@ -170,6 +172,10 @@ struct AIResponseView: View {
                     .scaleEffect(0.6)
                     .frame(width: 16, height: 16)
                 Text("thinking")
+                    .scaledFont(size: 14)
+                    .foregroundColor(.secondary)
+            } else if userInput.isEmpty && currentMessage == nil {
+                Text("conversation")
                     .scaledFont(size: 14)
                     .foregroundColor(.secondary)
             } else {
