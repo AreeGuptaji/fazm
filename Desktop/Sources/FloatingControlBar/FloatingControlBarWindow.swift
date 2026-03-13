@@ -1274,24 +1274,24 @@ class FloatingControlBarManager {
 
     /// Re-send the pending message that was interrupted by browser extension setup.
     /// Opens the floating bar and routes through `sendAIQuery` so streaming is wired up.
+    ///
+    /// The bridge is stopped (not restarted) so that `sendMessage` → `ensureBridgeStarted()`
+    /// does a full warmup with ACP session resume, preserving conversation history.
+    /// Instead of repeating the original prompt (which the AI already saw), we send a
+    /// continuation message so the AI picks up where it left off.
     func retryPendingQuery() {
         guard let provider = chatProvider,
-              let text = provider.pendingRetryMessage else { return }
+              let _ = provider.pendingRetryMessage else { return }
         provider.pendingRetryMessage = nil
         guard let window = window else { return }
 
-        log("FloatingControlBarManager: Retrying pending query via floating bar")
+        log("FloatingControlBarManager: Retrying pending query via floating bar (with session resume)")
 
-        // Reset stale state
+        // Reset streaming state but keep chat history — the session will be resumed
         chatCancellable?.cancel()
         chatCancellable = nil
         window.cancelInputHeightObserver()
-        window.state.showingAIConversation = false
-        window.state.showingAIResponse = false
-        window.state.aiInputText = ""
         window.state.currentAIMessage = nil
-        window.state.chatHistory = []
-        window.state.clearLastConversation()
 
         NSApp.activate(ignoringOtherApps: true)
         if !window.isVisible { show() }
@@ -1300,11 +1300,12 @@ class FloatingControlBarManager {
         window.showAIConversation()
         window.orderFrontRegardless()
 
-        // Restart the bridge so it picks up the newly-saved Playwright token,
-        // then send the query through the normal streaming path.
+        // Stop the bridge so ensureBridgeStarted() restarts with session resume.
+        // Send a continuation message — the AI already has the original prompt in session history.
+        let continuationMessage = "The browser extension is now connected and ready. Please continue with the task."
         Task { @MainActor in
             await provider.restartBridgeForNewToken()
-            await self.sendAIQuery(text, barWindow: window, provider: provider)
+            await self.sendAIQuery(continuationMessage, barWindow: window, provider: provider)
         }
     }
 
