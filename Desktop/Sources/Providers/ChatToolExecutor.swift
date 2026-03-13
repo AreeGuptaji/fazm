@@ -336,7 +336,7 @@ class ChatToolExecutor {
 
                 // Recent chat messages
                 let messages = try Row.fetchAll(db, sql: """
-                    SELECT role, text, createdAt FROM chat_messages
+                    SELECT sender, messageText, createdAt FROM chat_messages
                     WHERE createdAt >= datetime('now', 'start of day', '-\(daysAgo) day', 'localtime')
                         AND createdAt < \(upperBound)
                     ORDER BY createdAt DESC
@@ -348,8 +348,8 @@ class ChatToolExecutor {
                     out += "No chat messages found.\n"
                 } else {
                     for msg in messages {
-                        let role = msg["role"] as? String ?? "unknown"
-                        let text = msg["text"] as? String ?? ""
+                        let role = msg["sender"] as? String ?? "unknown"
+                        let text = msg["messageText"] as? String ?? ""
                         let preview = text.count > 120 ? String(text.prefix(120)) + "..." : text
                         out += "- **\(role)**: \(preview)\n"
                     }
