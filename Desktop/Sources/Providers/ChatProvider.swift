@@ -738,10 +738,11 @@ class ChatProvider: ObservableObject {
             AnalyticsManager.shared.browserExtensionConnectionTested(success: true, skipped: true)
             return true
         }
-        // Stop bridge so ensureBridgeStarted() restarts with new token + session resume
+        // Stop bridge so ensureBridgeStarted() restarts with new token + session resume.
+        // ensureBridgeStarted() reads the saved session ID from UserDefaults and passes
+        // it to warmup, preserving conversation history across the setup flow.
         await acpBridge.stop()
         acpBridgeStarted = false
-        floatingChatRestored = false  // Allow session ID reload for resume
         guard await ensureBridgeStarted() else {
             throw NSError(domain: "ChatProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to restart bridge for Playwright test"])
         }
@@ -2037,7 +2038,6 @@ class ChatProvider: ObservableObject {
         log("ChatProvider: Stopping bridge to pick up new Playwright token (will restart with session resume on next query)")
         await acpBridge.stop()
         acpBridgeStarted = false
-        floatingChatRestored = false  // Allow restoreFloatingChatIfNeeded to reload session ID
     }
 
     /// Send a follow-up message while the agent is still running.
