@@ -497,6 +497,15 @@ class ChatProvider: ObservableObject {
 
         // Re-register global auth handlers
         setupBridgeAuthHandlers()
+
+        // When switching to personal mode, start the bridge immediately so the
+        // OAuth flow triggers right away instead of waiting for the first message.
+        // If the user already has a valid Claude session (e.g. clicking back and forth),
+        // this will just reconnect without showing the auth sheet.
+        if newMode == "personal" {
+            log("ChatProvider: Starting personal bridge eagerly")
+            _ = await ensureBridgeStarted()
+        }
     }
 
     private func setupBridgeAuthHandlers() {
