@@ -129,7 +129,7 @@ class TranscriptionService {
     init(apiKey: String? = nil, language: String = "en", vocabulary: [String] = [], channels: Int = 2) throws {
         guard let key = apiKey
             ?? (getenv("DEEPGRAM_API_KEY").flatMap { String(validatingUTF8: $0) })
-            ?? { let k = DeepgramKeyProvider.deobfuscate(); return k.isEmpty ? nil : k }()
+            ?? { let k = KeyService.shared.deepgramAPIKey; return (k ?? "").isEmpty ? nil : k }()
         else {
             throw TranscriptionError.missingAPIKey
         }
@@ -549,7 +549,7 @@ extension TranscriptionService {
     ) async throws -> String? {
         guard let key = apiKey
             ?? (getenv("DEEPGRAM_API_KEY").flatMap { String(validatingUTF8: $0) })
-            ?? { let k = DeepgramKeyProvider.deobfuscate(); return k.isEmpty ? nil : k }()
+            ?? { let k = KeyService.shared.deepgramAPIKey; return (k ?? "").isEmpty ? nil : k }()
         else {
             throw TranscriptionError.missingAPIKey
         }
