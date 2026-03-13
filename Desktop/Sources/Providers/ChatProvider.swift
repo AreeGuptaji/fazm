@@ -2811,13 +2811,15 @@ class ChatProvider: ObservableObject {
     }
 
     /// Add a tool call indicator to a streaming message
-    /// Append a discovery card block to the last AI message in the chat
+    /// Add a discovery card as a new standalone AI message so it doesn't attach to unrelated messages
     func appendDiscoveryCard(title: String, summary: String, fullText: String) {
-        guard let index = messages.lastIndex(where: { $0.sender == .ai }) else { return }
-        messages[index].contentBlocks.append(
-            .discoveryCard(id: UUID().uuidString, title: title, summary: summary, fullText: fullText)
+        let cardBlock = ChatContentBlock.discoveryCard(id: UUID().uuidString, title: title, summary: summary, fullText: fullText)
+        let message = ChatMessage(
+            text: "",
+            sender: .ai,
+            contentBlocks: [cardBlock]
         )
-        forceNewTextBlock = true
+        messages.append(message)
     }
 
     private func addToolActivity(messageId: String, toolName: String, status: ToolCallStatus, toolUseId: String? = nil, input: [String: Any]? = nil) {
