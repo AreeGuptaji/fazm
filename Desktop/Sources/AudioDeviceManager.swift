@@ -47,6 +47,8 @@ class AudioDeviceManager: ObservableObject {
     // Level monitoring
     private var levelCaptureService: AudioCaptureService?
     private var isMonitoringLevel = false
+    private var levelMonitorRetryTask: Task<Void, Never>?
+    @Published var noMicrophoneAvailable = false
 
     // MARK: - Init
 
@@ -104,6 +106,9 @@ class AudioDeviceManager: ObservableObject {
     func startLevelMonitoring() {
         guard !isMonitoringLevel else { return }
         isMonitoringLevel = true
+        noMicrophoneAvailable = false
+        levelMonitorRetryTask?.cancel()
+        levelMonitorRetryTask = nil
 
         let capture = AudioCaptureService()
         levelCaptureService = capture
@@ -119,19 +124,39 @@ class AudioDeviceManager: ObservableObject {
                         }
                     }
                 )
+                noMicrophoneAvailable = false
+            } catch let error as AudioCaptureService.AudioCaptureError where error == .noInputAvailable {
+                // Expected when no mic is connected (e.g. Mac mini) — don't report to Sentry
+                log("AudioDeviceManager: no microphone available for level monitoring")
+                isMonitoringLevel = false
+                noMicrophoneAvailable = true
+                scheduleLevelMonitorRetry()
             } catch {
-                logError("AudioDeviceManager: level monitoring failed", error: error)
+                log("AudioDeviceManager: level monitoring failed: \(error.localizedDescription)")
                 isMonitoringLevel = false
             }
         }
     }
 
+    /// Retry level monitoring after a delay — picks up newly connected microphones.
+    private func scheduleLevelMonitorRetry() {
+        levelMonitorRetryTask?.cancel()
+        levelMonitorRetryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            guard !Task.isCancelled, let self, !self.isMonitoringLevel else { return }
+            self.startLevelMonitoring()
+        }
+    }
+
     func stopLevelMonitoring() {
+        levelMonitorRetryTask?.cancel()
+        levelMonitorRetryTask = nil
         guard isMonitoringLevel else { return }
         levelCaptureService?.stopCapture()
         levelCaptureService = nil
         isMonitoringLevel = false
         currentAudioLevel = 0.0
+        noMicrophoneAvailable = false
     }
 
     /// Restart level monitoring on a background thread so we can synchronously
@@ -139,10 +164,13 @@ class AudioDeviceManager: ObservableObject {
     private func restartLevelMonitoringIfNeeded() {
         guard isMonitoringLevel else { return }
 
+        levelMonitorRetryTask?.cancel()
+        levelMonitorRetryTask = nil
         let oldCapture = levelCaptureService
         levelCaptureService = nil
         isMonitoringLevel = false
         currentAudioLevel = 0.0
+        noMicrophoneAvailable = false
 
         let newDeviceUID = effectiveDeviceUID
 
@@ -169,8 +197,13 @@ class AudioDeviceManager: ObservableObject {
                                 }
                             }
                         )
+                    } catch let error as AudioCaptureService.AudioCaptureError where error == .noInputAvailable {
+                        log("AudioDeviceManager: no microphone available after restart")
+                        self.isMonitoringLevel = false
+                        self.noMicrophoneAvailable = true
+                        self.scheduleLevelMonitorRetry()
                     } catch {
-                        logError("AudioDeviceManager: level monitoring restart failed", error: error)
+                        log("AudioDeviceManager: level monitoring restart failed: \(error.localizedDescription)")
                         self.isMonitoringLevel = false
                     }
                 }
