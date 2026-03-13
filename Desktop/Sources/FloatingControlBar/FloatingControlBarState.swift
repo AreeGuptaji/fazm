@@ -112,6 +112,22 @@ class FloatingControlBarState: NSObject, ObservableObject {
     /// System prompt suffix injected during tutorial (cleared on finish)
     var tutorialSystemPromptSuffix: String?
 
+    /// Pre-populate chatHistory from ChatProvider's messages so previous conversation is visible on fresh launch.
+    func loadHistory(from messages: [ChatMessage]) {
+        var exchanges: [FloatingChatExchange] = []
+        var i = 0
+        while i < messages.count {
+            let msg = messages[i]
+            if msg.sender == .user, i + 1 < messages.count, messages[i + 1].sender == .ai {
+                exchanges.append(FloatingChatExchange(question: msg.text, aiMessage: messages[i + 1]))
+                i += 2
+            } else {
+                i += 1
+            }
+        }
+        chatHistory = exchanges
+    }
+
     // Model selection
     @Published var selectedModel: String = "claude-opus-4-6"
 
