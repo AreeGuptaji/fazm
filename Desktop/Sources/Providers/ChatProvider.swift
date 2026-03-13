@@ -727,8 +727,8 @@ class ChatProvider: ObservableObject {
     }
 
     /// Test that the Playwright Chrome extension is connected and working.
-    /// Ensures the bridge is started (restarting if needed to pick up new token),
-    /// then sends a lightweight test query that triggers a browser_snapshot tool call.
+    /// Stops the bridge and restarts via `ensureBridgeStarted()` which does a full
+    /// warmup with session resume, preserving conversation history across the setup flow.
     func testPlaywrightConnection() async throws -> Bool {
         // If a query is in progress, skip the bridge restart — it would kill the
         // in-flight query. The token is already saved in UserDefaults and will be
@@ -738,14 +738,12 @@ class ChatProvider: ObservableObject {
             AnalyticsManager.shared.browserExtensionConnectionTested(success: true, skipped: true)
             return true
         }
-        // Restart bridge to pick up new extension token
+        // Stop bridge so ensureBridgeStarted() restarts with new token + session resume
+        await acpBridge.stop()
         acpBridgeStarted = false
-        do {
-            try await acpBridge.restart()
-            acpBridgeStarted = true
-        } catch {
-            try await acpBridge.start()
-            acpBridgeStarted = true
+        floatingChatRestored = false  // Allow session ID reload for resume
+        guard await ensureBridgeStarted() else {
+            throw NSError(domain: "ChatProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to restart bridge for Playwright test"])
         }
         return try await acpBridge.testPlaywrightConnection()
     }
