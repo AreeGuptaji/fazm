@@ -2359,6 +2359,21 @@ class ChatProvider: ObservableObject {
             let toolResultDisplayHandler: ACPBridge.ToolResultDisplayHandler = { [weak self] toolUseId, name, output in
                 Task { @MainActor [weak self] in
                     self?.addToolResult(messageId: aiMessageId, toolUseId: toolUseId, name: name, output: output)
+                    // Detect browser extension disconnect mid-task and surface it clearly
+                    let isBrowserTool = name.contains("browser") || name.contains("playwright")
+                    let isDisconnected = output.contains("Extension connection timeout")
+                        || output.contains("extension is not connected")
+                    if isBrowserTool && isDisconnected && self?.stoppedForBrowserSetup != true {
+                        log("ChatProvider: Browser extension disconnected mid-task (\(name)) — stopping and prompting setup")
+                        self?.errorMessage = "The browser extension disconnected. Reconnecting — your task will resume automatically once it's back."
+                        self?.stoppedForBrowserSetup = true
+                        self?.needsBrowserExtensionSetup = true
+                        self?.stopAgent()
+                        NSApp.activate(ignoringOtherApps: true)
+                        for window in NSApp.windows where window.title.hasPrefix("Fazm") {
+                            window.makeKeyAndOrderFront(nil)
+                        }
+                    }
                 }
             }
             let textBlockBoundaryHandler: ACPBridge.TextBlockBoundaryHandler = { [weak self] in
