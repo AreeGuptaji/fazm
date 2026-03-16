@@ -115,21 +115,35 @@ struct HomeSection: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(recentMessages.enumerated()), id: \.offset) { _, message in
-                        HStack(spacing: 8) {
+                        HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "person.fill")
                                 .scaledFont(size: 10)
                                 .foregroundColor(FazmColors.purplePrimary)
+                                .padding(.top, 3)
 
                             Text(message.text)
                                 .scaledFont(size: 13, weight: .medium)
                                 .foregroundColor(FazmColors.textPrimary)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
 
                             Spacer()
 
-                            Text(timeAgo(message.date))
-                                .scaledFont(size: 11)
-                                .foregroundColor(FazmColors.textQuaternary)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(timeAgo(message.date))
+                                    .scaledFont(size: 11)
+                                    .foregroundColor(FazmColors.textQuaternary)
+
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(message.text, forType: .string)
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .scaledFont(size: 11)
+                                        .foregroundColor(FazmColors.textQuaternary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Copy to clipboard")
+                            }
                         }
                         .padding(12)
                         .background(
