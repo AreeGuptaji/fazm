@@ -900,6 +900,9 @@ class FloatingControlBarManager {
     /// PID of the last active app before Fazm. Used to capture that app's window for screenshots.
     private(set) var lastActiveAppPID: pid_t = 0
 
+    /// File URL of a pre-captured screenshot, taken when the bar opens (PTT or keyboard).
+    private var pendingScreenshotPath: URL?
+
     /// Whether the user has enabled the Ask Fazm bar (persisted across launches).
     /// Defaults to true for new users.
     var isEnabled: Bool {
@@ -932,6 +935,24 @@ class FloatingControlBarManager {
         if let frontApp = NSWorkspace.shared.frontmostApplication,
            frontApp.bundleIdentifier != Bundle.main.bundleIdentifier {
             lastActiveAppPID = frontApp.processIdentifier
+        }
+    }
+
+    /// Capture the last active app's window immediately (before Fazm's bar covers it).
+    /// Stores the file path for use when the query is sent.
+    private func captureScreenshotEarly() {
+        let targetPID = self.lastActiveAppPID
+        pendingScreenshotPath = nil
+        Task.detached { [weak self] in
+            let url: URL?
+            if targetPID != 0 {
+                url = ScreenCaptureManager.captureAppWindow(pid: targetPID)
+            } else {
+                url = ScreenCaptureManager.captureScreen()
+            }
+            await MainActor.run {
+                self?.pendingScreenshotPath = url
+            }
         }
     }
 
@@ -1129,6 +1150,9 @@ class FloatingControlBarManager {
         // Move to the active monitor before opening
         window.moveToActiveScreen()
 
+        // Capture the last active app's window before Fazm activates and covers it
+        captureScreenshotEarly()
+
         // Activate the app so the window can become key and accept keyboard input.
         // Without this, makeFirstResponder silently fails when triggered from a global shortcut.
         NSApp.activate(ignoringOtherApps: true)
@@ -1180,6 +1204,9 @@ class FloatingControlBarManager {
 
         // Move to the active monitor before opening
         window.moveToActiveScreen()
+
+        // Capture the last active app's window before Fazm activates and covers it
+        captureScreenshotEarly()
 
         // Cancel stale subscriptions immediately to prevent old data from flashing
         chatCancellable?.cancel()
@@ -1379,28 +1406,11 @@ class FloatingControlBarManager {
             }
         }
 
-        // Capture the last active app's window (not the full desktop)
-        let targetPID = self.lastActiveAppPID
-        let needsHideBar = targetPID == 0 // Only hide for full-screen capture
-        if needsHideBar {
-            barWindow.orderOut(nil)
-            try? await Task.sleep(nanoseconds: 150_000_000) // 150ms for window to disappear
-        }
-        let screenshotData = await Task.detached { () -> Data? in
-            let url: URL?
-            if targetPID != 0 {
-                url = ScreenCaptureManager.captureAppWindow(pid: targetPID)
-            } else {
-                url = ScreenCaptureManager.captureScreen()
-            }
-            guard let url else { return nil }
-            return try? Data(contentsOf: url)
-        }.value
-        if needsHideBar {
-            barWindow.makeKeyAndOrderFront(nil)
-        }
+        // Use pre-captured screenshot (taken when the bar opened), then clear it
+        let screenshotPath = self.pendingScreenshotPath
+        self.pendingScreenshotPath = nil
 
-        AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotData != nil, queryText: message)
+        AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotPath != nil, queryText: message)
 
         // Provider is already initialized by ViewModelContainer at app launch
 
