@@ -1142,11 +1142,6 @@ class FloatingControlBarManager {
 
         AnalyticsManager.shared.floatingBarAskFazmOpened(source: "shortcut")
 
-        // Load conversation history from ChatProvider (survives app restart, unlike lastConversation)
-        if window.state.lastConversation == nil, let provider = self.chatProvider, !provider.messages.isEmpty {
-            window.state.loadHistory(from: provider.messages)
-        }
-
         // Re-wire onSendQuery for the shared provider
         if let provider = self.chatProvider {
             window.onSendQuery = { [weak self, weak window, weak provider] message in
@@ -1161,10 +1156,21 @@ class FloatingControlBarManager {
             show()
         }
 
-        // If there's existing conversation history (from provider or lastConversation),
-        // showAIConversation will auto-resume it. Otherwise shows blank input.
-        window.showAIConversation()
-        window.orderFrontRegardless()
+        // Restore floating chat from DB before showing conversation so history is visible immediately.
+        // Must await the DB load before showAIConversation() checks chatHistory.isEmpty.
+        if let provider = self.chatProvider {
+            Task { @MainActor in
+                await provider.restoreFloatingChatIfNeeded()
+                if window.state.lastConversation == nil && window.state.chatHistory.isEmpty && !provider.messages.isEmpty {
+                    window.state.loadHistory(from: provider.messages)
+                }
+                window.showAIConversation()
+                window.orderFrontRegardless()
+            }
+        } else {
+            window.showAIConversation()
+            window.orderFrontRegardless()
+        }
     }
 
     /// Open AI input with a pre-filled transcription from PTT (inserts into input field without sending).
@@ -1188,9 +1194,6 @@ class FloatingControlBarManager {
         window.state.voiceFollowUpTranscript = ""
 
         guard let provider = self.chatProvider else { return }
-
-        // Pre-populate chat history from provider so previous conversation is visible
-        window.state.loadHistory(from: provider.messages)
 
         // Re-wire the onSendQuery to use the shared provider
         window.onSendQuery = { [weak self, weak window, weak provider] message in
@@ -1228,17 +1231,22 @@ class FloatingControlBarManager {
         // center instead of where it was before the chat opened.
         window.savePreChatCenterIfNeeded()
 
-        // Show the input view with the transcription pre-filled (user can edit before sending)
-        window.state.clearLastConversation()
-        window.state.aiInputText = query
-        window.showAIConversation()
-        // Override the empty text that showAIConversation sets
-        window.state.aiInputText = query
-        window.orderFrontRegardless()
+        // Restore floating chat from DB before showing conversation so history is visible immediately.
+        Task { @MainActor in
+            await provider.restoreFloatingChatIfNeeded()
+            if window.state.chatHistory.isEmpty && !provider.messages.isEmpty {
+                window.state.loadHistory(from: provider.messages)
+            }
 
-        // Focus the input field so user can immediately edit or press Enter to send
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            window.focusInputField()
+            window.state.clearLastConversation()
+            window.state.aiInputText = query
+            window.showAIConversation()
+            window.state.aiInputText = query
+            window.orderFrontRegardless()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                window.focusInputField()
+            }
         }
     }
 
@@ -1425,17 +1433,19 @@ class FloatingControlBarManager {
         chatCancellable = provider.$messages
             .receive(on: DispatchQueue.main)
             .sink { [weak barWindow] messages in
+                // Ignore updates if the conversation was closed (Esc pressed during streaming)
+                guard let barWindow = barWindow, barWindow.state.showingAIConversation else { return }
                 // Find the AI response message added after our query
                 guard messages.count > messageCountBefore,
                       let aiMessage = messages.last,
                       aiMessage.sender == .ai else { return }
 
                 // Store the full ChatMessage (preserves contentBlocks, tool calls, thinking)
-                barWindow?.state.currentAIMessage = aiMessage
+                barWindow.state.currentAIMessage = aiMessage
 
                 if aiMessage.isStreaming {
-                    barWindow?.state.isAILoading = false
-                    if let barWindow = barWindow, !hasSetUpResponseHeight {
+                    barWindow.state.isAILoading = false
+                    if !hasSetUpResponseHeight {
                         hasSetUpResponseHeight = true
                         if !barWindow.state.showingAIResponse {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -1445,7 +1455,7 @@ class FloatingControlBarManager {
                         barWindow.resizeToResponseHeightPublic(animated: false)
                     }
                 } else {
-                    barWindow?.state.isAILoading = false
+                    barWindow.state.isAILoading = false
                 }
             }
 
@@ -1461,6 +1471,11 @@ class FloatingControlBarManager {
 
         // Handle errors after sendMessage completes
         barWindow.state.isAILoading = false
+
+        // Don't update bar state if the conversation was closed while the query was in flight.
+        // Without this guard, the post-completion code sets showingAIResponse = true and resizes
+        // the window, creating a phantom gray box after the user pressed Esc.
+        guard barWindow.state.showingAIConversation else { return }
 
         if provider.isClaudeAuthRequired {
             // Auth needed — the main window's auth sheet will appear via the observer.
