@@ -15,7 +15,7 @@ use crate::config::Config;
 
 /// Google's JWKS endpoint for Firebase Auth tokens
 const GOOGLE_JWKS_URL: &str =
-    "https://www.googleapis.com/service_account/v1/metadata/jwk/securetoken@system.gserviceaccount.com";
+    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 
 /// How long to cache JWKS keys
 const JWKS_CACHE_TTL_SECS: u64 = 3600; // 1 hour
