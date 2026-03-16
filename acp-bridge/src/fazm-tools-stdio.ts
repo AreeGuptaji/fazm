@@ -268,6 +268,18 @@ This is the ONLY way to see what's on the user's desktop. Do NOT use playwright'
     },
   },
   {
+    name: "query_browser_profile",
+    description: `Search the user's locally-extracted browser profile (identity, accounts, tools, contacts, addresses, payments). Use when the user asks about themselves or you need personal context. Data comes from browser autofill, saved logins, history, and bookmarks — extracted locally, nothing leaves the machine.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string" as const, description: "Natural language query, e.g. 'email address', 'full profile', 'GitHub account'" },
+        tags: { type: "array" as const, items: { type: "string" as const }, description: "Optional tag filters: identity, contact_info, account, tool, address, payment, contact, work, knowledge" },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "scan_files",
     description: `Scan the user's files. BLOCKING — waits for the scan to complete before returning. Scans ~/Downloads, ~/Documents, ~/Desktop, ~/Developer, ~/Projects, /Applications. Returns file type breakdown, project indicators, recent files, installed apps. Also reports which folders were DENIED access by macOS. If folders were denied, call again after the user grants access.`,
     inputSchema: {
@@ -579,6 +591,16 @@ async function handleJsonRpc(
         toolName === "save_knowledge_graph"
       ) {
         // Onboarding tools — forward directly to Swift
+        const result = await requestSwiftTool(toolName, args);
+        if (!isNotification) {
+          send({
+            jsonrpc: "2.0",
+            id,
+            result: { content: [{ type: "text", text: result }] },
+          });
+        }
+      } else if (toolName === "query_browser_profile") {
+        // Always-available tool — forward to Swift
         const result = await requestSwiftTool(toolName, args);
         if (!isNotification) {
           send({
