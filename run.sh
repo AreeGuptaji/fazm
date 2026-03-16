@@ -213,8 +213,13 @@ if [ -d "$GWS_MCP_REPO" ]; then
     if command -v uv &>/dev/null; then
         substep "Creating Python venv with uv"
         uv venv "$GWS_MCP_BUNDLE/.venv" --python python3.12 --quiet 2>&1 | tail -1 || true
-        uv pip install --python "$GWS_MCP_BUNDLE/.venv/bin/python3" \
-            --project "$GWS_MCP_REPO" -e "$GWS_MCP_REPO" --quiet 2>&1 | tail -3 || true
+        # Install dependencies (extracted from pyproject.toml) into the bundled venv
+        GWS_DEPS=$(python3 -c "
+import tomllib
+with open('$GWS_MCP_REPO/pyproject.toml', 'rb') as f:
+    print(' '.join(tomllib.load(f)['project']['dependencies']))
+")
+        uv pip install --python "$GWS_MCP_BUNDLE/.venv/bin/python3" $GWS_DEPS --quiet 2>&1 | tail -3 || true
         substep "Bundled Google Workspace MCP with venv"
     else
         substep "Warning: uv not found — Google Workspace MCP will not work without dependencies"
