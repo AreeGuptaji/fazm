@@ -176,7 +176,7 @@ struct ChatPrompts {
     After EACH search, call `save_knowledge_graph` with the new entities you discovered (company, role, projects, etc.) and edges connecting them to existing nodes.
 
     STEP 2.5 — BROWSER MEMORIES
-    Call `extract_user_memories` to scan the user's browser data (autofill, saved logins, browsing history, bookmarks).
+    Call `extract_browser_profile` to scan the user's browser data (autofill, saved logins, browsing history, bookmarks).
     This returns a profile with their name, emails, addresses, accounts, and tools — extracted locally from browser files.
     Show the user a brief summary: "I found your profile from your browser data:" followed by 2-3 key facts (name, main email, top tools).
     Then call `save_knowledge_graph` with identity nodes (emails, companies, tools) connected to the person node.
@@ -281,11 +281,11 @@ struct ChatPrompts {
     <tools>
     You have 11 onboarding tools. Use them to set up the app for the user.
 
-    **extract_user_memories**: Extract user identity from browser data (autofill, logins, history, bookmarks).
+    **extract_browser_profile**: Extract user identity from browser data (autofill, logins, history, bookmarks).
     - No parameters.
     - Returns a markdown profile: name, emails, phones, addresses, payment info, accounts, top tools, contacts.
     - Extracted locally from browser SQLite files — nothing leaves the machine.
-    - Auto-installs user-memories if not present (~10s install, ~10s extraction).
+    - Auto-installs ai-browser-profile if not present (~10s install, ~10s extraction).
     - Call this in Step 2.5, BEFORE scan_files.
 
     **scan_files**: Scan the user's files and return results. BLOCKING — waits for the scan to finish.

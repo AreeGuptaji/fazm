@@ -122,7 +122,7 @@ const isOnboarding = (process.env.FAZM_ONBOARDING || process.env.OMI_ONBOARDING)
 const ONBOARDING_TOOL_NAMES = new Set([
   "check_permission_status",
   "request_permission",
-  "extract_user_memories",
+  "extract_browser_profile",
   "scan_files",
   "set_user_preferences",
   "ask_followup",
@@ -259,8 +259,8 @@ This is the ONLY way to see what's on the user's desktop. Do NOT use playwright'
     },
   },
   {
-    name: "extract_user_memories",
-    description: `Extract user identity from browser data (autofill, logins, history, bookmarks). Returns a markdown profile: name, emails, phones, addresses, payment info, accounts, top tools, contacts. Extracted locally from browser SQLite files — nothing leaves the machine. Auto-installs user-memories if not present (~10s install, ~10s extraction). Call BEFORE scan_files in onboarding.`,
+    name: "extract_browser_profile",
+    description: `Extract user identity from browser data (autofill, logins, history, bookmarks). Returns a markdown profile: name, emails, phones, addresses, payment info, accounts, top tools, contacts. Extracted locally from browser SQLite files — nothing leaves the machine. Auto-installs ai-browser-profile if not present (~10s install, ~10s extraction). Call BEFORE scan_files in onboarding.`,
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -571,7 +571,7 @@ async function handleJsonRpc(
       } else if (
         toolName === "check_permission_status" ||
         toolName === "request_permission" ||
-        toolName === "extract_user_memories" ||
+        toolName === "extract_browser_profile" ||
         toolName === "scan_files" ||
         toolName === "set_user_preferences" ||
         toolName === "ask_followup" ||

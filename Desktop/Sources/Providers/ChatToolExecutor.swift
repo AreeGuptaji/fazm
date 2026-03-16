@@ -54,9 +54,9 @@ class ChatToolExecutor {
             AnalyticsManager.shared.onboardingChatToolUsed(tool: "check_permission_status")
             return result
 
-        case "extract_user_memories":
-            AnalyticsManager.shared.onboardingChatToolUsed(tool: "extract_user_memories")
-            return await executeExtractUserMemories(toolCall.arguments)
+        case "extract_browser_profile":
+            AnalyticsManager.shared.onboardingChatToolUsed(tool: "extract_browser_profile")
+            return await executeExtractBrowserProfile(toolCall.arguments)
 
         case "scan_files", "start_file_scan":
             AnalyticsManager.shared.onboardingChatToolUsed(tool: "scan_files")
@@ -498,25 +498,25 @@ class ChatToolExecutor {
         return out
     }
 
-    // MARK: - User Memories Extraction
+    // MARK: - Browser Profile Extraction
 
-    /// Extract user memories from browser data using the user-memories Python package.
+    /// Extract user browser profile using the ai-browser-profile Python package.
     /// Runs the fast extraction steps (autofill, history, bookmarks, logins, Notion) + cleanup,
     /// then returns the interim profile. WhatsApp contacts and embeddings continue in the background.
-    private static func executeExtractUserMemories(_ args: [String: Any]) async -> String {
+    private static func executeExtractBrowserProfile(_ args: [String: Any]) async -> String {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        let userMemoriesDir = homeDir.appendingPathComponent("user-memories")
-        let python = userMemoriesDir.appendingPathComponent(".venv/bin/python").path
-        let extractScript = userMemoriesDir.appendingPathComponent("extract.py").path
+        let aiBrowserProfileDir = homeDir.appendingPathComponent("ai-browser-profile")
+        let python = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
+        let extractScript = aiBrowserProfileDir.appendingPathComponent("extract.py").path
 
-        // Check if user-memories is installed, auto-install if not
+        // Check if ai-browser-profile is installed, auto-install if not
         if !FileManager.default.fileExists(atPath: python) ||
            !FileManager.default.fileExists(atPath: extractScript) {
-            log("user-memories not found, installing via npx...")
+            log("ai-browser-profile not found, installing via npx...")
             let installResult = await Task.detached(priority: .userInitiated) {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = ["npx", "user-memories", "init"]
+                process.arguments = ["npx", "ai-browser-profile", "init"]
                 process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
                 let pipe = Pipe()
                 process.standardOutput = pipe
@@ -532,14 +532,14 @@ class ChatToolExecutor {
             }.value
 
             if !installResult.0 {
-                return "Failed to install user-memories: \(installResult.1)\nUser can install manually: npx user-memories init"
+                return "Failed to install ai-browser-profile: \(installResult.1)\nUser can install manually: npx ai-browser-profile init"
             }
 
             // Also install embeddings
             let _ = await Task.detached(priority: .userInitiated) {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = ["npx", "user-memories", "install-embeddings"]
+                process.arguments = ["npx", "ai-browser-profile", "install-embeddings"]
                 process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
                 let pipe = Pipe()
                 process.standardOutput = pipe
@@ -554,7 +554,7 @@ class ChatToolExecutor {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: python)
             process.arguments = [extractScript]
-            process.currentDirectoryURL = userMemoriesDir
+            process.currentDirectoryURL = aiBrowserProfileDir
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = pipe
@@ -579,13 +579,13 @@ class ChatToolExecutor {
                 profileProcess.executableURL = URL(fileURLWithPath: python)
                 profileProcess.arguments = ["-c", """
                     import sys, os
-                    sys.path.insert(0, os.path.expanduser("~/user-memories"))
-                    from user_memories import MemoryDB
-                    mem = MemoryDB(os.path.expanduser("~/user-memories/memories.db"))
+                    sys.path.insert(0, os.path.expanduser("~/ai-browser-profile"))
+                    from ai_browser_profile import MemoryDB
+                    mem = MemoryDB(os.path.expanduser("~/ai-browser-profile/memories.db"))
                     print(mem.profile_text())
                     mem.close()
                     """]
-                profileProcess.currentDirectoryURL = userMemoriesDir
+                profileProcess.currentDirectoryURL = aiBrowserProfileDir
                 let profilePipe = Pipe()
                 profileProcess.standardOutput = profilePipe
                 profileProcess.standardError = profilePipe
@@ -598,8 +598,8 @@ class ChatToolExecutor {
             }
         }.value
 
-        OnboardingChatPersistence.markStepCompleted("user_memories")
-        log("User memories extraction completed")
+        OnboardingChatPersistence.markStepCompleted("ai_browser_profile")
+        log("Browser profile extraction completed")
         return result
     }
 
