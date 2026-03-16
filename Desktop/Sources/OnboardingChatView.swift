@@ -201,18 +201,6 @@ struct OnboardingChatView: View {
                                 .id(message.id)
                         }
 
-                        // Parallel exploration card (appears after scan_files)
-                        if explorationRunning || (explorationCompleted && !explorationText.isEmpty) {
-                            ExplorationProfileCard(
-                                text: explorationText,
-                                isRunning: explorationRunning,
-                                isCompleted: explorationCompleted
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 44) // align with message text
-                            .id("exploration-card")
-                        }
-
                         // Typing indicator (floating, no avatar)
                         if chatProvider.isSending {
                             TypingIndicator()
@@ -368,6 +356,16 @@ struct OnboardingChatView: View {
                         scrollToBottom(proxy: proxy, delay: 0.2)
                     }
                 }
+            }
+
+            // Exploration profile card — sticks above the input field
+            if explorationRunning || (explorationCompleted && !explorationText.isEmpty) {
+                ExplorationProfileCard(
+                    text: explorationText,
+                    isRunning: explorationRunning,
+                    isCompleted: explorationCompleted
+                )
+                .padding(.horizontal, 20)
             }
 
             // Input area
