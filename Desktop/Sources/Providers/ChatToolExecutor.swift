@@ -39,9 +39,6 @@ class ChatToolExecutor {
         case "delete_task":
             return await executeDeleteTask(toolCall.arguments)
 
-        case "google_workspace":
-            return await executeGoogleWorkspace(toolCall.arguments)
-
         case "capture_screenshot":
             return await executeCaptureScreenshot(toolCall.arguments)
 
@@ -826,80 +823,6 @@ class ChatToolExecutor {
         return "Presented to user: \"\(question)\" with options: \(options.joined(separator: ", "))"
     }
 
-    // MARK: - Google Workspace
-
-    /// Path to the gws binary (bundled or system-installed)
-    private static var gwsBinaryPath: String? {
-        // Check bundled binary first
-        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("gws").path,
-           FileManager.default.isExecutableFile(atPath: bundled) {
-            return bundled
-        }
-        // Check common install locations
-        for path in ["/usr/local/bin/gws", "/opt/homebrew/bin/gws"] {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return path
-            }
-        }
-        // Check npm global installs (various locations)
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let npmPaths = [
-            home.appendingPathComponent(".npm-global/bin/gws").path,
-            home.appendingPathComponent(".nvm/versions/node").path, // check nvm below
-        ]
-        for path in npmPaths {
-            if path.contains(".nvm") {
-                // Search nvm node versions for gws
-                if let versions = try? FileManager.default.contentsOfDirectory(atPath: path) {
-                    for version in versions.sorted().reversed() {
-                        let gwsPath = "\(path)/\(version)/bin/gws"
-                        if FileManager.default.isExecutableFile(atPath: gwsPath) {
-                            return gwsPath
-                        }
-                    }
-                }
-            } else if FileManager.default.isExecutableFile(atPath: path) {
-                return path
-            }
-        }
-        return nil
-    }
-
-    /// Check if gws is authenticated by looking for credential files
-    private static var isGWSAuthenticated: Bool {
-        let configDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/gws")
-        let fm = FileManager.default
-        // Check plain credentials (credentials.json)
-        let plainCreds = configDir.appendingPathComponent("credentials.json").path
-        if fm.fileExists(atPath: plainCreds) { return true }
-        // Check global encrypted credentials (credentials.enc)
-        let encCreds = configDir.appendingPathComponent("credentials.enc").path
-        if fm.fileExists(atPath: encCreds) { return true }
-        // Check per-account encrypted credentials (credentials.<base64_email>.enc)
-        if let contents = try? fm.contentsOfDirectory(atPath: configDir.path) {
-            return contents.contains { $0.hasPrefix("credentials.") && $0.hasSuffix(".enc") }
-        }
-        return false
-    }
-
-
-    /// List connected gws accounts by reading ~/.config/gws/accounts.json
-    private static func listGWSAccounts() -> (accounts: [[String: String]], defaultAccount: String?) {
-        let fm = FileManager.default
-        let accountsFile = fm.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/gws/accounts.json")
-        guard let data = fm.contents(atPath: accountsFile.path),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let accountsDict = json["accounts"] as? [String: Any] else {
-            return ([], nil)
-        }
-        let defaultAccount = json["default"] as? String
-        let accounts = accountsDict.keys.sorted().map { email -> [String: String] in
-            ["email": email, "is_default": email == defaultAccount ? "true" : "false"]
-        }
-        return (accounts, defaultAccount)
-    }
 
     /// Execute a Google Workspace tool action
     private static func executeGoogleWorkspace(_ args: [String: Any]) async -> String {
