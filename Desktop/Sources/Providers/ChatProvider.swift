@@ -961,13 +961,20 @@ class ChatProvider: ObservableObject {
         log("ChatProvider: Claude account disconnected, switched to builtin mode")
     }
 
-    /// Check if an error message from the ACP bridge indicates an auth/OAuth failure
-    /// (e.g. "OAuth callback timed out", "unauthorized", etc.)
+    /// Check if an error message from the ACP bridge indicates an auth/OAuth failure.
+    ///
+    /// The bridge handles auth internally (OAuth flow + retries). It only emits a plain
+    /// `error` message with auth content when it exhausts retries, producing the specific
+    /// string: "Authentication required. Please disconnect and reconnect your Claude account..."
+    /// We match that precisely to avoid false positives from unrelated errors that happen
+    /// to contain broad substrings like "auth" or "login".
     static func isAuthRelatedError(_ message: String) -> Bool {
         let lower = message.lowercased()
-        return lower.contains("oauth") || lower.contains("auth")
-            || lower.contains("unauthorized") || lower.contains("sign in")
-            || lower.contains("login") || lower.contains("credential")
+        // Exact phrase the bridge emits after exhausting auth retries
+        if lower.contains("authentication required") { return true }
+        // HTTP 401 surfaced directly as an agentError (shouldn't happen but guard it)
+        if lower.contains("401") && (lower.contains("unauthorized") || lower.contains("unauthenticated")) { return true }
+        return false
     }
 
     // MARK: - Session Management
