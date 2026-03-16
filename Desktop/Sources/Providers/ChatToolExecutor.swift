@@ -647,6 +647,7 @@ class ChatToolExecutor {
 
         let query = args["query"] as? String ?? "full profile"
         let tags = args["tags"] as? [String] ?? []
+        let queryLiteral = pythonStringLiteral(query)
 
         return await Task.detached(priority: .userInitiated) { () -> String in
             let process = Process()
@@ -658,7 +659,7 @@ class ChatToolExecutor {
                 sys.path.insert(0, os.path.expanduser("~/ai-browser-profile"))
                 from ai_browser_profile import MemoryDB
                 mem = MemoryDB(os.path.expanduser("~/ai-browser-profile/memories.db"))
-                query = \(Self.pythonStringLiteral(query))
+                query = \(queryLiteral)
                 tags = \(tagsExpr)
                 if query in ("full profile", "profile"):
                     print(mem.profile_text())
