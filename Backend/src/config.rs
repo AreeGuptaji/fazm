@@ -2,7 +2,8 @@
 #[derive(Clone)]
 pub struct Config {
     pub port: u16,
-    pub backend_secret: String,
+    pub backend_secret: Option<String>,
+    pub firebase_project_id: String,
     pub vertex_sa_private_key_pem: String,
     pub vertex_issuer: String,
     pub vertex_project_id: String,
@@ -29,8 +30,9 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8080),
-            backend_secret: std::env::var("FAZM_BACKEND_SECRET")
-                .expect("FAZM_BACKEND_SECRET must be set"),
+            backend_secret: std::env::var("FAZM_BACKEND_SECRET").ok(),
+            firebase_project_id: std::env::var("FIREBASE_PROJECT_ID")
+                .unwrap_or_else(|_| "fazm-prod".to_string()),
             vertex_sa_private_key_pem: {
                 let raw = std::env::var("VERTEX_SA_PRIVATE_KEY_PEM")
                     .expect("VERTEX_SA_PRIVATE_KEY_PEM must be set");
