@@ -214,7 +214,7 @@ if [ -d "$GWS_MCP_REPO" ]; then
         substep "Creating Python venv with uv"
         uv venv "$GWS_MCP_BUNDLE/.venv" --python python3.12 --quiet 2>&1 | tail -1 || true
         # Install dependencies (extracted from pyproject.toml) into the bundled venv
-        GWS_DEPS=$(python3 -c "
+        GWS_DEPS=$(python3.12 -c "
 import tomllib
 with open('$GWS_MCP_REPO/pyproject.toml', 'rb') as f:
     print(' '.join(tomllib.load(f)['project']['dependencies']))
