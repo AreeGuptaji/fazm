@@ -11,28 +11,31 @@ final class KeyService {
     private var hasFetched = false
 
     private let backendUrl: String
-    private let backendSecret: String
     private let deviceId: String
 
     private init() {
         self.backendUrl = Self.env("FAZM_BACKEND_URL").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        self.backendSecret = Self.env("FAZM_BACKEND_SECRET")
         self.deviceId = Self.getDeviceId()
     }
 
     /// Fetch keys from the backend. Safe to call multiple times — only fetches once per launch.
     func fetchKeys() async {
         guard !hasFetched else { return }
-        guard !backendUrl.isEmpty, !backendSecret.isEmpty else {
-            log("KeyService: missing FAZM_BACKEND_URL or FAZM_BACKEND_SECRET, skipping key fetch")
+        guard !backendUrl.isEmpty else {
+            log("KeyService: missing FAZM_BACKEND_URL, skipping key fetch")
+            return
+        }
+        guard await AuthService.shared.isSignedIn else {
+            log("KeyService: user not signed in, skipping key fetch")
             return
         }
 
         do {
+            let authHeader = try await AuthService.shared.getAuthHeader()
             let url = URL(string: "\(backendUrl)/v1/keys")!
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
-            request.setValue("Bearer \(backendSecret)", forHTTPHeaderField: "Authorization")
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
             request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
             request.timeoutInterval = 15
 
