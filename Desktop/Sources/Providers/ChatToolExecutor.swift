@@ -58,6 +58,9 @@ class ChatToolExecutor {
             AnalyticsManager.shared.onboardingChatToolUsed(tool: "extract_browser_profile")
             return await executeExtractBrowserProfile(toolCall.arguments)
 
+        case "query_browser_profile":
+            return await executeQueryBrowserProfile(toolCall.arguments)
+
         case "scan_files", "start_file_scan":
             AnalyticsManager.shared.onboardingChatToolUsed(tool: "scan_files")
             return await executeScanFiles(toolCall.arguments)
@@ -601,6 +604,71 @@ class ChatToolExecutor {
         OnboardingChatPersistence.markStepCompleted("ai_browser_profile")
         log("Browser profile extraction completed")
         return result
+    }
+
+    // MARK: - Browser Profile Query
+
+    /// Query the user's browser profile database (always available, not onboarding-only).
+    private static func executeQueryBrowserProfile(_ args: [String: Any]) async -> String {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let aiBrowserProfileDir = homeDir.appendingPathComponent("ai-browser-profile")
+        let python = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
+        let dbPath = aiBrowserProfileDir.appendingPathComponent("memories.db").path
+
+        guard FileManager.default.fileExists(atPath: python),
+              FileManager.default.fileExists(atPath: dbPath) else {
+            return "Browser profile not available. Run `npx ai-browser-profile init` then extract browser data to set it up."
+        }
+
+        let query = args["query"] as? String ?? "full profile"
+        let tags = args["tags"] as? [String] ?? []
+
+        return await Task.detached(priority: .userInitiated) { () -> String in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: python)
+
+            let tagsExpr = tags.isEmpty ? "None" : "[\(tags.map { "\"\($0)\"" }.joined(separator: ", "))]"
+            let script = """
+                import sys, os
+                sys.path.insert(0, os.path.expanduser("~/ai-browser-profile"))
+                from ai_browser_profile import MemoryDB
+                mem = MemoryDB(os.path.expanduser("~/ai-browser-profile/memories.db"))
+                query = \(Self.pythonStringLiteral(query))
+                tags = \(tagsExpr)
+                if query in ("full profile", "profile"):
+                    print(mem.profile_text())
+                elif tags:
+                    results = mem.search(tags, limit=20)
+                    for r in results:
+                        print(f'{r["key"]}: {r["value"]}')
+                else:
+                    results = mem.semantic_search(query, limit=15)
+                    for r in results:
+                        print(f'{r["key"]}: {r["value"]}')
+                mem.close()
+                """
+
+            process.arguments = ["-c", script]
+            process.currentDirectoryURL = aiBrowserProfileDir
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                return output.isEmpty ? "No results found for query: \(query)" : output
+            } catch {
+                return "Failed to query browser profile: \(error.localizedDescription)"
+            }
+        }.value
+    }
+
+    private static func pythonStringLiteral(_ s: String) -> String {
+        let escaped = s.replacingOccurrences(of: "\\", with: "\\\\")
+                       .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 
     /// Get file scan results from the database
