@@ -548,26 +548,57 @@ struct BrowserExtensionSetup: View {
         FileManager.default.fileExists(atPath: "/Applications/Google Chrome.app")
     }
 
-    /// Open a URL explicitly in Chrome (not the default browser).
+    /// Open a URL explicitly in Chrome's front window (new tab), ensuring it uses
+    /// the same profile as whatever Chrome window is currently active.
+    /// Falls back to NSWorkspace if AppleScript fails or Chrome isn't installed.
     static func openURLInChrome(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
-        let chromeURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+        let chromeApp = "/Applications/Google Chrome.app"
 
-        if FileManager.default.fileExists(atPath: chromeURL.path) {
+        guard FileManager.default.fileExists(atPath: chromeApp) else {
+            NSWorkspace.shared.open(url)
+            return
+        }
+
+        let script = """
+        tell application "Google Chrome"
+            activate
+            if (count of windows) = 0 then
+                make new window
+                set URL of active tab of front window to "\(urlString)"
+            else
+                tell front window
+                    make new tab with properties {URL:"\(urlString)"}
+                end tell
+            end if
+        end tell
+        """
+        guard let appleScript = NSAppleScript(source: script) else {
             NSWorkspace.shared.open(
                 [url],
-                withApplicationAt: chromeURL,
+                withApplicationAt: URL(fileURLWithPath: chromeApp),
                 configuration: NSWorkspace.OpenConfiguration()
             )
-        } else {
-            // Fallback: try default browser
-            NSWorkspace.shared.open(url)
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            if error != nil {
+                DispatchQueue.main.async {
+                    NSWorkspace.shared.open(
+                        [url],
+                        withApplicationAt: URL(fileURLWithPath: chromeApp),
+                        configuration: NSWorkspace.OpenConfiguration()
+                    )
+                }
+            }
         }
     }
 
-    /// Open the extension status page in Chrome.
-    /// Uses AppleScript to navigate inside Chrome, since newer Chrome versions block
-    /// chrome-extension:// URLs opened via NSWorkspace/external apps.
+    /// Open the extension status page in Chrome's front window.
+    /// Navigates the active tab (rather than opening a new one) since the user
+    /// is done with the Web Store page at this point.
     static func openExtensionInChrome() {
         let urlString = "chrome-extension://mmlmfjhmonkocbjadbfplnigmagldckm/status.html"
         let script = """
@@ -582,17 +613,17 @@ struct BrowserExtensionSetup: View {
         end tell
         """
         guard let appleScript = NSAppleScript(source: script) else {
-            openURLInChrome(urlString)
+            let url = URL(string: urlString)!
+            NSWorkspace.shared.open(url)
             return
         }
-        // Run off the main thread — AppleScript blocks until Chrome responds,
-        // which can hang indefinitely if Chrome is slow or unresponsive.
         DispatchQueue.global(qos: .userInitiated).async {
             var error: NSDictionary?
             appleScript.executeAndReturnError(&error)
             if error != nil {
                 DispatchQueue.main.async {
-                    Self.openURLInChrome(urlString)
+                    let url = URL(string: urlString)!
+                    NSWorkspace.shared.open(url)
                 }
             }
         }
