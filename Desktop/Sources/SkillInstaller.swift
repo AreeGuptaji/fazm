@@ -15,15 +15,12 @@ enum SkillInstaller {
         "pdf": "Documents", "docx": "Documents", "xlsx": "Documents", "pptx": "Documents",
         "video-edit": "Creation", "frontend-design": "Creation", "canvas-design": "Creation", "doc-coauthoring": "Creation",
         "deep-research": "Research & Planning", "travel-planner": "Research & Planning", "web-scraping": "Research & Planning",
-        "gws-gmail": "Google Workspace", "gws-calendar": "Google Workspace", "gws-docs": "Google Workspace",
-        "gws-docs-write": "Google Workspace", "gws-sheets": "Google Workspace", "gws-drive": "Google Workspace",
-        "gws-setup": "Google Workspace",
         "social-autoposter": "Social Media", "social-autoposter-setup": "Social Media",
         "find-skills": "Discovery",
     ]
 
     private static let categoryOrder = [
-        "Documents", "Creation", "Research & Planning", "Google Workspace", "Social Media", "Discovery"
+        "Documents", "Creation", "Research & Planning", "Social Media", "Discovery"
     ]
 
     /// Auto-discovered skill names from all *.skill.md files in the app bundle's BundledSkills directory.
