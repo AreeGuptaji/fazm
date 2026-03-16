@@ -13,7 +13,6 @@ actor VertexTokenManager {
     // MARK: - Configuration
 
     private let backendUrl: String
-    private let backendSecret: String
     private let deviceId: String
     private let projectId: String
     private let region: String
@@ -36,7 +35,6 @@ actor VertexTokenManager {
 
     init() {
         self.backendUrl = Self.env("FAZM_BACKEND_URL").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        self.backendSecret = Self.env("FAZM_BACKEND_SECRET")
         self.deviceId = Self.getDeviceId()
         self.projectId = { let v = Self.env("VERTEX_PROJECT_ID"); return v.isEmpty ? "fazm-prod" : v }()
         self.region = { let v = Self.env("VERTEX_REGION"); return v.isEmpty ? "us-east5" : v }()
@@ -90,7 +88,9 @@ actor VertexTokenManager {
 
     /// Whether the backend is configured (env vars present)
     var isConfigured: Bool {
-        !backendUrl.isEmpty && !backendSecret.isEmpty
+        get async {
+            !backendUrl.isEmpty && await AuthService.shared.isSignedIn
+        }
     }
 
     // MARK: - Private
@@ -103,7 +103,8 @@ actor VertexTokenManager {
         let url = URL(string: "\(backendUrl)/v1/vertex/subject-token")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(backendSecret)", forHTTPHeaderField: "Authorization")
+        let authHeader = try await AuthService.shared.getAuthHeader()
+        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
         request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
         request.timeoutInterval = 15
 
