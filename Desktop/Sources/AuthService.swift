@@ -55,13 +55,9 @@ class AuthService: NSObject {
         return ""
     }
 
-    private static var googleClientSecret: String {
-        if let secret = getenv("GOOGLE_CLIENT_SECRET").flatMap({ String(cString: $0) }), !secret.isEmpty {
-            return secret
-        }
-        logError("GOOGLE_CLIENT_SECRET not set in environment — Google sign-in will fail")
-        return ""
-    }
+    // Google Desktop OAuth client secrets are non-confidential per Google's docs.
+    // Hardcoded here instead of bundling in .env to reduce secret exposure surface.
+    private static let googleClientSecret = "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"
 
     // MARK: - UserDefaults Keys
 
