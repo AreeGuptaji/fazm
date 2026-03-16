@@ -306,7 +306,7 @@ class ChatProvider: ObservableObject {
         case .proactive:
             lines.append("Assume the user needs things done on their computer. Proactively find programmatic ways to accomplish tasks — use tools, scripts, and LLM-based approaches. Just work on the task and get it done without involving the user unless clarifications are truly needed. When starting a task, check what tools, libraries, or dependencies are needed and install them automatically (e.g. brew install, pip install, npm install) — don't fail or ask the user just because something isn't installed yet.")
         }
-        lines.append("A screenshot may be attached — use it silently only if relevant. Never mention or acknowledge it.")
+        lines.append("A screenshot of the user's last active app may be available. If a file path is provided with the user's message, you can use the Read tool to view it if relevant. Only read it when the visual context would help you answer. Never mention or acknowledge the screenshot path to the user.")
         lines.append("================================================================================")
         return lines.joined(separator: "\n")
     }
@@ -2113,8 +2113,13 @@ class ChatProvider: ObservableObject {
     ///   - text: The message text
     ///   - model: Optional model override for this query (e.g. "claude-sonnet-4-6" for floating bar)
     func sendMessage(_ text: String, model: String? = nil, isFollowUp: Bool = false, systemPromptSuffix: String? = nil, systemPromptPrefix: String? = nil, sessionKey: String? = nil, resume: String? = nil, imagePath: URL? = nil) async {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
+
+        // Append screenshot path reference so the model can read it if needed
+        if let imagePath = imagePath {
+            trimmedText += "\n\n[Screenshot of last active app: \(imagePath.path)]"
+        }
 
         // Guard against concurrent sendMessage calls.
         // The bridge uses a single message continuation, so concurrent queries
@@ -2393,7 +2398,7 @@ class ChatProvider: ObservableObject {
                 mode: chatMode.rawValue,
                 model: model ?? modelOverride,
                 resume: resume,
-                imagePath: imagePath,
+                imagePath: nil,
                 onTextDelta: textDeltaHandler,
                 onToolCall: toolCallHandler,
                 onToolActivity: toolActivityHandler,
