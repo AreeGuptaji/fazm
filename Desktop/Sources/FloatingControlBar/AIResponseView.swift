@@ -142,10 +142,16 @@ struct AIResponseView: View {
             if isLoading {
                 userHasScrolledUp = false
                 hangTask?.cancel()
-                hangTask = Task {
-                    try? await Task.sleep(for: .seconds(120))
+                hangTask = Task { [onStopAgent] in
+                    // If no streaming data arrives within 60s, the query is failing silently
+                    // (e.g. credit exhaustion, bridge crash, backend unreachable).
+                    // Stop the bridge so sendMessage() returns and error handling kicks in.
+                    try? await Task.sleep(for: .seconds(60))
                     guard !Task.isCancelled else { return }
                     isHanging = true
+                    await MainActor.run {
+                        onStopAgent?()
+                    }
                 }
             } else {
                 hangTask?.cancel()
@@ -171,12 +177,21 @@ struct AIResponseView: View {
                     .scaledFont(size: 14)
                     .foregroundColor(.orange)
             } else if isLoading {
-                ProgressView()
-                    .scaleEffect(0.6)
-                    .frame(width: 16, height: 16)
-                Text("thinking")
-                    .scaledFont(size: 14)
-                    .foregroundColor(.secondary)
+                if isHanging {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    Text("not responding")
+                        .scaledFont(size: 14)
+                        .foregroundColor(.orange)
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 16, height: 16)
+                    Text("thinking")
+                        .scaledFont(size: 14)
+                        .foregroundColor(.secondary)
+                }
             } else if userInput.isEmpty && currentMessage == nil {
                 Text("conversation")
                     .scaledFont(size: 14)
