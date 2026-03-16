@@ -18,8 +18,15 @@ fileprivate class PlainCopyNSTextView: NSTextView {
         guard let lm = layoutManager, let tc = textContainer else {
             return super.intrinsicContentSize
         }
-        lm.ensureLayout(for: tc)
-        let rect = lm.usedRect(for: tc)
+        // ensureLayout can throw NSExceptions on malformed attributed strings
+        var rect = NSRect.zero
+        if let exception = ObjCExceptionCatcher.catching({
+            lm.ensureLayout(for: tc)
+            rect = lm.usedRect(for: tc)
+        }) {
+            log("PlainCopyNSTextView: NSException in ensureLayout — \(exception.name.rawValue): \(exception.reason ?? "nil")")
+            return super.intrinsicContentSize
+        }
         // When text container doesn't track text view width (no-wrap mode),
         // report the actual content width so ScrollView can size correctly.
         let width = tc.widthTracksTextView
