@@ -2560,7 +2560,8 @@ class ChatProvider: ObservableObject {
                 inputTokens: queryResult.inputTokens,
                 outputTokens: queryResult.outputTokens,
                 cacheReadTokens: queryResult.cacheReadTokens,
-                cacheWriteTokens: queryResult.cacheWriteTokens
+                cacheWriteTokens: queryResult.cacheWriteTokens,
+                queryText: trimmedText
             )
 
             // Track conversation depth (total messages in this session)
