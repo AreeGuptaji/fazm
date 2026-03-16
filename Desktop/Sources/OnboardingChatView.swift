@@ -811,10 +811,6 @@ struct OnboardingChatView: View {
             log("OnboardingChat: Restoring completed exploration from saved state (\(saved.text.count) chars)")
             explorationText = saved.text
             explorationCompleted = true
-            // Re-inject the discovery card (UI state was lost on restart)
-            if !saved.text.isEmpty {
-                await injectExplorationDiscoveryCard()
-            }
             return
         }
 
@@ -959,9 +955,8 @@ struct OnboardingChatView: View {
                 // Persist so it survives app restarts
                 OnboardingChatPersistence.saveExplorationState(text: finalText, completed: true)
 
-                // Append to user profile and inject discovery card
+                // Append to user profile
                 await appendExplorationToProfile()
-                await injectExplorationDiscoveryCard()
 
                 await bridge.stop()
                 await MainActor.run { explorationBridge = nil }
@@ -1068,22 +1063,6 @@ struct OnboardingChatView: View {
             log("OnboardingChat: No existing AI profile, saving exploration as new profile")
             let success = await service.saveExplorationAsProfile(text: text)
             log("OnboardingChat: Saved exploration as profile (success=\(success))")
-        }
-    }
-
-    /// Inject a discovery card into the onboarding chat with the exploration profile
-    private func injectExplorationDiscoveryCard() async {
-        let text = await MainActor.run { explorationText }
-        guard !text.isEmpty else { return }
-
-        let summary = text.count > 120 ? String(text.prefix(120)) + "..." : text
-
-        await MainActor.run {
-            chatProvider.appendDiscoveryCard(
-                title: "Your Digital Profile",
-                summary: summary,
-                fullText: text
-            )
         }
     }
 
