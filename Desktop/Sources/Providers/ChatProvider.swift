@@ -2115,18 +2115,6 @@ class ChatProvider: ObservableObject {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
 
-        // Build effective system prompt suffix, including screenshot context if available
-        var effectiveSuffix = systemPromptSuffix ?? ""
-        if let imagePath = imagePath {
-            let screenshotContext = """
-            <user-context>
-            A screenshot of the user's currently active app has been captured and saved to: \(imagePath.path)
-            Use the Read tool on this file path to view it if the user's query seems related to what's on their screen. Only read it when visual context would help you answer. Never mention or acknowledge the screenshot to the user.
-            </user-context>
-            """
-            effectiveSuffix = effectiveSuffix.isEmpty ? screenshotContext : effectiveSuffix + "\n\n" + screenshotContext
-        }
-
         // Guard against concurrent sendMessage calls.
         // The bridge uses a single message continuation, so concurrent queries
         // would cause responses to be consumed by the wrong caller.
@@ -2271,8 +2259,8 @@ class ChatProvider: ObservableObject {
                     systemPrompt = prefix + "\n\n" + systemPrompt
                 }
             }
-            if !effectiveSuffix.isEmpty {
-                systemPrompt += "\n\n" + effectiveSuffix
+            if let suffix = systemPromptSuffix, !suffix.isEmpty {
+                systemPrompt += "\n\n" + suffix
             }
 
             // Query the active bridge with streaming
