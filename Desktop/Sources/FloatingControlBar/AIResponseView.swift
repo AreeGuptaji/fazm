@@ -26,6 +26,11 @@ struct AIResponseView: View {
     var onClose: (() -> Void)?
     var onNewChat: (() -> Void)?
     var onSendFollowUp: ((String) -> Void)?
+    var onEnqueueMessage: ((String) -> Void)?
+    var onSendNow: ((QueuedMessage) -> Void)?
+    var onDeleteQueued: ((QueuedMessage) -> Void)?
+    var onClearQueue: (() -> Void)?
+    var onReorderQueue: ((IndexSet, Int) -> Void)?
     var onStopAgent: (() -> Void)?
     var onConnectClaude: (() -> Void)?
 
@@ -119,6 +124,21 @@ struct AIResponseView: View {
 
             if !isLoading && !suggestedReplies.isEmpty {
                 suggestedRepliesView
+            }
+
+            if !state.messageQueue.isEmpty {
+                MessageQueueView(
+                    queue: Binding(
+                        get: { state.messageQueue },
+                        set: { state.messageQueue = $0 }
+                    ),
+                    onSendNow: { item in onSendNow?(item) },
+                    onDelete: { item in onDeleteQueued?(item) },
+                    onClearAll: { onClearQueue?() },
+                    onReorder: { source, dest in onReorderQueue?(source, dest) }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: state.messageQueue.count)
             }
 
             if !isVoiceFollowUp {
@@ -492,7 +512,7 @@ struct AIResponseView: View {
         HStack(alignment: .bottom, spacing: 6) {
             ZStack(alignment: .topLeading) {
                 if followUpText.isEmpty {
-                    Text("Ask follow up...")
+                    Text(isLoading ? "Type next question (queued)..." : "Ask follow up...")
                         .scaledFont(size: 13)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 8)
@@ -572,8 +592,15 @@ struct AIResponseView: View {
         let trimmed = followUpText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         followUpText = ""
-        userHasScrolledUp = false
-        onSendFollowUp?(trimmed)
+
+        let isStillGenerating = isLoading || currentMessage?.isStreaming == true
+        if isStillGenerating {
+            // Agent is busy — queue the message instead of interrupting
+            onEnqueueMessage?(trimmed)
+        } else {
+            userHasScrolledUp = false
+            onSendFollowUp?(trimmed)
+        }
     }
 }
 
