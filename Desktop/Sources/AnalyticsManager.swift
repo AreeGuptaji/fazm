@@ -799,6 +799,14 @@ class AnalyticsManager {
         PostHogManager.shared.track("floating_bar_query_sent", properties: props)
     }
 
+    func floatingBarMessageQueued(queueSize: Int, messageLength: Int) {
+        let props: [String: Any] = [
+            "queue_size": queueSize,
+            "message_length": messageLength
+        ]
+        PostHogManager.shared.track("floating_bar_message_queued", properties: props)
+    }
+
     func floatingBarPTTStarted(mode: String) {
         let props: [String: Any] = ["mode": mode]
         PostHogManager.shared.track("floating_bar_ptt_started", properties: props)
