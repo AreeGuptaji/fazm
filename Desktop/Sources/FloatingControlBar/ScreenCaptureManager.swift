@@ -5,26 +5,11 @@ class ScreenCaptureManager {
     /// Capture the frontmost window of a specific application by PID.
     /// Falls back to full-screen capture if the window cannot be found.
     static func captureAppWindow(pid: pid_t) -> URL? {
-        // Find the frontmost on-screen window belonging to this PID
-        guard let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[CFString: Any]] else {
-            log("ScreenCaptureManager: Could not get window list, falling back to full screen")
-            return captureScreen()
-        }
+        // Try on-screen windows first, then all windows (catches fullscreen apps in other Spaces)
+        let windowInfo = findWindow(for: pid, onScreenOnly: true)
+            ?? findWindow(for: pid, onScreenOnly: false)
 
-        // Find the first regular window for this PID (skip menu bar, status items, etc.)
-        let targetWindow = windowList.first { info in
-            guard let ownerPID = info[kCGWindowOwnerPID] as? pid_t,
-                  ownerPID == pid,
-                  let layer = info[kCGWindowLayer] as? Int,
-                  layer == 0  // Normal window layer
-            else { return false }
-            return true
-        }
-
-        guard let windowInfo = targetWindow,
-              let windowID = windowInfo[kCGWindowNumber] as? CGWindowID else {
+        guard let windowInfo, let windowID = windowInfo[kCGWindowNumber] as? CGWindowID else {
             log("ScreenCaptureManager: No window found for PID \(pid), falling back to full screen")
             return captureScreen()
         }
@@ -44,6 +29,52 @@ class ScreenCaptureManager {
 
         log("ScreenCaptureManager: Captured window of '\(ownerName)' (PID \(pid), \(image.width)×\(image.height))")
         return saveImage(image)
+    }
+
+    /// Find the best window for a PID. Accepts any window layer (including fullscreen).
+    /// Prefers larger windows when multiple exist (the main content window, not a toolbar float).
+    private static func findWindow(for pid: pid_t, onScreenOnly: Bool) -> [CFString: Any]? {
+        let options: CGWindowListOption = onScreenOnly
+            ? [.optionOnScreenOnly, .excludeDesktopElements]
+            : [.optionAll, .excludeDesktopElements]
+
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
+                as? [[CFString: Any]] else { return nil }
+
+        // Collect all windows for this PID, any layer
+        let candidates = windowList.filter { info in
+            guard let ownerPID = info[kCGWindowOwnerPID] as? pid_t,
+                  ownerPID == pid else { return false }
+            // Skip tiny windows (status bar items, tooltips)
+            if let bounds = info[kCGWindowBounds] as? [String: CGFloat],
+               let w = bounds["Width"], let h = bounds["Height"],
+               w >= 100, h >= 100 {
+                return true
+            }
+            // Also accept windows without bounds info
+            return info[kCGWindowBounds] == nil
+        }
+
+        guard !candidates.isEmpty else { return nil }
+
+        // Pick the largest window (by area) — the main/fullscreen window
+        let best = candidates.max { a, b in
+            let areaA = windowArea(a)
+            let areaB = windowArea(b)
+            return areaA < areaB
+        }
+
+        let label = onScreenOnly ? "on-screen" : "all-windows"
+        if let best, let layer = best[kCGWindowLayer] as? Int {
+            log("ScreenCaptureManager: Found window for PID \(pid) via \(label) search (layer=\(layer))")
+        }
+        return best
+    }
+
+    private static func windowArea(_ info: [CFString: Any]) -> CGFloat {
+        guard let bounds = info[kCGWindowBounds] as? [String: CGFloat],
+              let w = bounds["Width"], let h = bounds["Height"] else { return 0 }
+        return w * h
     }
 
     /// Capture the entire main display.
