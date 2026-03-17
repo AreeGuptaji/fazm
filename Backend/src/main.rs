@@ -48,6 +48,7 @@ async fn main() {
     // Public routes
     let public_routes = Router::new()
         .route("/health", axum::routing::get(routes::vertex::health))
+        .route("/appcast.xml", axum::routing::get(routes::appcast::appcast))
         .route(
             "/v1/vertex/jwks",
             axum::routing::get(routes::vertex::jwks),

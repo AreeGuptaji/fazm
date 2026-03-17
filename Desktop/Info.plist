@@ -52,7 +52,7 @@
     </array>
     <!-- Sparkle Auto-Update Configuration -->
     <key>SUFeedURL</key>
-    <string>https://github.com/m13v/fazm/releases/latest/download/appcast.xml</string>
+    <string>https://fazm-backend-472661769323.us-east5.run.app/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>vWleho4gIOl932wM4v9Gz+FTCt90+vUVdPHsRReFX40=</string>
     <key>SUEnableAutomaticChecks</key>
