@@ -1,8 +1,13 @@
 use axum::{
+    extract::Extension,
     http::{header, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
+use std::sync::Arc;
+
+use crate::config::Config;
+use crate::firestore;
 
 const GITHUB_REPO: &str = "m13v/fazm";
 const GITHUB_API: &str = "https://api.github.com";
@@ -13,7 +18,6 @@ struct GitHubRelease {
     published_at: String,
     body: Option<String>,
     assets: Vec<GitHubAsset>,
-    prerelease: bool,
     draft: bool,
 }
 
@@ -26,15 +30,15 @@ struct GitHubAsset {
 
 /// GET /appcast.xml
 /// Dynamically generates a Sparkle-compatible appcast from GitHub releases.
-/// Stable (non-prerelease) items have no channel tag (visible to all).
-/// Prerelease items get <sparkle:channel>staging</sparkle:channel>.
-pub async fn appcast() -> Response {
-    match generate_appcast().await {
+/// Channels are read from Firestore `desktop_releases` collection.
+/// Fallback: if Firestore is unavailable, uses GitHub's isPrerelease flag.
+pub async fn appcast(Extension(config): Extension<Arc<Config>>) -> Response {
+    match generate_appcast(&config).await {
         Ok(xml) => (
             StatusCode::OK,
             [
                 (header::CONTENT_TYPE, "application/rss+xml; charset=utf-8"),
-                (header::CACHE_CONTROL, "public, max-age=300"),
+                (header::CACHE_CONTROL, "public, max-age=60"),
             ],
             xml,
         )
@@ -50,22 +54,21 @@ pub async fn appcast() -> Response {
     }
 }
 
-async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::builder()
-        .user_agent("fazm-backend/1.0")
-        .build()?;
+async fn generate_appcast(
+    config: &Arc<Config>,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    // Fetch Firestore channel map (tag → channel) in parallel with GitHub releases
+    let (firestore_result, github_result) = tokio::join!(
+        fetch_firestore_channels(config),
+        fetch_github_releases()
+    );
 
-    let releases: Vec<GitHubRelease> = client
-        .get(format!(
-            "{}/repos/{}/releases?per_page=10",
-            GITHUB_API, GITHUB_REPO
-        ))
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+    let channel_map = firestore_result.unwrap_or_else(|e| {
+        tracing::warn!("Firestore unavailable, falling back to GitHub isPrerelease: {}", e);
+        std::collections::HashMap::new()
+    });
 
+    let releases = github_result?;
     let mut items = Vec::new();
 
     for release in &releases {
@@ -84,13 +87,12 @@ async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send +
             None => continue,
         };
 
-        // Parse version from tag: v0.9.0+56-macos or v0.9.0+56-macos-staging
-        let tag = &release.tag_name;
+        // Parse version from tag: v0.9.1+57-macos-staging
         let version_re =
-            regex_lite::Regex::new(r"v?(\d+\.\d+\.\d+)(?:\+(\d+))?(?:-macos)?(?:-staging)?")
+            regex_lite::Regex::new(r"v?(\d+\.\d+\.\d+)(?:\+(\d+))?(?:-macos)?(?:-(staging|beta))?")
                 .unwrap();
 
-        let caps = match version_re.captures(tag) {
+        let caps = match version_re.captures(&release.tag_name) {
             Some(c) => c,
             None => continue,
         };
@@ -99,11 +101,36 @@ async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send +
         let build_number = if let Some(b) = caps.get(2) {
             b.as_str().to_string()
         } else {
-            // Calculate from version: 0.9.0 -> 9000
             let parts: Vec<u64> = version.split('.').filter_map(|p| p.parse().ok()).collect();
-            let bn = parts.iter().fold(0u64, |acc, &p| acc * 1000 + p);
-            bn.to_string()
+            parts.iter().fold(0u64, |acc, &p| acc * 1000 + p).to_string()
         };
+
+        // Determine channel:
+        // 1. Check Firestore (authoritative — supports all 3 channels)
+        // 2. Fallback: Firestore empty → use GitHub isPrerelease
+        //    (isPrerelease=false → stable, isPrerelease=true → staging)
+        let channel = channel_map
+            .get(&release.tag_name)
+            .cloned()
+            .unwrap_or_else(|| {
+                // Firestore not available — skip this release (only show Firestore-tracked ones)
+                // If channel_map is empty (Firestore failed), fall back to a simple heuristic
+                if channel_map.is_empty() {
+                    // Fallback: use tag suffix
+                    if release.tag_name.ends_with("-staging") {
+                        "staging".to_string()
+                    } else {
+                        "stable".to_string()
+                    }
+                } else {
+                    // Firestore available but no doc for this tag → skip
+                    "skip".to_string()
+                }
+            });
+
+        if channel == "skip" {
+            continue;
+        }
 
         // Extract EdDSA signature from release body
         let ed_sig = release
@@ -119,18 +146,18 @@ async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send +
             })
             .unwrap_or_default();
 
-        // Format pub date as RFC 2822
         let pub_date = format_rfc2822(&release.published_at);
 
-        // Channel tag: stable releases have no channel (visible to all),
-        // prereleases get staging channel
-        let channel_tag = if release.prerelease {
-            "\n      <sparkle:channel>staging</sparkle:channel>".to_string()
-        } else {
-            String::new()
+        // Sparkle channel tags:
+        //   stable  → no tag (visible to everyone)
+        //   beta    → <sparkle:channel>beta</sparkle:channel> (beta + staging users)
+        //   staging → <sparkle:channel>staging</sparkle:channel> (staging users only)
+        let channel_tag = match channel.as_str() {
+            "staging" => "\n      <sparkle:channel>staging</sparkle:channel>".to_string(),
+            "beta" => "\n      <sparkle:channel>beta</sparkle:channel>".to_string(),
+            _ => String::new(), // stable = no tag
         };
 
-        // Build enclosure attributes
         let mut enclosure_attrs = format!(r#"url="{}""#, zip_asset.browser_download_url);
         if !ed_sig.is_empty() {
             enclosure_attrs.push_str(&format!(
@@ -138,10 +165,7 @@ async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send +
                 ed_sig
             ));
         }
-        enclosure_attrs.push_str(&format!(
-            "\n                 length=\"{}\"",
-            zip_asset.size
-        ));
+        enclosure_attrs.push_str(&format!("\n                 length=\"{}\"", zip_asset.size));
         enclosure_attrs.push_str("\n                 type=\"application/octet-stream\"");
 
         items.push(format!(
@@ -156,7 +180,7 @@ async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send +
         ));
     }
 
-    let xml = format!(
+    Ok(format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
@@ -168,13 +192,40 @@ async fn generate_appcast() -> Result<String, Box<dyn std::error::Error + Send +
   </channel>
 </rss>"#,
         items = items.join("\n")
-    );
+    ))
+}
 
-    Ok(xml)
+/// Fetch channel assignments from Firestore. Returns a map of tag → channel.
+async fn fetch_firestore_channels(
+    config: &Arc<Config>,
+) -> Result<std::collections::HashMap<String, String>, Box<dyn std::error::Error + Send + Sync>> {
+    let token = firestore::get_access_token(config).await?;
+    let releases = firestore::list_live_releases(config, &token).await?;
+    Ok(releases
+        .into_iter()
+        .map(|r| (r.tag, r.channel))
+        .collect())
+}
+
+async fn fetch_github_releases(
+) -> Result<Vec<GitHubRelease>, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::builder()
+        .user_agent("fazm-backend/1.0")
+        .build()?;
+
+    Ok(client
+        .get(format!(
+            "{}/repos/{}/releases?per_page=20",
+            GITHUB_API, GITHUB_REPO
+        ))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?)
 }
 
 fn format_rfc2822(iso: &str) -> String {
-    // Parse ISO 8601 (e.g. "2024-03-15T12:00:00Z") -> RFC 2822
     let normalized = iso.replace('Z', "+00:00");
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&normalized) {
         dt.format("%a, %d %b %Y %H:%M:%S +0000").to_string()
