@@ -854,6 +854,7 @@ class ChatProvider: ObservableObject {
             UserDefaults.standard.removeObject(forKey: floatingSessionIdKey)
             pendingFloatingResume = nil
             messages = []
+            pendingMessages.removeAll()
         }
     }
 
