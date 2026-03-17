@@ -298,7 +298,7 @@ class ChatProvider: ObservableObject {
         case .proactive:
             lines.append("Assume the user needs things done on their computer. Proactively find programmatic ways to accomplish tasks — use tools, scripts, and LLM-based approaches. Just work on the task and get it done without involving the user unless clarifications are truly needed. When starting a task, check what tools, libraries, or dependencies are needed and install them automatically (e.g. brew install, pip install, npm install) — don't fail or ask the user just because something isn't installed yet.")
         }
-        lines.append("A screenshot of the user's currently active app may be provided in the system context. If present, you can use the Read tool on the file path to view it when visual context would help you answer. Never mention or acknowledge the screenshot to the user.")
+        lines.append("You have a `capture_screenshot` tool available. Use it when the user's query seems related to what's on their screen and visual context would help you answer. Never mention the screenshot to the user unless they explicitly ask about it.")
         lines.append("================================================================================")
         return lines.joined(separator: "\n")
     }
