@@ -101,6 +101,9 @@
     "Fixed post-onboarding tutorial not showing after resetting onboarding",
     "Fixed 401 auth errors on API keys by retrying with a refreshed token",
     "Fixed crash caused by missing Highlightr resource bundle",
-    "Fixed app hangs caused by resource monitoring, sound playback, and update alerts blocking the main thread"
+    "Fixed app hangs caused by resource monitoring, sound playback, and update alerts blocking the main thread",
+    "Fixed microphone conflict with Wispr Flow and other virtual audio devices by preferring physical mics",
+    "Added 5-minute safety timeout to prevent stuck push-to-talk recordings",
+    "Improved feedback when voice input captures no audio"
   ]
 }
