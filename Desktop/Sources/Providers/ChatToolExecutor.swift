@@ -61,6 +61,9 @@ class ChatToolExecutor {
         case "query_browser_profile":
             return await executeQueryBrowserProfile(toolCall.arguments)
 
+        case "edit_browser_profile":
+            return await executeEditBrowserProfile(toolCall.arguments)
+
         case "scan_files", "start_file_scan":
             AnalyticsManager.shared.onboardingChatToolUsed(tool: "scan_files")
             return await executeScanFiles(toolCall.arguments)
