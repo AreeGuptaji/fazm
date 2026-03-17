@@ -101,31 +101,49 @@ actor VertexTokenManager {
             throw VertexError.notConfigured("FAZM_BACKEND_URL not set")
         }
 
-        let url = URL(string: "\(backendUrl)/v1/vertex/subject-token")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        let authHeader = try await AuthService.shared.getAuthHeader()
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
-        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
-        request.timeoutInterval = 15
+        // Try up to 2 times: first with current token, then with a force-refreshed token
+        var lastError: Error?
+        for attempt in 1...2 {
+            let forceRefresh = attempt > 1
+            if forceRefresh {
+                log("VertexTokenManager: retrying with force-refreshed token")
+            }
+            let token = try await AuthService.shared.getIdToken(forceRefresh: forceRefresh)
+            let authHeader = "Bearer \(token)"
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+            let url = URL(string: "\(backendUrl)/v1/vertex/subject-token")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+            request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+            request.timeoutInterval = 15
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw VertexError.networkError("Invalid response")
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw VertexError.networkError("Invalid response")
+            }
+
+            if httpResponse.statusCode == 401 && attempt < 2 {
+                log("VertexTokenManager: got 401, will retry with refreshed token")
+                continue
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                lastError = VertexError.networkError("Subject token request failed: \(httpResponse.statusCode) - \(body)")
+                continue
+            }
+
+            guard let subjectToken = String(data: data, encoding: .utf8), !subjectToken.isEmpty else {
+                throw VertexError.networkError("Empty subject token response")
+            }
+
+            log("VertexTokenManager: subject token fetched (len=\(subjectToken.count))")
+            return subjectToken
         }
 
-        guard httpResponse.statusCode == 200 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw VertexError.networkError("Subject token request failed: \(httpResponse.statusCode) - \(body)")
-        }
-
-        guard let token = String(data: data, encoding: .utf8), !token.isEmpty else {
-            throw VertexError.networkError("Empty subject token response")
-        }
-
-        log("VertexTokenManager: subject token fetched (len=\(token.count))")
-        return token
+        throw lastError ?? VertexError.networkError("Subject token request failed after retries")
     }
 
     private func writeTokenFiles(subjectToken: String) throws {
