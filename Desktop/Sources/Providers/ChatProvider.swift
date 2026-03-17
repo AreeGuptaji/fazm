@@ -2,6 +2,12 @@ import SwiftUI
 import Combine
 import GRDB
 
+extension Notification.Name {
+    /// Posted by ChatProvider when it dequeues and starts processing a pending message.
+    /// userInfo contains "text" key with the dequeued message text.
+    static let chatProviderDidDequeue = Notification.Name("chatProviderDidDequeue")
+}
+
 // MARK: - UserDefaults Extension for KVO
 
 extension UserDefaults {
@@ -2021,10 +2027,9 @@ class ChatProvider: ObservableObject {
 
     // MARK: - Stop / Follow-Up
 
-    /// Text and session key of a follow-up queued while the current query is being interrupted.
-    /// Checked at the end of `sendMessage` — if set, a new query is chained automatically.
-    private var pendingFollowUpText: String?
-    private var pendingFollowUpSessionKey: String?
+    /// Queue of messages waiting to be sent after the current query finishes.
+    /// Replaces the old single pendingFollowUpText. Checked at the end of `sendMessage`.
+    private var pendingMessages: [(text: String, sessionKey: String?)] = []
     /// Session key of the currently running sendMessage call, so follow-ups can be chained on the same session.
     private var activeSessionKey: String?
 
@@ -2057,9 +2062,18 @@ class ChatProvider: ObservableObject {
         acpBridgeStarted = false
     }
 
-    /// Send a follow-up message while the agent is still running.
-    /// Interrupts the current query and chains a new one with full context.
-    func sendFollowUp(_ text: String) async {
+    /// Enqueue a message to be sent after the current query finishes.
+    /// Does NOT interrupt the current query — it will be picked up automatically.
+    func enqueueMessage(_ text: String) {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+        pendingMessages.append((text: trimmedText, sessionKey: activeSessionKey))
+        log("ChatProvider: message enqueued (\(pendingMessages.count) pending)")
+    }
+
+    /// Interrupt the current query and send a message immediately.
+    /// The message jumps to the front of the queue.
+    func interruptAndSend(_ text: String) async {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty, isSending else { return }
 
@@ -2071,7 +2085,7 @@ class ChatProvider: ObservableObject {
         )
         messages.append(userMessage)
 
-        // Persist to backend and sync server ID back to prevent poll duplicates
+        // Persist to backend
         let capturedSessionId = isInDefaultChat ? nil : currentSessionId
         let capturedAppId = overrideAppId ?? selectedAppId
         let localId = userMessage.id
@@ -2095,13 +2109,27 @@ class ChatProvider: ObservableObject {
             }
         }
 
-        // Queue the follow-up and interrupt the current query.
-        // When sendMessage finishes (due to the interrupt), it checks
-        // pendingFollowUpText and chains a new full query automatically.
-        pendingFollowUpText = trimmedText
-        pendingFollowUpSessionKey = activeSessionKey
+        // Insert at front of queue and interrupt
+        pendingMessages.insert((text: trimmedText, sessionKey: activeSessionKey), at: 0)
         await acpBridge.interrupt()
-        log("ChatProvider: follow-up queued, interrupt sent")
+        log("ChatProvider: interrupt+send, \(pendingMessages.count) pending")
+    }
+
+    /// Remove a pending message by matching text (used when UI deletes from queue).
+    func removePendingMessage(at index: Int) {
+        guard index >= 0, index < pendingMessages.count else { return }
+        pendingMessages.remove(at: index)
+    }
+
+    /// Reorder pending messages (used when UI reorders queue).
+    func reorderPendingMessages(from source: IndexSet, to destination: Int) {
+        pendingMessages.move(fromOffsets: source, toOffset: destination)
+    }
+
+    /// Clear all pending messages.
+    func clearPendingMessages() {
+        pendingMessages.removeAll()
+        log("ChatProvider: pending queue cleared")
     }
 
     // MARK: - Send Message
@@ -2705,13 +2733,13 @@ class ChatProvider: ObservableObject {
         isSending = false
         isStopping = false
 
-        // If a follow-up was queued while we were running, chain it as a new full query
-        if let followUp = pendingFollowUpText {
-            let followUpSessionKey = pendingFollowUpSessionKey
-            pendingFollowUpText = nil
-            pendingFollowUpSessionKey = nil
-            log("ChatProvider: chaining follow-up query")
-            await sendMessage(followUp, isFollowUp: true, sessionKey: followUpSessionKey)
+        // If messages are queued, chain the next one as a follow-up query
+        if !pendingMessages.isEmpty {
+            let next = pendingMessages.removeFirst()
+            log("ChatProvider: chaining queued message (\(pendingMessages.count) remaining)")
+            // Notify UI to dequeue (posted on main actor)
+            NotificationCenter.default.post(name: .chatProviderDidDequeue, object: nil, userInfo: ["text": next.text])
+            await sendMessage(next.text, isFollowUp: true, sessionKey: next.sessionKey)
         }
     }
 
