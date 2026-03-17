@@ -543,14 +543,15 @@ class PushToTalkManager: ObservableObject {
     updateBarState(skipResize: hasQuery || wasPttOpenedChat)
 
     guard hasQuery else {
-      log("PushToTalkManager: no transcript to send")
+      let holdDuration = ProcessInfo.processInfo.systemUptime - lastOptionDownTime
+      let micName = AudioCaptureService.getCurrentMicrophoneName() ?? "unknown"
+      log("PushToTalkManager: no transcript to send (held \(String(format: "%.1f", holdDuration))s, mic='\(micName)')")
       if wasPttOpenedChat && !chatWasOpenBeforePTT {
         // PTT opened the chat but no transcript — close it only if PTT opened it
         pttOpenedChat = false
         FloatingControlBarManager.shared.closeAIConversation()
       }
       // Only show silence overlay if PTT was held for at least 3 seconds
-      let holdDuration = ProcessInfo.processInfo.systemUptime - lastOptionDownTime
       if holdDuration >= 3.0 {
         barState?.showSilenceOverlay()
       }
@@ -685,6 +686,10 @@ class PushToTalkManager: ObservableObject {
           }
         )
         log("PushToTalkManager: mic capture started (batch=\(batchMode))")
+      } catch let error as AudioCaptureService.AudioCaptureError where error.isNoInput {
+        log("PushToTalkManager: no microphone available — showing feedback")
+        self.stopListening()
+        self.barState?.showSilenceOverlay()
       } catch {
         logError("PushToTalkManager: mic capture failed", error: error)
         self.stopListening()
