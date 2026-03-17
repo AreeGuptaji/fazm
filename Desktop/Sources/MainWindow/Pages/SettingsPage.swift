@@ -1701,6 +1701,8 @@ struct SettingsContentView: View {
 
                     // Links
                     linkRow(title: "Visit Website", url: "https://fazm.ai")
+                    linkRow(title: "Watch Tutorials", url: "https://fazm.ai#use-cases")
+                    linkRow(title: "Safety & Trust", url: "https://fazm.ai/safety")
                     linkRow(title: "Help Center", url: "https://help.fazm.ai")
                     linkRow(title: "Privacy Policy", url: "https://fazm.ai/privacy")
                     linkRow(title: "Terms of Service", url: "https://fazm.ai/terms")
