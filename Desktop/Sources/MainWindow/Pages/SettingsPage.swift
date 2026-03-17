@@ -976,6 +976,39 @@ struct SettingsContentView: View {
 
                 Spacer()
 
+                if fileViewerEditable {
+                    Button(action: {
+                        fileViewerSaving = true
+                        let content = fileViewerContent
+                        let path = fileViewerPath
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            do {
+                                try content.write(toFile: path, atomically: true, encoding: .utf8)
+                                DispatchQueue.main.async {
+                                    fileViewerSaving = false
+                                    showFileViewer = false
+                                    refreshAIChatConfig()
+                                }
+                            } catch {
+                                DispatchQueue.main.async {
+                                    fileViewerSaving = false
+                                }
+                            }
+                        }
+                    }) {
+                        if fileViewerSaving {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .controlSize(.mini)
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(fileViewerSaving)
+                }
+
                 Button(action: { showFileViewer = false }) {
                     Image(systemName: "xmark.circle.fill")
                         .scaledFont(size: 18)
@@ -994,6 +1027,11 @@ struct SettingsContentView: View {
                     .progressViewStyle(.circular)
                     .controlSize(.small)
                 Spacer()
+            } else if fileViewerEditable {
+                TextEditor(text: $fileViewerContent)
+                    .font(.system(size: 12, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .padding(12)
             } else {
                 ScrollView {
                     Text(fileViewerContent)
