@@ -119,6 +119,16 @@ class AnalyticsManager {
         PostHogManager.shared.track("Onboarding Chat Message", properties: props)
     }
 
+    // MARK: - Browser Profile Events
+
+    func browserProfileExtractionCompleted(source: String) {
+        PostHogManager.shared.track("Browser Profile Extraction Completed", properties: ["source": source])
+    }
+
+    func browserProfileMigrationSkipped() {
+        PostHogManager.shared.track("Browser Profile Migration Skipped")
+    }
+
     // MARK: - Browser Extension Events
 
     func browserExtensionSetupOpened(source: String) {
