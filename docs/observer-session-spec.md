@@ -6,7 +6,7 @@ Users currently have to manually create skill files (.skill.md) to teach Fazm th
 
 ## Solution
 
-A parallel ACP session ("the Observer") that runs alongside every main conversation. It watches the conversation transcript and screen context, extracts preferences and patterns, organizes knowledge, and occasionally interacts with the user to confirm or clarify what it learned.
+A parallel ACP session ("the Observer") that runs alongside every main conversation. Same Opus model. It watches the conversation transcript and screen context, learns about the user, updates the knowledge graph, stores observations via Hindsight, and can create new skills — all using existing infrastructure.
 
 ## Architecture
 
@@ -15,168 +15,132 @@ A parallel ACP session ("the Observer") that runs alongside every main conversat
 │                Main ACP Session                      │
 │  (interactive — user ↔ agent conversation)           │
 │                                                      │
-│  Reads preferences from DB at each turn              │
+│  Reads knowledge graph + Hindsight at each turn      │
 │  Never aware of the observer directly                │
 └──────────┬──────────────────────┬────────────────────┘
-           │ conversation turns   │ (shared DB)
+           │ conversation turns   │ (shared state)
            │ (piped as context)   │
            ▼                      │
-┌──────────────────────────────── │ ────────────────────┐
-│           Observer ACP Session   │                    │
-│  (parallel — same Opus model)    │                    │
-│                                  │                    │
-│  Inputs:                         │                    │
-│  • Batched conversation turns    │                    │
-│  • Periodic screenshots          │                    │
-│  • Current knowledge graph       │                    │
-│  • Current preferences           │                    │
-│                                  │                    │
-│  Outputs:                        ▼                    │
-│  • Writes to user_preferences table ──────────────────│──→ Main session reads these
-│  • Writes to local_kg_nodes/edges                     │
-│  • Queues UI cards (observer_cards table)              │
-│  • Updates ai_user_profiles                           │
-└───────────────────────────────────────────────────────┘
+┌─────────────────────────────────│────────────────────┐
+│           Observer ACP Session  │                    │
+│  (parallel Opus — same model)   │                    │
+│                                 │                    │
+│  Inputs:                        │                    │
+│  • Batched conversation turns   │                    │
+│  • Periodic screenshots         │                    │
+│                                 │                    │
+│  Outputs:                       ▼                    │
+│  • Knowledge graph (save_knowledge_graph) ───────────│──→ Main session reads via SQL
+│  • Hindsight (retain/recall/reflect) ────────────────│──→ Main session recalls
+│  • Skills (~/.claude/skills/*.skill.md) ─────────────│──→ Main session discovers
+│  • Observer cards (observer_activity table) ──────────│──→ UI renders inline
+└──────────────────────────────────────────────────────┘
+```
+
+## What the Observer Uses (all existing)
+
+| Capability | Infrastructure | Already exists? |
+|------------|---------------|-----------------|
+| Store facts about the user | `local_kg_nodes` + `local_kg_edges` | Yes |
+| Semantic memory | Hindsight MCP (`retain`, `recall`, `reflect`) | Yes |
+| Create automations | Write `.skill.md` files to `~/.claude/skills/` | Yes |
+| Query user profile | `query_browser_profile`, `ai_user_profiles` | Yes |
+| Read/write DB | `execute_sql` | Yes |
+| See the screen | `capture_screenshot` | Yes |
+| Interact with user | **observer_activity table** (new) | **No — one new table** |
+
+## The One New Table: `observer_activity`
+
+Everything the observer does — insights, questions, skill creation notices, learned facts — goes here. One table, flexible schema.
+
+```sql
+CREATE TABLE observer_activity (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,          -- "card", "insight", "skill_created", "kg_update", "pattern"
+    content TEXT NOT NULL,       -- JSON blob: {title, body, options, ...}
+    status TEXT DEFAULT 'pending', -- "pending", "shown", "acted", "dismissed"
+    user_response TEXT,          -- which button was tapped (for cards)
+    created_at TEXT NOT NULL,
+    acted_at TEXT
+);
+```
+
+This is the observer's activity log AND the UI card queue. The Swift UI polls for `status = 'pending'` rows with `type = 'card'` and renders them.
+
+### Example rows
+
+**A learned preference (silent, no UI):**
+```json
+{
+  "id": "obs_001",
+  "type": "insight",
+  "content": "{\"fact\": \"prefers Amazon for electronics\", \"kg_node_id\": \"n_42\"}",
+  "status": "logged",
+  "created_at": "2026-03-17T10:30:00Z"
+}
+```
+
+**A question for the user (shows as card):**
+```json
+{
+  "id": "obs_002",
+  "type": "card",
+  "content": "{\"title\": \"Two shipping addresses used recently\", \"body\": \"Which should be your default?\", \"options\": [\"123 Main St, SF\", \"456 Oak Ave, LA\"]}",
+  "status": "pending",
+  "created_at": "2026-03-17T10:31:00Z"
+}
+```
+
+**A skill was auto-created:**
+```json
+{
+  "id": "obs_003",
+  "type": "skill_created",
+  "content": "{\"skill_name\": \"client-report-export\", \"description\": \"Export PDF and email to client in one step\", \"path\": \"~/.claude/skills/client-report-export/SKILL.md\"}",
+  "status": "pending",
+  "created_at": "2026-03-17T10:35:00Z"
+}
 ```
 
 ## Observer Responsibilities
 
-### 1. Silent Learning (no UI, always on)
-- Extract preferences and rules from conversation ("I always use Amazon", "ship to my office")
-- Update knowledge graph with new entities and relationships
-- Detect repeated multi-step workflows (candidate for auto-skill generation)
-- Maintain a living user profile summary
+### 1. Learn — Update the Knowledge Graph
+The observer uses `save_knowledge_graph` (existing tool) to add nodes and edges as it learns about the user from conversations and screen context. Preferences, people, tools, habits — all go into the same graph the onboarding built.
 
-### 2. User Interaction (via UI cards)
-When the observer needs user input, it writes a card to `observer_cards` table. The Swift UI renders these as interactive elements.
+### 2. Remember — Use Hindsight
+The observer calls `retain` (Hindsight MCP) to store observations that don't fit neatly into a graph — nuanced context, conversation summaries, behavioral patterns. The main session can `recall` these naturally.
 
-**Card types:**
+### 3. Automate — Create Skills
+When the observer detects a repeated workflow (3+ occurrences), it writes a `.skill.md` file to `~/.claude/skills/` and logs a `skill_created` entry to `observer_activity`. The main session auto-discovers new skills on next prompt.
 
-#### Confirmation Card
-Observer detected a preference and wants to confirm.
-```
-┌─ Observer ─────────────────────────────────────────┐
-│ Looks like you prefer Amazon for electronics.      │
-│ Save as a default?                                 │
-│                                                    │
-│  [Yes]    [No]    [More options]                   │
-└────────────────────────────────────────────────────┘
-```
+### 4. Ask — Surface Cards (sparingly)
+When the observer needs user input, it writes a `type = 'card'` row to `observer_activity`. The UI renders it inline in the chat.
 
-#### Choice Card
-Observer detected ambiguity and needs clarification.
-```
-┌─ Observer ─────────────────────────────────────────┐
-│ You've used two shipping addresses recently.       │
-│ Which is your default?                             │
-│                                                    │
-│  [123 Main St, SF]    [456 Oak Ave, LA]            │
-└────────────────────────────────────────────────────┘
-```
+## UI: Observer Cards
 
-#### Pattern Card
-Observer detected a repeated workflow.
+Cards appear inline in the chat but are visually distinct — different background, "Observer" label, button-only interaction.
+
 ```
 ┌─ Observer ─────────────────────────────────────────┐
 │ You've done "export PDF → email to client" 4       │
-│ times this week. Want me to make it one command?   │
+│ times. Want me to make it a single command?        │
 │                                                    │
 │  [Create skill]    [Not now]    [Never ask]        │
 └────────────────────────────────────────────────────┘
 ```
 
-#### Insight Card (no action needed)
-Observer shares something it learned.
-```
-┌─ Observer ─────────────────────────────────────────┐
-│ Saved: your default delivery is same-day to your   │
-│ office address when ordering before 2pm.           │
-│                                                    │
-│                                          [Undo]    │
-└────────────────────────────────────────────────────┘
-```
+### UI Rules
+1. **Button-only** — user never types to the observer. Text input always goes to the main agent.
+2. **Non-blocking** — main conversation continues. Cards appear at natural pauses.
+3. **Dismissible** — tap X or swipe. Dismissed = `status: 'dismissed'`.
+4. **Rate-limited** — max 2-3 cards per conversation. Observer picks the most valuable.
+5. **Clearly labeled** — always shows "Observer" label. Never confused with the main agent.
 
-### 3. Session Start Summary
-When the user opens a new session, the observer can surface 1-2 high-value items from what it learned in previous sessions:
-```
-┌─ Observer ─────────────────────────────────────────┐
-│ Since last time:                                   │
-│ • Learned 3 new preferences from your sessions     │
-│ • Created a "client-report-export" skill from      │
-│   your repeated workflow                           │
-│                                                    │
-│  [Review changes]    [Dismiss]                     │
-└────────────────────────────────────────────────────┘
-```
-
-## UI Design Principles
-
-1. **Observer cards are button-only** — the user never types to the observer. Text input always goes to the main agent. This eliminates "who am I talking to?" confusion.
-
-2. **Cards appear inline in the chat** but are visually distinct — different background, "Observer" label, no avatar. They feel like margin notes, not messages.
-
-3. **Cards are non-blocking** — the main conversation continues regardless. Cards queue up and appear at natural pauses (between turns, after task completion).
-
-4. **Cards are dismissible** — swipe or tap X. Dismissed cards don't come back.
-
-5. **Rate-limited** — max 2-3 cards per conversation. The observer batches its insights and picks the most valuable ones to surface. No notification fatigue.
-
-6. **The observer never speaks as the agent** — it's always clearly labeled. The user should understand these are background observations, not the agent they're talking to responding.
-
-## Data Model
-
-### New Tables
-
-#### `user_preferences`
-```sql
-CREATE TABLE user_preferences (
-    id TEXT PRIMARY KEY,
-    domain TEXT NOT NULL,        -- "shopping", "communication", "coding", "delivery", etc.
-    key TEXT NOT NULL,           -- "preferred_store", "shipping_address", "code_style"
-    value TEXT NOT NULL,         -- "Amazon", "123 Main St", "python_snake_case"
-    confidence REAL DEFAULT 0.5, -- 0.0 to 1.0, increases with repeated observations
-    source TEXT,                 -- "conversation", "screen", "onboarding", "user_confirmed"
-    confirmed INTEGER DEFAULT 0, -- 1 if user explicitly confirmed via card
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-```
-
-#### `observer_cards`
-```sql
-CREATE TABLE observer_cards (
-    id TEXT PRIMARY KEY,
-    card_type TEXT NOT NULL,     -- "confirmation", "choice", "pattern", "insight"
-    title TEXT NOT NULL,
-    body TEXT,
-    options TEXT,                -- JSON array of button labels
-    status TEXT DEFAULT 'pending', -- "pending", "shown", "acted", "dismissed"
-    user_response TEXT,          -- which button was tapped
-    priority REAL DEFAULT 0.5,  -- for ordering when multiple cards queue
-    created_at TEXT NOT NULL,
-    shown_at TEXT,
-    acted_at TEXT
-);
-```
-
-#### `observed_patterns`
-```sql
-CREATE TABLE observed_patterns (
-    id TEXT PRIMARY KEY,
-    pattern_type TEXT NOT NULL,  -- "workflow", "preference", "schedule"
-    description TEXT NOT NULL,
-    occurrence_count INTEGER DEFAULT 1,
-    last_seen_at TEXT NOT NULL,
-    skill_generated INTEGER DEFAULT 0, -- 1 if auto-skill was created
-    created_at TEXT NOT NULL
-);
-```
-
-### Modified Tables
-
-#### `local_kg_nodes` — no schema change, observer writes to it
-#### `local_kg_edges` — no schema change, observer writes to it
-#### `ai_user_profiles` — no schema change, observer updates it
+### Card Interaction Flow
+1. Observer writes row to `observer_activity` with `type: 'card'`, `status: 'pending'`
+2. Swift UI polls table, renders card inline in chat
+3. User taps a button → Swift writes `user_response` and sets `status: 'acted'`
+4. Observer reads the response on next batch and acts accordingly (e.g., creates skill, updates KG)
 
 ## Observer Session Configuration
 
@@ -184,49 +148,65 @@ CREATE TABLE observed_patterns (
 `"observer"` — alongside existing `"main"` and `"onboarding"`
 
 ### Model
-Opus (same as main session — this is a full intelligence, not a cheap extractor)
+Opus (same as main session)
 
 ### Tools Available
-- `execute_sql` — read/write preferences, patterns, cards, knowledge graph
+- `execute_sql` — read/write observer_activity, knowledge graph, profiles
 - `capture_screenshot` — periodic screen context (max 1/minute)
-- `save_knowledge_graph` — update user graph
+- `save_knowledge_graph` — update user graph with new nodes/edges
 - `query_browser_profile` — access browser-extracted profile data
+- `load_skill` — read existing skills to avoid duplicates
+- Hindsight MCP — `retain`, `recall`, `reflect`
+- File write access to `~/.claude/skills/` — for creating new skills
 
 ### Tools NOT Available
 - No `ask_followup` — observer doesn't talk to user directly via chat
 - No onboarding tools
-- No Playwright/macos-use — observer doesn't take actions
+- No Playwright/macos-use — observer observes, it doesn't act
 
-### System Prompt (summary)
+### System Prompt
+
 ```
-You are the Observer — a parallel intelligence watching the user's conversation
-with their AI agent and their screen activity. Your job:
+You are the Observer — a parallel intelligence running alongside the user's
+conversation with their AI agent. You watch the conversation and screen
+activity. Your job is to build an ever-richer understanding of this person
+and make their agent more effective over time.
 
-1. LEARN: Extract preferences, rules, habits, and patterns from what you see.
-   Write them to user_preferences with appropriate confidence scores.
+## Your tools
 
-2. ORGANIZE: Keep the knowledge graph updated with new entities and relationships.
-   Update the user profile when significant new information emerges.
+1. KNOWLEDGE GRAPH (save_knowledge_graph)
+   Add nodes and edges as you learn about the user. Preferences, people,
+   projects, tools, habits, rules — all belong in the graph. This is the
+   same graph built during onboarding. Extend it continuously.
 
-3. NOTICE: Detect repeated workflows that could become automated skills.
-   Track patterns in observed_patterns table.
+2. HINDSIGHT (retain, recall, reflect)
+   Store nuanced observations, conversation summaries, and behavioral
+   context. Use retain for new observations. Use reflect periodically
+   to synthesize patterns across multiple observations.
 
-4. ASK (sparingly): When you need user input, create a card in observer_cards.
-   - Max 2-3 cards per conversation
-   - Prefer insight cards (no action needed) over questions
-   - Only ask when the answer materially changes how you'd serve the user
-   - Never ask about trivial preferences — just save them at low confidence
+3. SKILLS (write to ~/.claude/skills/)
+   When you detect a repeated multi-step workflow (3+ times), create a
+   .skill.md file that automates it. Log the creation to observer_activity.
 
-5. SURFACE conclusions, not observations. Never say "I noticed you did X."
-   Say "Saved: you prefer X" or "Should I make X your default?"
+4. OBSERVER CARDS (execute_sql → observer_activity table)
+   When you need user input, write a card. Use sparingly — max 2-3 per
+   conversation. Card format:
+   INSERT INTO observer_activity (id, type, content, status, created_at)
+   VALUES ('obs_xxx', 'card', '{"title":"...","body":"...","options":["A","B"]}',
+           'pending', datetime('now'));
 
-You receive:
-- Batched conversation turns (every 5-10 messages)
-- Periodic screenshots (1/minute during active sessions)
-- Current state of preferences and knowledge graph
+## What you receive
+- Batched conversation turns (every 5-10 messages from the main session)
+- Periodic screenshots (1/minute when user is active)
+- The user's response to any cards you surfaced (poll observer_activity)
 
-You are Opus. Think deeply. Connect dots across sessions. Build a rich,
-accurate model of this person over time.
+## Principles
+- Surface CONCLUSIONS, not observations. "Saved: you prefer X" not "I noticed you did X"
+- Write to the knowledge graph liberally — it's cheap and the main agent reads it
+- Use Hindsight for context that's too nuanced for structured data
+- Create skills only for clear, repeated patterns — not one-off workflows
+- Ask the user only when the answer materially changes how you'd serve them
+- You are Opus. Think deeply. Connect dots across sessions.
 ```
 
 ## Conversation Feed Mechanism
@@ -238,65 +218,56 @@ The ACP bridge pipes main session turns to the observer in batches:
 3. Every 5 turns (or when the user goes idle for 30s), the bridge sends the batch to the observer session as a `session/prompt` with:
    - The conversation batch
    - A fresh screenshot (if user was active)
-   - Current preference count and last-updated timestamp
+4. The observer processes asynchronously — its outputs (KG updates, Hindsight retains, skill files, cards) happen independently of the main session
 
-The observer processes asynchronously. Its outputs (DB writes, cards) happen independently of the main session's flow.
+## How the Main Session Benefits
 
-## Preference Injection into Main Session
+The main session already reads from all the stores the observer writes to:
 
-`ChatProvider.swift` gets a new `formatPreferencesSection()` method:
+| Observer writes to | Main session reads via | Already wired? |
+|-------------------|----------------------|----------------|
+| `local_kg_nodes/edges` | `execute_sql` + system prompt context | Yes |
+| Hindsight | `recall` MCP tool | Yes |
+| `~/.claude/skills/` | Skill discovery in `ChatProvider.swift` | Yes |
+| `ai_user_profiles` | `formatAIProfileSection()` | Yes |
 
-```swift
-func formatPreferencesSection() -> String {
-    // Load from user_preferences table
-    // Group by domain
-    // Only include confirmed OR high-confidence (>0.7) preferences
-    // Format as:
-    // <user_preferences>
-    // Shopping: prefers Amazon, same-day delivery to office address
-    // Communication: formal tone for work emails, casual for personal
-    // Coding: Python, snake_case, prefers list comprehensions
-    // </user_preferences>
-}
-```
-
-This is called at every `session/prompt` in the main session, so the agent naturally uses the preferences without being told to.
+No new "preference injection" code needed. The observer enriches the same stores the main session already consults.
 
 ## Implementation Phases
 
-### Phase 1: Silent Learning + Preference Injection
-- New DB tables (user_preferences, observed_patterns)
+### Phase 1: Observer Session + Knowledge Graph Learning
+- One new DB table (`observer_activity`)
 - Observer ACP session that receives conversation batches
-- Observer extracts preferences and writes to DB
-- Main session reads preferences into system prompt
-- **No UI changes** — the observer is invisible but the main agent gets smarter
+- Observer updates knowledge graph via `save_knowledge_graph`
+- Observer stores context via Hindsight `retain`
+- **No UI changes** — the main agent just gets smarter because the KG and Hindsight are richer
 
 ### Phase 2: Observer Cards
-- New DB table (observer_cards)
 - Swift UI component for rendering cards inline in chat
-- Observer writes cards, UI renders them
-- Button taps write back to observer_cards, observer reads responses
+- Poll `observer_activity` for `type='card', status='pending'`
+- Button taps write back to table
+- Observer reads responses and acts
 - Rate limiting (max 2-3 per conversation)
 
-### Phase 3: Pattern Detection + Auto-Skills
-- Observer tracks repeated workflows in observed_patterns
-- When count >= 3, generates a .skill.md and offers via pattern card
-- Session start summary cards
+### Phase 3: Auto-Skill Creation
+- Observer detects repeated workflows
+- Writes `.skill.md` files to `~/.claude/skills/`
+- Surfaces `skill_created` card for user awareness
+- Main session auto-discovers new skills
 
 ### Phase 4: Screen Context Intelligence
 - Periodic screenshot analysis (not just on-demand)
-- Observer understands what app the user is in, what they're looking at
-- Cross-references screen context with conversation to build richer model
-- "You were looking at X while asking about Y" inference
+- Observer understands what app the user is in, what they're working on
+- Cross-references screen context with conversation for richer KG updates
 
 ## Open Questions
 
-1. **Cost**: Running Opus in parallel doubles the API cost per conversation. Is this acceptable for all users, or should it be a premium feature / opt-in?
+1. **Cost**: Running Opus in parallel doubles API cost. Premium feature, opt-in, or default for all?
 
-2. **Privacy**: The observer sees everything. Should there be an easy way to pause it? A "private mode" toggle?
+2. **Privacy**: Should there be a "pause observer" toggle? Private mode?
 
-3. **Preference conflicts**: What happens when the observer learns something that contradicts a previous preference? Always ask, or auto-update with lower confidence?
+3. **Hindsight vs KG boundary**: When should the observer use `save_knowledge_graph` vs Hindsight `retain`? Rule of thumb: structured facts (entities, relationships) → KG. Nuanced context (behavioral patterns, conversation summaries) → Hindsight.
 
-4. **Cross-device**: Preferences are stored locally in SQLite. If the user has multiple devices, how do preferences sync? (Backend table? Or local-only for now?)
+4. **Skill quality**: Auto-generated skills need to be good enough to use immediately. Should the observer test them before surfacing, or always ask the user to review?
 
-5. **Preference decay**: Should old, unconfirmed preferences lose confidence over time? A preference learned 6 months ago and never confirmed might be stale.
+5. **Cross-session continuity**: The observer session resets each app launch. Its memory persists through KG + Hindsight + observer_activity table. Is that sufficient, or does it need its own persistent context?
