@@ -1508,7 +1508,7 @@ class FloatingControlBarManager {
                 barWindow?.state.isCompacting = isCompacting
             }
 
-        await provider.sendMessage(message, model: ShortcutSettings.shared.selectedModel, systemPromptSuffix: barWindow.state.tutorialSystemPromptSuffix, systemPromptPrefix: ChatProvider.floatingBarSystemPromptPrefixCurrent, sessionKey: "floating", imagePath: screenshotPath)
+        await provider.sendMessage(message, model: ShortcutSettings.shared.selectedModel, systemPromptSuffix: barWindow.state.tutorialSystemPromptSuffix, systemPromptPrefix: ChatProvider.floatingBarSystemPromptPrefixCurrent, sessionKey: "floating")
 
         // Handle errors after sendMessage completes
         barWindow.state.isAILoading = false
