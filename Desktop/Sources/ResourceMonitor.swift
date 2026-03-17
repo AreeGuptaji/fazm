@@ -369,7 +369,7 @@ class ResourceMonitor {
 
     /// Collect per-thread CPU usage to identify which thread is burning CPU.
     /// Only called at critical threshold to avoid overhead.
-    private func collectPerThreadCPUDiagnostics() -> [String: Any] {
+    private nonisolated func collectPerThreadCPUDiagnostics() -> [String: Any] {
         var threadList: thread_act_array_t?
         var threadCount: mach_msg_type_number_t = 0
 
@@ -445,7 +445,7 @@ class ResourceMonitor {
     }
 
     /// Collect malloc zone statistics to see heap vs VM allocations.
-    private func collectMallocZoneDiagnostics() -> [String: Any] {
+    private nonisolated func collectMallocZoneDiagnostics() -> [String: Any] {
         var stats = malloc_statistics_t()
         malloc_zone_statistics(nil, &stats) // nil = default zone aggregate
 
@@ -461,7 +461,7 @@ class ResourceMonitor {
     }
 
     /// Collect VM region breakdown from task_vm_info.
-    private func collectVMRegionDiagnostics() -> [String: Any] {
+    private nonisolated func collectVMRegionDiagnostics() -> [String: Any] {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<task_vm_info>.size) / 4
 
@@ -495,31 +495,35 @@ class ResourceMonitor {
 
     /// Collect all enhanced diagnostics and send to Sentry.
     /// Only called at critical memory threshold to avoid overhead.
+    /// Runs heavy mach introspection off the main thread.
     private func collectEnhancedDiagnostics(snapshot: ResourceSnapshot) {
-        log("ResourceMonitor: === ENHANCED DIAGNOSTICS START (memory: \(snapshot.memoryFootprintMB)MB) ===")
+        let isDevBuild = self.isDevBuild
+        Task.detached(priority: .utility) { [self] in
+            log("ResourceMonitor: === ENHANCED DIAGNOSTICS START (memory: \(snapshot.memoryFootprintMB)MB) ===")
 
-        let threadDiag = collectPerThreadCPUDiagnostics()
-        let mallocDiag = collectMallocZoneDiagnostics()
-        let vmDiag = collectVMRegionDiagnostics()
+            let threadDiag = self.collectPerThreadCPUDiagnostics()
+            let mallocDiag = self.collectMallocZoneDiagnostics()
+            let vmDiag = self.collectVMRegionDiagnostics()
 
-        log("ResourceMonitor: === ENHANCED DIAGNOSTICS END ===")
+            log("ResourceMonitor: === ENHANCED DIAGNOSTICS END ===")
 
-        // Send to Sentry as breadcrumbs and context
-        if !isDevBuild {
-            SentrySDK.configureScope { scope in
-                scope.setContext(value: threadDiag, key: "hot_threads")
-                scope.setContext(value: mallocDiag, key: "malloc_zones")
-                scope.setContext(value: vmDiag, key: "vm_regions")
+            // Send to Sentry as breadcrumbs and context
+            if !isDevBuild {
+                SentrySDK.configureScope { scope in
+                    scope.setContext(value: threadDiag, key: "hot_threads")
+                    scope.setContext(value: mallocDiag, key: "malloc_zones")
+                    scope.setContext(value: vmDiag, key: "vm_regions")
+                }
+
+                let breadcrumb = Breadcrumb(level: .error, category: "enhanced_diagnostics")
+                breadcrumb.message = "Enhanced diagnostics at \(snapshot.memoryFootprintMB)MB"
+                breadcrumb.data = [
+                    "hot_threads": threadDiag,
+                    "malloc_zones": mallocDiag,
+                    "vm_regions": vmDiag
+                ]
+                SentrySDK.addBreadcrumb(breadcrumb)
             }
-
-            let breadcrumb = Breadcrumb(level: .error, category: "enhanced_diagnostics")
-            breadcrumb.message = "Enhanced diagnostics at \(snapshot.memoryFootprintMB)MB"
-            breadcrumb.data = [
-                "hot_threads": threadDiag,
-                "malloc_zones": mallocDiag,
-                "vm_regions": vmDiag
-            ]
-            SentrySDK.addBreadcrumb(breadcrumb)
         }
     }
 
@@ -647,7 +651,7 @@ class ResourceMonitor {
     }
 
     /// Get app's memory usage as percentage of total system RAM
-    private func getMemoryPercentage() -> Double {
+    private nonisolated func getMemoryPercentage() -> Double {
         let totalRAM = getTotalSystemRAM()
         guard totalRAM > 0 else { return 0 }
         let footprint = getMemoryFootprintMB()
@@ -655,7 +659,7 @@ class ResourceMonitor {
     }
 
     /// Get system-wide memory pressure (percentage of total RAM in use by all apps)
-    private func getSystemMemoryPressure() -> Double {
+    private nonisolated func getSystemMemoryPressure() -> Double {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
 
