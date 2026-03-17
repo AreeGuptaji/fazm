@@ -313,11 +313,13 @@ class PushToTalkManager: ObservableObject {
     // Dismiss silence overlay if it's showing from a previous PTT attempt
     barState?.dismissSilenceOverlay()
 
-    // Play start-of-PTT sound
+    // Play start-of-PTT sound (off main thread to avoid audio subsystem XPC blocking UI)
     if ShortcutSettings.shared.pttSoundsEnabled {
-      let sound = NSSound(named: "Funk")
-      sound?.volume = 0.3
-      sound?.play()
+      DispatchQueue.global(qos: .userInitiated).async {
+        let sound = NSSound(named: "Funk")
+        sound?.volume = 0.3
+        sound?.play()
+      }
     }
 
     // Track whether PTT actually opened the chat (vs it was already open)
@@ -347,11 +349,13 @@ class PushToTalkManager: ObservableObject {
     finalizeWorkItem = nil
     state = .lockedListening
 
-    // Play start-of-PTT sound for locked mode
+    // Play start-of-PTT sound for locked mode (off main thread)
     if ShortcutSettings.shared.pttSoundsEnabled {
-      let sound = NSSound(named: "Funk")
-      sound?.volume = 0.3
-      sound?.play()
+      DispatchQueue.global(qos: .userInitiated).async {
+        let sound = NSSound(named: "Funk")
+        sound?.volume = 0.3
+        sound?.play()
+      }
     }
 
     // Track whether PTT actually opened the chat (vs it was already open)
@@ -438,11 +442,13 @@ class PushToTalkManager: ObservableObject {
     // Stop mic immediately — no more audio capture
     audioCaptureService?.stopCapture()
 
-    // Play end-of-PTT sound
+    // Play end-of-PTT sound (off main thread)
     if ShortcutSettings.shared.pttSoundsEnabled {
-      let sound = NSSound(named: "Bottle")
-      sound?.volume = 0.3
-      sound?.play()
+      DispatchQueue.global(qos: .userInitiated).async {
+        let sound = NSSound(named: "Bottle")
+        sound?.volume = 0.3
+        sound?.play()
+      }
     }
 
     let isBatchMode = ShortcutSettings.shared.pttTranscriptionMode == .batch
