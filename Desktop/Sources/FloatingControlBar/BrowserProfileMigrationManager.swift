@@ -102,6 +102,7 @@ class BrowserProfileMigrationManager {
 
     private func skip() {
         UserDefaults.standard.set(true, forKey: userDefaultsKey)
+        AnalyticsManager.shared.browserProfileMigrationSkipped()
         dismissWindow()
         log("BrowserProfileMigration: Skipped")
     }
