@@ -269,13 +269,6 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             TutorialChatGuide.shared.finish(barState: state)
         }
 
-        // End browser profile migration if active — treat dismiss as skip
-        if state.isBrowserMigrationActive {
-            BrowserProfileMigrationManager.shared.skip()
-            state.isBrowserMigrationActive = false
-            state.browserMigrationSystemPromptSuffix = nil
-        }
-
         // Cancel any in-flight chat streaming to prevent re-expansion
         FloatingControlBarManager.shared.cancelChat()
 
@@ -515,13 +508,6 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         // End tutorial chat guide if active
         if state.isTutorialChatActive {
             TutorialChatGuide.shared.finish(barState: state)
-        }
-
-        // End browser profile migration if active
-        if state.isBrowserMigrationActive {
-            BrowserProfileMigrationManager.shared.skip()
-            state.isBrowserMigrationActive = false
-            state.browserMigrationSystemPromptSuffix = nil
         }
 
         state.showingAIConversation = true
@@ -1133,12 +1119,10 @@ class FloatingControlBarManager {
         // Show post-onboarding tutorial if needed
         if let barState = self.barState {
             PostOnboardingTutorialManager.shared.showIfNeeded(barState: barState)
-
-            // Browser profile migration for existing users (after tutorial)
-            if !barState.isTutorialChatActive {
-                BrowserProfileMigrationManager.shared.startIfNeeded(barState: barState)
-            }
         }
+
+        // Browser profile migration popup for existing users
+        BrowserProfileMigrationManager.shared.showIfNeeded()
 
         // Auto-focus input if AI conversation is open
         if let window = window, window.state.showingAIConversation && !window.state.showingAIResponse {
@@ -1358,18 +1342,6 @@ class FloatingControlBarManager {
         }
     }
 
-    /// Open the AI conversation view and resize to fit response content.
-    func showAIConversationAndResize() {
-        guard let window else { return }
-        window.showAIConversation()
-        window.resizeToResponseHeightPublic(animated: true)
-    }
-
-    /// Resize the floating bar to fit current response content (without resetting state).
-    func resizeToFitResponse() {
-        window?.resizeToResponseHeightPublic(animated: true)
-    }
-
     /// Expand the floating bar from collapsed state (used by PTT when bar was collapsed).
     func expandFromCollapsed(instant: Bool = false) {
         guard let window else { return }
@@ -1540,11 +1512,7 @@ class FloatingControlBarManager {
                 barWindow?.state.isCompacting = isCompacting
             }
 
-        let sessionKey = barWindow.state.isBrowserMigrationActive ? "browser-migration" : "floating"
-        let promptSuffix = barWindow.state.isBrowserMigrationActive
-            ? barWindow.state.browserMigrationSystemPromptSuffix
-            : barWindow.state.tutorialSystemPromptSuffix
-        await provider.sendMessage(message, model: ShortcutSettings.shared.selectedModel, systemPromptSuffix: promptSuffix, systemPromptPrefix: ChatProvider.floatingBarSystemPromptPrefixCurrent, sessionKey: sessionKey)
+        await provider.sendMessage(message, model: ShortcutSettings.shared.selectedModel, systemPromptSuffix: barWindow.state.tutorialSystemPromptSuffix, systemPromptPrefix: ChatProvider.floatingBarSystemPromptPrefixCurrent, sessionKey: "floating")
 
         // Handle errors after sendMessage completes
         barWindow.state.isAILoading = false
