@@ -235,6 +235,25 @@ else
     echo "Warning: Google Workspace MCP not found at $GWS_MCP_REPO — skipping"
 fi
 
+# Bundle Hindsight Memory MCP (Python)
+HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
+if command -v uv &>/dev/null; then
+    substep "Bundling Hindsight Memory MCP"
+    mkdir -p "$HINDSIGHT_BUNDLE"
+    if [ ! -d "$HINDSIGHT_BUNDLE/.venv" ]; then
+        uv venv "$HINDSIGHT_BUNDLE/.venv" --python python3.12 --quiet 2>&1 | tail -1 || true
+        uv pip install --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" \
+            'hindsight-api-slim[embedded-db]' --quiet 2>&1 | tail -3 || true
+        # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider, we use anthropic
+        uv pip uninstall --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
+        substep "Bundled Hindsight Memory MCP with venv"
+    else
+        substep "Hindsight venv already exists, skipping install"
+    fi
+else
+    echo "Warning: uv not found — Hindsight Memory MCP will not be bundled"
+fi
+
 substep "Copying .env.app"
 if [ -f ".env.app.dev" ]; then
     cp -f .env.app.dev "$APP_BUNDLE/Contents/Resources/.env"
