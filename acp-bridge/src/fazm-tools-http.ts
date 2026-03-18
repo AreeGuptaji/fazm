@@ -1,5 +1,5 @@
 /**
- * HTTP-based MCP server that exposes Fazm tools (execute_sql, semantic_search)
+ * HTTP-based MCP server that exposes Fazm tools (execute_sql, complete_task, etc.)
  * to the ACP agent. Tool calls are forwarded to Swift via stdout using the
  * same protocol as agent-bridge.
  *
@@ -78,30 +78,6 @@ Use for: app usage stats, time queries, task management, aggregations, anything 
       type: "object",
       properties: {
         query: { type: "string", description: "SQL query to execute" },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "semantic_search",
-    description: `Vector similarity search on screen history.
-Use for: fuzzy conceptual queries where exact SQL keywords won't work.
-e.g. "reading about machine learning", "working on design mockups"`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Natural language search query",
-        },
-        days: {
-          type: "number",
-          description: "Number of days to search back (default: 7)",
-        },
-        app_filter: {
-          type: "string",
-          description: "Filter results to a specific app name",
-        },
       },
       required: ["query"],
     },
@@ -194,20 +170,6 @@ async function handleJsonRpc(
           }
         }
         const result = await requestSwiftTool("execute_sql", { query });
-        return {
-          jsonrpc: "2.0",
-          id,
-          result: { content: [{ type: "text", text: result }] },
-        };
-      }
-
-      if (toolName === "semantic_search") {
-        const input: Record<string, unknown> = {
-          query: args.query,
-          days: args.days ?? 7,
-        };
-        if (args.app_filter) input.app_filter = args.app_filter;
-        const result = await requestSwiftTool("semantic_search", input);
         return {
           jsonrpc: "2.0",
           id,
