@@ -921,10 +921,10 @@ function getHttpMcpServers(): Record<string, { type: string; url: string }> {
 }
 
 function buildMeta(systemPrompt?: string, sessionKey?: string): Record<string, unknown> {
-  // Only give Hindsight MCP to the observer session — it owns memory/persistence
-  const httpServers = sessionKey === "observer" ? getHttpMcpServers() : {};
+  // All sessions get Hindsight — observer uses retain/reflect for writing,
+  // main session uses recall for reading context
   const meta: Record<string, unknown> = {
-    claudeCode: { options: { mcpServers: httpServers } },
+    claudeCode: { options: { mcpServers: getHttpMcpServers() } },
   };
   if (systemPrompt) {
     meta.systemPrompt = systemPrompt;
