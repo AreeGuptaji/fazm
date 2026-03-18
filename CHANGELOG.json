@@ -111,6 +111,7 @@
     "Added Explore Fazm resource cards on Home page linking to demos, safety, use cases, and comparisons",
     "Replaced Talk to Fazm button-like badge with animated keyboard showing the active shortcut key",
     "Observer cards now appear immediately in chat with accept/reject buttons and click feedback",
-    "Reduced observer response delay from 30s to 5s"
+    "Reduced observer response delay from 30s to 5s",
+    "Bundled Hindsight memory system \u2014 the AI now remembers context across conversations"
   ]
 }
