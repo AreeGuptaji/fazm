@@ -156,21 +156,14 @@ async function startHindsight(): Promise<boolean> {
     }
   } catch {}
 
-  // Hindsight uses Vertex AI (Gemini Pro) for LLM — needs fazm-prod service account
-  // Look for the key next to the bridge source first, then fall back to backend/
-  const adcCandidates = [
-    join(__dirname, "..", "vertex-ai-sa-key.json"),
-    join(__dirname, "..", "..", "backend", "vertex-ai-sa-key.json"),
-  ];
-  const adcPath = adcCandidates.find((p) => existsSync(p));
-  const vertexProject = process.env.VERTEX_PROJECT_ID || "fazm-prod";
-  const vertexRegion = process.env.VERTEX_REGION || "us-east5";
-  if (!adcPath) {
-    logErr(`Hindsight: no vertex-ai-sa-key.json found (checked ${adcCandidates.join(", ")}) — skipping`);
+  // Hindsight uses Gemini API (generativelanguage) with gemini-pro-latest
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    logErr("Hindsight: no GEMINI_API_KEY — skipping");
     return false;
   }
 
-  logErr(`Hindsight: starting server (vertexai, project=${vertexProject}, region=${vertexRegion}, adc=${adcPath})...`);
+  logErr("Hindsight: starting server (gemini, model=gemini-pro-latest)...");
   // Use a clean environment to avoid conflicting Google auth vars
   // (e.g. CLOUD_ML_REGION, ANTHROPIC_VERTEX_PROJECT_ID) from the parent
   const hindsightEnv: Record<string, string> = {
@@ -178,11 +171,9 @@ async function startHindsight(): Promise<boolean> {
     HOME: process.env.HOME || "",
     TMPDIR: process.env.TMPDIR || "/tmp",
     LANG: process.env.LANG || "en_US.UTF-8",
-    GOOGLE_APPLICATION_CREDENTIALS: adcPath,
-    HINDSIGHT_API_LLM_PROVIDER: "vertexai",
-    HINDSIGHT_API_LLM_MODEL: "gemini-3.1-pro-preview",
-    HINDSIGHT_API_LLM_VERTEXAI_PROJECT_ID: vertexProject,
-    HINDSIGHT_API_LLM_VERTEXAI_REGION: "global",
+    HINDSIGHT_API_LLM_PROVIDER: "gemini",
+    HINDSIGHT_API_LLM_MODEL: "gemini-pro-latest",
+    HINDSIGHT_API_LLM_API_KEY: geminiApiKey,
     HINDSIGHT_API_EMBEDDINGS_PROVIDER: "local",
     HINDSIGHT_API_RERANKER_PROVIDER: "local",
     HINDSIGHT_API_DATABASE_URL: "pg0://fazm",
