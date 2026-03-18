@@ -162,6 +162,17 @@ else
     echo "Warning: mcp-server-macos-use not found at $MCP_REPO — skipping"
 fi
 
+# Build and bundle whatsapp-mcp
+MCP_WHATSAPP="$HOME/whatsapp-mcp-skill-macos"
+if [ -d "$MCP_WHATSAPP" ]; then
+    substep "Building whatsapp-mcp..."
+    xcrun swift build -c debug --package-path "$MCP_WHATSAPP"
+    cp -f "$MCP_WHATSAPP/.build/debug/whatsapp-mcp" "$APP_BUNDLE/Contents/MacOS/whatsapp-mcp"
+    substep "Bundled whatsapp-mcp ($(du -h "$APP_BUNDLE/Contents/MacOS/whatsapp-mcp" | cut -f1))"
+else
+    echo "Warning: whatsapp-mcp not found at $MCP_WHATSAPP — skipping"
+fi
+
 substep "Adding rpath for Frameworks"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME" 2>/dev/null || true
 
@@ -314,6 +325,11 @@ if [ -n "$SIGN_IDENTITY" ]; then
     if [ -f "$MCP_BIN" ]; then
         substep "Signing mcp-server-macos-use"
         codesign --force --options runtime --sign "$SIGN_IDENTITY" "$MCP_BIN"
+    fi
+    WHATSAPP_BIN="$APP_BUNDLE/Contents/MacOS/whatsapp-mcp"
+    if [ -f "$WHATSAPP_BIN" ]; then
+        substep "Signing whatsapp-mcp"
+        codesign --force --options runtime --sign "$SIGN_IDENTITY" "$WHATSAPP_BIN"
     fi
     substep "Signing app bundle"
     codesign --force --options runtime --entitlements Desktop/Fazm.entitlements --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
