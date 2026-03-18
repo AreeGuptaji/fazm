@@ -76,6 +76,133 @@ const gwsMcpDir = join(
 const gwsMcpPython = join(gwsMcpDir, ".venv", "bin", "python3");
 const gwsMcpMain = join(gwsMcpDir, "main.py");
 
+// Hindsight Memory MCP — Python HTTP server bundled under Contents/Resources/hindsight/
+const hindsightDir = join(
+  dirname(process.execPath),
+  "..",
+  "..",
+  "Resources",
+  "hindsight"
+);
+const hindsightPython = join(hindsightDir, ".venv", "bin", "python3");
+const HINDSIGHT_PORT = 18888;
+let hindsightProcess: ChildProcess | null = null;
+let hindsightReady = false;
+
+async function ensureHindsightVenv(): Promise<boolean> {
+  if (existsSync(hindsightPython)) return true;
+
+  // Check if requirements.txt exists (release builds bundle this instead of full venv)
+  const requirementsPath = join(hindsightDir, "requirements.txt");
+  if (!existsSync(requirementsPath)) return false;
+
+  logErr("Hindsight: creating venv from requirements.txt (first launch)...");
+  try {
+    // Use uv if available, fall back to python3 -m venv + pip
+    try {
+      execSync("command -v uv", { stdio: "ignore" });
+      execSync(`uv venv "${join(hindsightDir, ".venv")}" --python python3.12 --quiet`, {
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 30000,
+      });
+      execSync(`uv pip install --python "${hindsightPython}" -r "${requirementsPath}" --quiet`, {
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 120000,
+      });
+      // Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
+      try {
+        execSync(`uv pip uninstall --python "${hindsightPython}" claude-agent-sdk --quiet`, {
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: 30000,
+        });
+      } catch {}
+    } catch {
+      // Fallback: python3 -m venv + pip
+      execSync(`python3 -m venv "${join(hindsightDir, ".venv")}"`, {
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 30000,
+      });
+      execSync(`"${hindsightPython}" -m pip install -r "${requirementsPath}" --quiet`, {
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 120000,
+      });
+      try {
+        execSync(`"${hindsightPython}" -m pip uninstall -y claude-agent-sdk --quiet`, {
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: 30000,
+        });
+      } catch {}
+    }
+    logErr("Hindsight: venv created successfully");
+    return existsSync(hindsightPython);
+  } catch (err) {
+    logErr(`Hindsight: venv creation failed: ${err}`);
+    return false;
+  }
+}
+
+async function startHindsight(): Promise<boolean> {
+  if (!await ensureHindsightVenv()) {
+    logErr(`Hindsight: python not found and cannot be created`);
+    return false;
+  }
+
+  // Check if already running (user's own instance or previous launch)
+  try {
+    const res = await fetch(`http://127.0.0.1:${HINDSIGHT_PORT}/health`);
+    if (res.ok) {
+      logErr("Hindsight: already running, reusing existing instance");
+      return true;
+    }
+  } catch {}
+
+  logErr("Hindsight: starting server...");
+  hindsightProcess = spawn(hindsightPython, [
+    "-m", "hindsight_api.main",
+    "--host", "127.0.0.1",
+    "--port", String(HINDSIGHT_PORT),
+    "--log-level", "warning",
+  ], {
+    env: {
+      ...process.env,
+      HINDSIGHT_API_LLM_PROVIDER: "anthropic",
+      HINDSIGHT_API_LLM_MODEL: "claude-haiku-4-5-20251001",
+      HINDSIGHT_API_LLM_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+      HINDSIGHT_API_EMBEDDINGS_PROVIDER: "local",
+      HINDSIGHT_API_RERANKER_PROVIDER: "local",
+      HINDSIGHT_API_DATABASE_URL: "pg0://fazm",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
+  });
+
+  hindsightProcess.unref();
+
+  // Log stderr for diagnostics
+  hindsightProcess.stderr?.on("data", (data: Buffer) => {
+    logErr(`Hindsight: ${data.toString().trim()}`);
+  });
+
+  hindsightProcess.on("exit", (code) => {
+    logErr(`Hindsight: process exited with code ${code}`);
+    hindsightProcess = null;
+  });
+
+  // Wait for health check (up to 30s — first launch initializes Postgres)
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const res = await fetch(`http://127.0.0.1:${HINDSIGHT_PORT}/health`);
+      if (res.ok) {
+        logErr("Hindsight: server ready");
+        return true;
+      }
+    } catch {}
+  }
+  logErr("Hindsight: health check timed out after 30s");
+  return false;
+}
+
 // --- Helpers ---
 
 function send(msg: OutboundMessage): void {
@@ -206,6 +333,14 @@ function startFazmToolsRelay(): Promise<string> {
         unlinkSync(pipePath);
       } catch {
         // ignore
+      }
+      // Kill Hindsight server if we spawned it
+      if (hindsightProcess) {
+        try {
+          hindsightProcess.kill();
+        } catch {
+          // ignore
+        }
       }
     });
   });
@@ -761,16 +896,20 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
 }
 
 // HTTP MCP servers (passed via _meta to bypass stdio-only validation on the mcpServers array)
-const httpMcpServers: Record<string, { type: string; url: string }> = {
-  hindsight: {
-    type: "http",
-    url: "http://localhost:8888/mcp/matthew/",
-  },
-};
+function getHttpMcpServers(): Record<string, { type: string; url: string }> {
+  const servers: Record<string, { type: string; url: string }> = {};
+  if (hindsightReady) {
+    servers.hindsight = {
+      type: "http",
+      url: `http://127.0.0.1:${HINDSIGHT_PORT}/mcp/default/`,
+    };
+  }
+  return servers;
+}
 
 function buildMeta(systemPrompt?: string): Record<string, unknown> {
   const meta: Record<string, unknown> = {
-    claudeCode: { options: { mcpServers: httpMcpServers } },
+    claudeCode: { options: { mcpServers: getHttpMcpServers() } },
   };
   if (systemPrompt) {
     meta.systemPrompt = systemPrompt;
@@ -1638,8 +1777,17 @@ async function main(): Promise<void> {
   } catch { /* ignore */ }
 
   logErr(`Bridge main() starting (pid=${process.pid}, node=${process.version}, execPath=${process.execPath})`);
-  logErr(`MCP versions: playwright=${playwrightVersion}, macos-use=${existsSync(macosUseBinary) ? "bundled" : "missing"}, google-workspace=${existsSync(gwsMcpPython) ? "bundled" : "missing"}`);
+  logErr(`MCP versions: playwright=${playwrightVersion}, macos-use=${existsSync(macosUseBinary) ? "bundled" : "missing"}, google-workspace=${existsSync(gwsMcpPython) ? "bundled" : "missing"}, hindsight=${existsSync(hindsightPython) ? "bundled" : "missing"}`);
   logErr(`Playwright MCP config: extension=${process.env.PLAYWRIGHT_USE_EXTENSION ?? "false"}, token=${process.env.PLAYWRIGHT_MCP_EXTENSION_TOKEN ? "set" : "unset"}, outputMode=file, imageResponses=omit, outputDir=/tmp/playwright-mcp`);
+
+  // Start Hindsight Memory MCP server (HTTP, runs in background)
+  // Don't block startup — start it concurrently and set hindsightReady when done
+  startHindsight().then((ready) => {
+    hindsightReady = ready;
+    logErr(`Hindsight: ${ready ? "ready" : "not available"}`);
+  }).catch((err) => {
+    logErr(`Hindsight: startup failed: ${err}`);
+  });
 
   // Log browser diagnostics for debugging Playwright connection issues
   try {
