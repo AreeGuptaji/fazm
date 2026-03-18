@@ -21,7 +21,7 @@ struct Payload: Decodable {
 }
 
 enum ManifestLoader {
-    static let manifestURL = URL(string: "https://storage.googleapis.com/fazm-releases/desktop/latest.json")!
+    static let manifestURL = URL(string: "https://storage.googleapis.com/fazm-prod-releases/desktop/latest.json")!
 
     static func fetchManifest() async throws -> ReleaseManifest {
         let (data, response) = try await URLSession.shared.data(from: manifestURL)

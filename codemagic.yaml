@@ -787,7 +787,7 @@ workflows:
           gcloud auth activate-service-account --key-file=/tmp/gcp-sa-key.json
           rm /tmp/gcp-sa-key.json
 
-          BUCKET="fazm-releases"
+          BUCKET="fazm-prod-releases"
           PREFIX="desktop/$VERSION"
           BASE_URL="https://storage.googleapis.com/$BUCKET"
 

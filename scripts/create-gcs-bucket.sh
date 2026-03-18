@@ -5,7 +5,7 @@
 set -euo pipefail
 
 PROJECT="fazm-prod"
-BUCKET="fazm-releases"
+BUCKET="fazm-prod-releases"
 REGION="us-east1"
 
 echo "Creating GCS bucket gs://$BUCKET in project $PROJECT..."

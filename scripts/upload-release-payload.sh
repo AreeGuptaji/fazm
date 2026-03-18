@@ -9,7 +9,7 @@ VERSION="${1:?Usage: $0 <version> <arm64-zip> <x86_64-zip>}"
 ARM64_ZIP="${2:?Missing arm64 ZIP path}"
 X86_64_ZIP="${3:?Missing x86_64 ZIP path}"
 
-BUCKET="fazm-releases"
+BUCKET="fazm-prod-releases"
 PREFIX="desktop/$VERSION"
 BASE_URL="https://storage.googleapis.com/$BUCKET"
 
