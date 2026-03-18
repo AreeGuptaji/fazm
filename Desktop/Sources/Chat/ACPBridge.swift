@@ -113,6 +113,10 @@ actor ACPBridge {
   /// Called when the observer session completes a batch and new cards may be available
   var onObserverPoll: (() -> Void)?
 
+  func setObserverPollHandler(_ handler: @escaping @Sendable () -> Void) {
+    self.onObserverPoll = handler
+  }
+
   func setGlobalAuthHandlers(
     onAuthRequired: AuthRequiredHandler?,
     onAuthSuccess: AuthSuccessHandler?,
