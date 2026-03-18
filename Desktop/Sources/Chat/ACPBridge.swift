@@ -800,6 +800,7 @@ actor ACPBridge {
       }
     case .observerPoll:
       // Always handle immediately — observer runs independently of any active query
+      log("ACPBridge: received observer_poll, handler=\(onObserverPoll != nil)")
       onObserverPoll?()
       return
     case .toolUse(let callId, let name, let input):
