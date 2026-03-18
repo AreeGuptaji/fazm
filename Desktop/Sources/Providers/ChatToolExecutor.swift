@@ -3,7 +3,7 @@ import Foundation
 import GRDB
 
 /// Executes tool calls from Gemini and returns results
-/// Tools: execute_sql (read/write SQL on fazm.db), semantic_search (vector similarity)
+/// Tools: execute_sql (read/write SQL on fazm.db), complete_task, capture_screenshot, etc.
 @MainActor
 class ChatToolExecutor {
 
