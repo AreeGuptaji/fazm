@@ -151,9 +151,10 @@ class SessionRecordingManager {
             self.isStarted = true
 
             // Wire up Gemini analysis: copy each chunk before upload deletes it
-            await recorder.setOnChunkReady { info in
-                await GeminiAnalysisService.shared.handleChunk(info)
-            }
+            // TODO: Re-enable once macos-session-replay exposes ChunkInfo/setOnChunkReady
+            // await recorder.setOnChunkReady { info in
+            //     await GeminiAnalysisService.shared.handleChunk(info)
+            // }
 
             do {
                 try await recorder.start()
