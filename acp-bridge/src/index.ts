@@ -1035,7 +1035,12 @@ async function flushObserverBatch(): Promise<void> {
 
     // After observer completes, poll observer_activity for new cards
     // and send them to Swift. The observer writes cards via execute_sql.
-    send({ type: "observer_poll" as any });
+    // Include batch metadata for PostHog tracking
+    send({
+      type: "observer_poll" as any,
+      batchSize: batch.length,
+      batchTurnCount: Math.floor(batch.length / 2),
+    } as any);
   } catch (err) {
     logErr(`Observer: batch failed: ${err}`);
   } finally {
