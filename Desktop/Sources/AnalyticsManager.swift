@@ -510,7 +510,8 @@ class AnalyticsManager {
         outputTokens: Int = 0,
         cacheReadTokens: Int = 0,
         cacheWriteTokens: Int = 0,
-        queryText: String = ""
+        queryText: String = "",
+        ttftMs: Int? = nil
     ) {
         var props: [String: Any] = [
             "duration_ms": durationMs,
@@ -526,6 +527,9 @@ class AnalyticsManager {
         ]
         if !queryText.isEmpty {
             props["query_text"] = String(queryText.prefix(1000))
+        }
+        if let ttftMs = ttftMs {
+            props["ttft_ms"] = ttftMs
         }
         PostHogManager.shared.track("chat_agent_query_completed", properties: props)
     }
