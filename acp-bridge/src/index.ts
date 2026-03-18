@@ -247,6 +247,20 @@ let acpResponseHandlers = new Map<
 >();
 let acpNotificationHandler: ((method: string, params: unknown) => void) | null =
   null;
+
+// Per-session notification handlers — observer and other background sessions register here
+// so that the main query's handler doesn't swallow their notifications.
+const sessionNotificationHandlers = new Map<string, (method: string, params: unknown) => void>();
+
+/** Look up which session a notification belongs to (ACP includes sessionId in update params) */
+function getNotificationSessionId(params: unknown): string | undefined {
+  const p = params as Record<string, unknown> | undefined;
+  if (p?.sessionId) return p.sessionId as string;
+  // Also check inside update object
+  const update = p?.update as Record<string, unknown> | undefined;
+  if (update?.sessionId) return update.sessionId as string;
+  return undefined;
+}
 let nextRpcId = 1;
 
 /** Send a JSON-RPC request to the ACP subprocess and wait for the response */
@@ -381,7 +395,12 @@ function startAcpProcess(): void {
         }
       } else if ("method" in msg) {
         // JSON-RPC notification (has method but no id)
-        if (acpNotificationHandler) {
+        // Route to per-session handler if one exists (observer, background sessions)
+        const notifSessionId = getNotificationSessionId(msg.params);
+        const sessionHandler = notifSessionId ? sessionNotificationHandlers.get(notifSessionId) : undefined;
+        if (sessionHandler) {
+          sessionHandler(msg.method as string, msg.params as unknown);
+        } else if (acpNotificationHandler) {
           acpNotificationHandler(
             msg.method as string,
             msg.params as unknown
