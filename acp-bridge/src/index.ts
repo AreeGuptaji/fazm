@@ -757,14 +757,25 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
     });
   }
 
-  // Hindsight memory (HTTP MCP server, runs locally via launchd)
-  servers.push({
-    name: "hindsight",
+  return servers;
+}
+
+// HTTP MCP servers (passed via _meta to bypass stdio-only validation on the mcpServers array)
+const httpMcpServers: Record<string, { type: string; url: string }> = {
+  hindsight: {
     type: "http",
     url: "http://localhost:8888/mcp/matthew/",
-  });
+  },
+};
 
-  return servers;
+function buildMeta(systemPrompt?: string): Record<string, unknown> {
+  const meta: Record<string, unknown> = {
+    claudeCode: { options: { mcpServers: httpMcpServers } },
+  };
+  if (systemPrompt) {
+    meta.systemPrompt = systemPrompt;
+  }
+  return { _meta: meta };
 }
 
 // --- Observer session: conversation batching ---
