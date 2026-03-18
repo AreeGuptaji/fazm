@@ -3083,6 +3083,7 @@ class ChatProvider: ObservableObject {
                     PostHogManager.shared.track("observer_card_shown", properties: [
                         "activity_id": activityId,
                         "card_type": type,
+                        "content_preview": String(displayText.prefix(500)),
                     ])
                 }
             } catch {
