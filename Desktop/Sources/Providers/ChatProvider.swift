@@ -2981,8 +2981,12 @@ class ChatProvider: ObservableObject {
 
     /// Poll observer_activity table for pending cards and inject them into the current chat
     private func pollObserverCards() {
+        log("ChatProvider: pollObserverCards() called")
         Task {
-            guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
+            guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else {
+                log("ChatProvider: pollObserverCards — no database queue")
+                return
+            }
             do {
                 let rows = try await dbQueue.read { db in
                     try Row.fetchAll(db, sql: """
@@ -2992,6 +2996,8 @@ class ChatProvider: ObservableObject {
                         ORDER BY createdAt ASC
                     """)
                 }
+
+                log("ChatProvider: pollObserverCards — found \(rows.count) pending cards")
 
                 for row in rows {
                     let activityId: Int64 = row["id"]
