@@ -322,7 +322,7 @@ workflows:
           # Bundle Hindsight Memory MCP (Python) — venv created at runtime
           HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
           mkdir -p "$HINDSIGHT_BUNDLE"
-          echo 'hindsight-api-slim[embedded-db]' > "$HINDSIGHT_BUNDLE/requirements.txt"
+          printf 'hindsight-api-slim[embedded-db]\nsentence-transformers\n' > "$HINDSIGHT_BUNDLE/requirements.txt"
           echo "Bundled Hindsight Memory MCP (venv will be created at runtime)"
 
           # Update Info.plist metadata
