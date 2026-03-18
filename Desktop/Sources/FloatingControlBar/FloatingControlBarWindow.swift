@@ -273,24 +273,6 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             ])
         }
 
-        NotificationCenter.default.addObserver(
-            forName: .floatingBarDragDidStart, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.isUserDragging = true
-                self?.state.isDragging = true
-            }
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: .floatingBarDragDidEnd, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.isUserDragging = false
-                self?.state.isDragging = false
-            }
-        }
-
         // Re-validate position when monitors are connected/disconnected
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
