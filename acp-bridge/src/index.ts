@@ -851,6 +851,11 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
     env: fazmToolsEnv,
   });
 
+  // Observer only gets fazm-tools + Hindsight (via buildMeta) — no browser/UI tools
+  if (sessionKey === "observer") {
+    return servers;
+  }
+
   // Playwright MCP server
   const playwrightArgs = [playwrightCli];
   if (process.env.PLAYWRIGHT_USE_EXTENSION === "true") {
@@ -907,9 +912,11 @@ function getHttpMcpServers(): Record<string, { type: string; url: string }> {
   return servers;
 }
 
-function buildMeta(systemPrompt?: string): Record<string, unknown> {
+function buildMeta(systemPrompt?: string, sessionKey?: string): Record<string, unknown> {
+  // Only give Hindsight MCP to the observer session — it owns memory/persistence
+  const httpServers = sessionKey === "observer" ? getHttpMcpServers() : {};
   const meta: Record<string, unknown> = {
-    claudeCode: { options: { mcpServers: getHttpMcpServers() } },
+    claudeCode: { options: { mcpServers: httpServers } },
   };
   if (systemPrompt) {
     meta.systemPrompt = systemPrompt;
@@ -1053,7 +1060,7 @@ async function preWarmSession(cwd?: string, sessionConfigs?: WarmupSessionConfig
           const sessionParams: Record<string, unknown> = {
             cwd: warmCwd,
             mcpServers: buildMcpServers("act", warmCwd, cfg.key),
-            ...buildMeta(cfg.systemPrompt),
+            ...buildMeta(cfg.systemPrompt, cfg.key),
           };
 
           // Resume existing session if ID provided, otherwise create a new one
@@ -1187,7 +1194,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
       const sessionParams: Record<string, unknown> = {
         cwd: requestedCwd,
         mcpServers: buildMcpServers(mode, requestedCwd, sessionKey),
-        ...buildMeta(msg.systemPrompt),
+        ...buildMeta(msg.systemPrompt, sessionKey),
       };
       const sessionResult = (await acpRequest("session/new", sessionParams)) as { sessionId: string };
 
