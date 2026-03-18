@@ -628,8 +628,8 @@ async function handleJsonRpc(
         // Observer mode: KG writes require user approval
         const nodes = (args.nodes as Array<Record<string, unknown>>) || [];
         const edges = (args.edges as Array<Record<string, unknown>>) || [];
-        const nodesSummary = nodes.map((n: Record<string, unknown>) => `${n.name} (${n.type})`).join(", ");
-        const edgesSummary = edges.map((e: Record<string, unknown>) => `${e.source} → ${e.target} (${e.relation})`).join(", ");
+        const nodesSummary = nodes.map((n: Record<string, unknown>) => `${n.name || n.label || n.id} (${n.type || n.node_type || "entity"})`).join(", ");
+        const edgesSummary = edges.map((e: Record<string, unknown>) => `${e.source || e.source_id} → ${e.target || e.target_id} (${e.relation || e.label})`).join(", ");
         const body = `Save to knowledge graph:\n• Nodes: ${nodesSummary || "none"}\n• Edges: ${edgesSummary || "none"}`;
         const cardContent = JSON.stringify({
           title: "Observer wants to update knowledge graph",
