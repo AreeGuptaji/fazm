@@ -770,8 +770,15 @@ function bufferObserverTurn(role: string, text: string): void {
   }
 }
 
+/** Whether the observer is currently processing a batch (prevents overlapping runs) */
+let observerRunning = false;
+
 async function flushObserverBatch(): Promise<void> {
   if (observerBuffer.length === 0) return;
+  if (observerRunning) {
+    logErr("Observer: already running, will retry after current batch completes");
+    return;
+  }
   if (observerBatchTimer) {
     clearTimeout(observerBatchTimer);
     observerBatchTimer = null;
@@ -783,9 +790,35 @@ async function flushObserverBatch(): Promise<void> {
     return;
   }
 
+  observerRunning = true;
   const batch = observerBuffer.splice(0);
   const batchText = batch.map(t => `[${t.role}]: ${t.text}`).join("\n\n");
   const prompt = `Here are the latest conversation turns from the main session:\n\n${batchText}\n\nAnalyze these turns. Update the knowledge graph with any new entities, preferences, or relationships you detect. Use Hindsight retain for nuanced observations. If you detect a repeated workflow or integration opportunity, draft a skill and surface a card for user confirmation.`;
+
+  // Register a per-session notification handler so observer notifications
+  // don't get swallowed by the main query's handler or vice versa.
+  // The observer works silently — we only care about tool calls (which go
+  // through acpResponseHandlers) and the final result. We log tool activity
+  // but don't send it to Swift UI.
+  sessionNotificationHandlers.set(observerSession.sessionId, (method, params) => {
+    if (method === "session/update") {
+      const p = params as Record<string, unknown>;
+      const update = p.update as Record<string, unknown> | undefined;
+      const sessionUpdate = update?.sessionUpdate as string | undefined;
+      // Log observer tool calls for debugging but don't send to Swift UI
+      if (sessionUpdate === "tool_call") {
+        const title = (update?.title as string) ?? "unknown";
+        const status = (update?.status as string) ?? "";
+        logErr(`Observer tool: ${title} (${status})`);
+      } else if (sessionUpdate === "agent_message_chunk") {
+        // Observer text output — silently accumulate for logging only
+        const content = update?.content as { text?: string } | undefined;
+        if (content?.text) {
+          logErr(`Observer text: ${content.text.slice(0, 100)}`);
+        }
+      }
+    }
+  });
 
   try {
     logErr(`Observer: sending batch of ${batch.length} messages`);
@@ -793,9 +826,21 @@ async function flushObserverBatch(): Promise<void> {
       sessionId: observerSession.sessionId,
       prompt: [{ type: "text", text: prompt }],
     });
-    logErr("Observer: batch processed");
+    logErr("Observer: batch processed successfully");
+
+    // After observer completes, poll observer_activity for new cards
+    // and send them to Swift. The observer writes cards via execute_sql.
+    send({ type: "observer_poll" as any });
   } catch (err) {
     logErr(`Observer: batch failed: ${err}`);
+  } finally {
+    sessionNotificationHandlers.delete(observerSession.sessionId);
+    observerRunning = false;
+
+    // If new messages accumulated while we were running, flush again
+    if (observerBuffer.length > 0) {
+      setTimeout(() => flushObserverBatch(), 1000);
+    }
   }
 }
 
