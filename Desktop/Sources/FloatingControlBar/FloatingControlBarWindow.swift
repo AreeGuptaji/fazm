@@ -68,6 +68,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     var onStopAgent: (() -> Void)?
     var onResetSession: (() -> Void)?
     var onConnectClaude: (() -> Void)?
+    var onObserverCardAction: ((Int64, String) -> Void)?
 
     override init(
         contentRect: NSRect, styleMask style: NSWindow.StyleMask,
@@ -162,7 +163,8 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             onClearQueue: { [weak self] in self?.onClearQueue?() },
             onReorderQueue: { [weak self] source, dest in self?.onReorderQueue?(source, dest) },
             onStopAgent: { [weak self] in self?.onStopAgent?() },
-            onConnectClaude: { [weak self] in self?.onConnectClaude?() }
+            onConnectClaude: { [weak self] in self?.onConnectClaude?() },
+            onObserverCardAction: { [weak self] activityId, action in self?.onObserverCardAction?(activityId, action) }
         ).environmentObject(state)
 
         hostingView = NSHostingView(rootView: AnyView(
@@ -1065,6 +1067,10 @@ class FloatingControlBarManager {
             ClaudeAuthWindowController.shared.show(chatProvider: provider)
         }
 
+        barWindow.onObserverCardAction = { [weak chatProvider] activityId, action in
+            chatProvider?.handleObserverCardAction(activityId: activityId, action: action)
+        }
+
         // Observe ChatProvider dequeuing messages to sync UI queue
         dequeueObserver = NotificationCenter.default.addObserver(
             forName: .chatProviderDidDequeue, object: nil, queue: .main
@@ -1358,6 +1364,10 @@ class FloatingControlBarManager {
 
         window.onStopAgent = { [weak provider] in
             provider?.stopAgent()
+        }
+
+        window.onObserverCardAction = { [weak provider] activityId, action in
+            provider?.handleObserverCardAction(activityId: activityId, action: action)
         }
 
         // Activate the app so the window can become key and accept keyboard input.
