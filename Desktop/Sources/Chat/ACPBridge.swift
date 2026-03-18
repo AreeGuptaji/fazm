@@ -221,9 +221,6 @@ actor ACPBridge {
     // KeyService fetches it from the backend; override any stale .env value.
     if let geminiKey = KeyService.shared.geminiAPIKey, !geminiKey.isEmpty {
       env["GEMINI_API_KEY"] = geminiKey
-      log("ACPBridge: GEMINI_API_KEY set from KeyService (\(geminiKey.prefix(12))...)")
-    } else {
-      log("ACPBridge: GEMINI_API_KEY not available from KeyService, using env: \(env["GEMINI_API_KEY"]?.prefix(12) ?? "nil")")
     }
 
     // Ensure the directory containing node is in PATH
