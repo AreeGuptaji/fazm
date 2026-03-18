@@ -9,6 +9,7 @@ enum ContentBlockGroup: Identifiable {
     case toolCalls(id: String, calls: [(name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)])
     case thinking(id: String, text: String)
     case discoveryCard(id: String, title: String, summary: String, fullText: String)
+    case observerCard(id: String, activityId: Int64, type: String, content: String, buttons: [ObserverCardButton])
 
     var id: String {
         switch self {
@@ -16,6 +17,7 @@ enum ContentBlockGroup: Identifiable {
         case .toolCalls(let id, _): return id
         case .thinking(let id, _): return id
         case .discoveryCard(let id, _, _, _): return id
+        case .observerCard(let id, _, _, _, _): return id
         }
     }
 
@@ -68,6 +70,11 @@ enum ContentBlockGroup: Identifiable {
                 flushText()
                 flushToolCalls()
                 result.append(.discoveryCard(id: id, title: title, summary: summary, fullText: fullText))
+
+            case .observerCard(let id, let activityId, let type, let content, let buttons):
+                flushText()
+                flushToolCalls()
+                result.append(.observerCard(id: id, activityId: activityId, type: type, content: content, buttons: buttons))
             }
         }
 
@@ -209,6 +216,100 @@ struct DiscoveryCard: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
         )
+    }
+}
+
+// MARK: - Observer Card View
+
+struct ObserverCardView: View {
+    let activityId: Int64
+    let type: String
+    let content: String
+    let buttons: [ObserverCardButton]
+    var onAction: ((Int64, String) -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Icon + label
+            HStack(spacing: 6) {
+                Image(systemName: iconName)
+                    .scaledFont(size: 12)
+                    .foregroundColor(iconColor)
+                Text(typeLabel)
+                    .scaledFont(size: 11, weight: .medium)
+                    .foregroundColor(.secondary)
+            }
+
+            // Content
+            Text(content)
+                .scaledFont(size: 13)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Buttons
+            if !buttons.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(buttons) { button in
+                        Button {
+                            onAction?(activityId, button.action)
+                        } label: {
+                            Text(button.label)
+                                .scaledFont(size: 12, weight: .medium)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                        }
+                        .buttonStyle(.plain)
+                        .background(buttonBackground(for: button.action))
+                        .cornerRadius(6)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(FazmColors.purplePrimary.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(FazmColors.purplePrimary.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+
+    private var iconName: String {
+        switch type {
+        case "skill_draft": return "wand.and.stars"
+        case "insight": return "lightbulb"
+        case "kg_update": return "brain"
+        case "pattern": return "arrow.triangle.branch"
+        default: return "sparkles"
+        }
+    }
+
+    private var iconColor: Color {
+        switch type {
+        case "skill_draft": return .orange
+        case "insight": return .yellow
+        default: return FazmColors.purplePrimary
+        }
+    }
+
+    private var typeLabel: String {
+        switch type {
+        case "skill_draft": return "New Skill"
+        case "insight": return "Insight"
+        case "kg_update": return "Updated Knowledge"
+        case "pattern": return "Pattern Detected"
+        default: return "Observer"
+        }
+    }
+
+    private func buttonBackground(for action: String) -> Color {
+        switch action {
+        case "approve": return FazmColors.purplePrimary.opacity(0.3)
+        case "dismiss": return Color.white.opacity(0.08)
+        default: return Color.white.opacity(0.1)
+        }
     }
 }
 
