@@ -76,7 +76,7 @@ struct AIResponseView: View {
                             let h = geo.size.height.rounded()
                             // Use a generous threshold to avoid feedback loops
                             // where resize → relayout → new height → resize (macOS 26 crash).
-                            if abs(state.responseContentHeight - h) > 4 {
+                            if abs(state.responseContentHeight - h) > 8 {
                                 DispatchQueue.main.async { [weak state] in
                                     state?.responseContentHeight = h
                                 }
