@@ -158,7 +158,9 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             switch event.type {
             case .leftMouseDown:
                 let hitView = contentView?.hitTest(event.locationInWindow)
-                if !isInteractiveView(hitView) {
+                if isInteractiveView(hitView) {
+                    NSLog("FloatingBar drag: mouseDown on interactive view (%@), skipping drag", String(describing: type(of: hitView!)))
+                } else {
                     dragStartScreenLocation = NSEvent.mouseLocation
                     dragStartWindowOrigin = frame.origin
                     isDragGestureActive = false
@@ -173,6 +175,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
                             isDragGestureActive = true
                             isUserDragging = true
                             state.isDragging = true
+                            NSLog("FloatingBar drag: started at x=%.0f", startOrigin.x)
                         }
                     }
                     if isDragGestureActive {
@@ -186,6 +189,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
                 }
             case .leftMouseUp:
                 if isDragGestureActive {
+                    NSLog("FloatingBar drag: ended at x=%.0f (moved %.0fpt)", frame.origin.x, frame.origin.x - (dragStartWindowOrigin?.x ?? 0))
                     isUserDragging = false
                     state.isDragging = false
                 }
