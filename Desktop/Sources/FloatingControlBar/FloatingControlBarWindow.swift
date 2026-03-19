@@ -1083,8 +1083,9 @@ class FloatingControlBarManager {
             } else {
                 url = ScreenCaptureManager.captureScreen()
             }
+            let capturedSelf = self
             await MainActor.run {
-                self?.pendingScreenshotPath = url
+                capturedSelf?.pendingScreenshotPath = url
             }
         }
     }
@@ -1191,25 +1192,27 @@ class FloatingControlBarManager {
         ) { [weak barWindow] notification in
             guard let text = notification.userInfo?["text"] as? String,
                   let state = barWindow?.state else { return }
-            // Remove the first matching queued message from UI
-            if let idx = state.messageQueue.firstIndex(where: { $0.text == text }) {
-                state.messageQueue.remove(at: idx)
-            }
-            // Archive current exchange and set up for the new query
-            let currentQuery = state.displayedQuery
-            if var currentMessage = state.currentAIMessage, !currentQuery.isEmpty {
-                currentMessage.contentBlocks = currentMessage.contentBlocks.map { block in
-                    if case .toolCall(let id, let name, .running, let toolUseId, let input, let output) = block {
-                        return .toolCall(id: id, name: name, status: .completed, toolUseId: toolUseId, input: input, output: output)
-                    }
-                    return block
+            MainActor.assumeIsolated {
+                // Remove the first matching queued message from UI
+                if let idx = state.messageQueue.firstIndex(where: { $0.text == text }) {
+                    state.messageQueue.remove(at: idx)
                 }
-                state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+                // Archive current exchange and set up for the new query
+                let currentQuery = state.displayedQuery
+                if var currentMessage = state.currentAIMessage, !currentQuery.isEmpty {
+                    currentMessage.contentBlocks = currentMessage.contentBlocks.map { block in
+                        if case .toolCall(let id, let name, .running, let toolUseId, let input, let output) = block {
+                            return .toolCall(id: id, name: name, status: .completed, toolUseId: toolUseId, input: input, output: output)
+                        }
+                        return block
+                    }
+                    state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+                }
+                state.flushPendingObserverExchanges()
+                state.displayedQuery = text
+                state.isAILoading = true
+                state.currentAIMessage = nil
             }
-            state.flushPendingObserverExchanges()
-            state.displayedQuery = text
-            state.isAILoading = true
-            state.currentAIMessage = nil
         }
 
         // Observe recording state
