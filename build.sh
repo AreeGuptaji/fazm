@@ -115,8 +115,6 @@ cp fazm_icon.icns "$APP_BUNDLE/Contents/Resources/FazmIcon.icns"
 SWIFT_BUILD_DIR=$(swift build -c release --package-path Desktop --show-bin-path)
 if [ -d "$SWIFT_BUILD_DIR/Fazm_Fazm.bundle" ]; then
     cp -R "$SWIFT_BUILD_DIR/Fazm_Fazm.bundle" "$APP_BUNDLE/Contents/Resources/"
-    # Also copy to app root — SPM's resource_bundle_accessor uses Bundle.main.bundleURL
-    cp -R "$SWIFT_BUILD_DIR/Fazm_Fazm.bundle" "$APP_BUNDLE/"
     echo "Copied resource bundle"
 else
     echo "Warning: Resource bundle not found at $SWIFT_BUILD_DIR/Fazm_Fazm.bundle"
@@ -126,9 +124,6 @@ fi
 HIGHLIGHTR_BUNDLE="$SWIFT_BUILD_DIR/Highlightr_Highlightr.bundle"
 if [ -d "$HIGHLIGHTR_BUNDLE" ]; then
     cp -R "$HIGHLIGHTR_BUNDLE" "$APP_BUNDLE/Contents/Resources/"
-    # Also copy to app root — SPM's resource_bundle_accessor uses Bundle.main.bundleURL
-    # (= Fazm.app/) not Bundle.main.resourceURL (= Fazm.app/Contents/Resources/)
-    cp -R "$HIGHLIGHTR_BUNDLE" "$APP_BUNDLE/"
     echo "Copied Highlightr bundle"
 else
     echo "ERROR: Highlightr_Highlightr.bundle not found — build will produce a crashing app"
