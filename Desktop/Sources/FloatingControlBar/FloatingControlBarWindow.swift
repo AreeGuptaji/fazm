@@ -371,7 +371,8 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             state.draftInputText = state.aiInputText
         }
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        // Phase 1: Fade out SwiftUI content immediately
+        withAnimation(.easeOut(duration: 0.2)) {
             state.showingAIConversation = false
             state.showingAIResponse = false
             state.aiInputText = ""
@@ -399,14 +400,20 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         // Record the animation target so savePreChatCenterIfNeeded() can snap to it
         // if a new PTT query fires while this restore animation is still running.
         pendingRestoreOrigin = restoreOrigin
-        NSAnimationContext.beginGrouping()
-        NSAnimationContext.current.duration = 0.4
-        NSAnimationContext.current.allowsImplicitAnimation = false
-        NSAnimationContext.current.timingFunction = CAMediaTimingFunction(
-            controlPoints: 0.2, 0.9, 0.3, 1.0
-        )
-        self.setFrame(NSRect(origin: restoreOrigin, size: size), display: true, animate: true)
-        NSAnimationContext.endGrouping()
+
+        // Phase 2: Start window shrink after content begins fading, creating
+        // a layered close effect instead of everything moving at once.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+            guard let self = self else { return }
+            NSAnimationContext.beginGrouping()
+            NSAnimationContext.current.duration = 0.35
+            NSAnimationContext.current.allowsImplicitAnimation = false
+            NSAnimationContext.current.timingFunction = CAMediaTimingFunction(
+                controlPoints: 0.4, 0.0, 0.2, 1.0  // ease-out for closing
+            )
+            self.setFrame(NSRect(origin: restoreOrigin, size: size), display: true, animate: true)
+            NSAnimationContext.endGrouping()
+        }
         let targetFrame = NSRect(origin: restoreOrigin, size: size)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
             guard let self = self else { return }
