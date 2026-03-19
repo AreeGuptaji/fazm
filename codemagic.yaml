@@ -790,16 +790,29 @@ workflows:
             PRERELEASE_FLAG="--prerelease"
           fi
 
-          # Create release and upload assets with retry (gh can hang on large uploads)
-          RELEASE_CREATED=false
-          for attempt in 1 2 3; do
-            if timeout 1800 gh release create "$CM_TAG" \
+          # Create release and upload assets with retry.
+          # 'timeout' is Linux-only; use background+kill pattern for macOS compatibility.
+          gh_release_with_timeout() {
+            gh release create "$CM_TAG" \
               --repo "$GITHUB_REPO" \
               --title "Fazm Desktop v${VERSION}" \
               --notes "$RELEASE_NOTES" \
               $PRERELEASE_FLAG \
               "$SPARKLE_ZIP_PATH" \
-              "$DMG_PATH"; then
+              "$DMG_PATH" &
+            GH_PID=$!
+            ( sleep 1800 && kill "$GH_PID" 2>/dev/null ) &
+            TIMER_PID=$!
+            wait "$GH_PID"
+            EXIT_CODE=$?
+            kill "$TIMER_PID" 2>/dev/null
+            wait "$TIMER_PID" 2>/dev/null
+            return $EXIT_CODE
+          }
+
+          RELEASE_CREATED=false
+          for attempt in 1 2 3; do
+            if gh_release_with_timeout; then
               RELEASE_CREATED=true
               break
             fi
