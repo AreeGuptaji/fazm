@@ -38,6 +38,8 @@ class FloatingControlBarState: NSObject, ObservableObject {
     @Published var inputViewHeight: CGFloat = 146
     @Published var responseContentHeight: CGFloat = 0
     @Published var chatHistory: [FloatingChatExchange] = []
+    /// Observer cards queued while a query is streaming — rendered below the current response.
+    @Published var pendingObserverExchanges: [FloatingChatExchange] = []
     @Published var suggestedReplies: [String] = []
 
     /// Convenience accessor for plain-text response (used by window geometry and error handling).
@@ -156,6 +158,13 @@ class FloatingControlBarState: NSObject, ObservableObject {
 
     /// System prompt suffix injected during tutorial (cleared on finish)
     var tutorialSystemPromptSuffix: String?
+
+    /// Move any pending observer cards into chatHistory (call when archiving the current exchange).
+    func flushPendingObserverExchanges() {
+        guard !pendingObserverExchanges.isEmpty else { return }
+        chatHistory.append(contentsOf: pendingObserverExchanges)
+        pendingObserverExchanges.removeAll()
+    }
 
     /// Pre-populate chatHistory from ChatProvider's messages so previous conversation is visible on fresh launch.
     func loadHistory(from messages: [ChatMessage]) {
