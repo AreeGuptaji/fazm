@@ -62,6 +62,11 @@ struct AIResponseView: View {
                             currentContentView
                         }
 
+                        // Observer cards that arrived while the current query was streaming
+                        ForEach(state.pendingObserverExchanges) { exchange in
+                            chatExchangeView(exchange)
+                        }
+
                         // Voice follow-up indicator (shown inline when PTT is active during conversation)
                         if isVoiceFollowUp {
                             voiceFollowUpView
