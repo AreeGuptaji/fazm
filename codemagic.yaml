@@ -793,7 +793,7 @@ workflows:
           # Create release and upload assets with retry (gh can hang on large uploads)
           RELEASE_CREATED=false
           for attempt in 1 2 3; do
-            if timeout 600 gh release create "$CM_TAG" \
+            if timeout 1800 gh release create "$CM_TAG" \
               --repo "$GITHUB_REPO" \
               --title "Fazm Desktop v${VERSION}" \
               --notes "$RELEASE_NOTES" \
