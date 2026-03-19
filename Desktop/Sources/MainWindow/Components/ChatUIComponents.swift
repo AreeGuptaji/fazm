@@ -365,15 +365,22 @@ struct ObserverCardView: View {
                             }
                             onAction?(activityId, button.action)
                         } label: {
-                            Text(button.label)
-                                .scaledFont(size: 12, weight: .medium)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
+                            HStack(spacing: 4) {
+                                if selectedAction == button.action {
+                                    Image(systemName: button.action == "dismiss" ? "xmark" : "checkmark")
+                                        .scaledFont(size: 10, weight: .bold)
+                                }
+                                Text(selectedAction == button.action ? buttonConfirmLabel(for: button.action) : button.label)
+                                    .scaledFont(size: 12, weight: .medium)
+                            }
+                            .foregroundColor(buttonForeground(for: button.action))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
                         }
                         .buttonStyle(.plain)
                         .background(buttonBackgroundResolved(for: button.action))
                         .cornerRadius(6)
-                        .opacity(selectedAction != nil && selectedAction != button.action ? 0.4 : 1.0)
+                        .opacity(selectedAction != nil && selectedAction != button.action ? 0.3 : 1.0)
                         .disabled(selectedAction != nil)
                     }
                 }
@@ -421,13 +428,31 @@ struct ObserverCardView: View {
         }
     }
 
+    private func buttonConfirmLabel(for action: String) -> String {
+        switch action {
+        case "approve": return "Saved"
+        case "dismiss": return "Dismissed"
+        default: return action.capitalized
+        }
+    }
+
+    private func buttonForeground(for action: String) -> Color {
+        if let selected = selectedAction, action == selected {
+            switch action {
+            case "approve": return .green
+            case "dismiss": return Color.red.opacity(0.9)
+            default: return .white
+            }
+        }
+        return .white
+    }
+
     private func buttonBackgroundResolved(for action: String) -> Color {
         if let selected = selectedAction {
-            // After click: selected button gets stronger highlight, other fades
             if action == selected {
                 switch action {
-                case "approve": return FazmColors.purplePrimary.opacity(0.5)
-                case "dismiss": return Color.white.opacity(0.15)
+                case "approve": return Color.green.opacity(0.2)
+                case "dismiss": return Color.red.opacity(0.15)
                 default: return Color.white.opacity(0.2)
                 }
             } else {
@@ -436,7 +461,7 @@ struct ObserverCardView: View {
         }
         // Default (before any click)
         switch action {
-        case "approve": return FazmColors.purplePrimary.opacity(0.3)
+        case "approve": return Color.green.opacity(0.15)
         case "dismiss": return Color.white.opacity(0.08)
         default: return Color.white.opacity(0.1)
         }
