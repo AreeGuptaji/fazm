@@ -644,7 +644,8 @@ class ChatProvider: ObservableObject {
             object: nil, queue: .main
         ) { [weak self] _ in
             guard let self else { return }
-            Task { await self.acpBridge.stop() }
+            let bridge = self.acpBridge
+            Task.detached { await bridge.stop() }
         }
     }
 
