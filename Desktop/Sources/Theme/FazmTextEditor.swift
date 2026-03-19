@@ -137,7 +137,7 @@ struct FazmTextEditor: NSViewRepresentable {
     /// keeps propagating unconstrained proposals upward, contributing to the
     /// recursive StackLayout sizing loop seen in the task chat panel.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
-        guard let minH = minHeight, let maxH = maxHeight else {
+        guard let minH = minHeight, let _ = maxHeight else {
             return nil  // no height tracking — let SwiftUI use default NSView sizing
         }
         // Use the coordinator's cached height instead of calling ensureLayout here.
