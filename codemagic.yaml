@@ -790,13 +790,19 @@ workflows:
             PRERELEASE_FLAG="--prerelease"
           fi
 
-          gh release create "$CM_TAG" \
-            --repo "$GITHUB_REPO" \
-            --title "Fazm Desktop v${VERSION}" \
-            --notes "$RELEASE_NOTES" \
-            $PRERELEASE_FLAG \
-            "$SPARKLE_ZIP_PATH" \
-            "$DMG_PATH"
+          # Create release and upload assets with retry (gh can hang on large uploads)
+          for attempt in 1 2 3; do
+            timeout 600 gh release create "$CM_TAG" \
+              --repo "$GITHUB_REPO" \
+              --title "Fazm Desktop v${VERSION}" \
+              --notes "$RELEASE_NOTES" \
+              $PRERELEASE_FLAG \
+              "$SPARKLE_ZIP_PATH" \
+              "$DMG_PATH" && break
+            echo "Attempt $attempt failed, retrying..."
+            gh release delete "$CM_TAG" --repo "$GITHUB_REPO" --yes 2>/dev/null || true
+            sleep 10
+          done
 
           echo "GitHub release created: $CM_TAG (staging=$IS_STAGING)"
 
