@@ -9,7 +9,7 @@ enum ContentBlockGroup: Identifiable {
     case toolCalls(id: String, calls: [(name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)])
     case thinking(id: String, text: String)
     case discoveryCard(id: String, title: String, summary: String, fullText: String)
-    case observerCard(id: String, activityId: Int64, type: String, content: String, buttons: [ObserverCardButton])
+    case observerCard(id: String, activityId: Int64, type: String, content: String, buttons: [ObserverCardButton], actedAction: String? = nil)
 
     var id: String {
         switch self {
@@ -334,6 +334,8 @@ struct ObserverCardView: View {
     let type: String
     let content: String
     let buttons: [ObserverCardButton]
+    /// Pre-populated when the card was already acted on (persisted in DB)
+    let actedAction: String?
     var onAction: ((Int64, String) -> Void)?
 
     @State private var selectedAction: String? = nil
@@ -387,6 +389,11 @@ struct ObserverCardView: View {
             }
         }
         .padding(10)
+        .onAppear {
+            if selectedAction == nil, let acted = actedAction {
+                selectedAction = acted
+            }
+        }
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(FazmColors.purplePrimary.opacity(0.08))
