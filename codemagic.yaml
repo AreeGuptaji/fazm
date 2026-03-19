@@ -48,6 +48,7 @@ workflows:
     cache:
       cache_paths:
         - ~/Library/Caches/org.swift.swiftpm
+        - /tmp/mcp-binary-cache
     scripts:
       - name: Extract version and build number from tag
         script: |
@@ -171,49 +172,67 @@ workflows:
 
       - name: Build mcp-server-macos-use (arm64 + x86_64)
         script: |
-          git clone --depth 1 https://github.com/mediar-ai/mcp-server-macos-use.git /tmp/mcp-server-macos-use
-          cd /tmp/mcp-server-macos-use
+          MCP_MACOS_USE_VERSION="v0.1.15"
+          CACHE_DIR="/tmp/mcp-binary-cache"
+          CACHE_BINARY="$CACHE_DIR/mcp-server-macos-use-universal-${MCP_MACOS_USE_VERSION}"
+          mkdir -p "$CACHE_DIR"
 
-          xcrun swift package resolve
+          if [ -f "$CACHE_BINARY" ]; then
+            echo "Cache hit: mcp-server-macos-use $MCP_MACOS_USE_VERSION — skipping build"
+            cp "$CACHE_BINARY" /tmp/mcp-server-macos-use-universal
+          else
+            echo "Cache miss: building mcp-server-macos-use $MCP_MACOS_USE_VERSION"
+            git clone --depth 1 --branch "$MCP_MACOS_USE_VERSION" https://github.com/mediar-ai/mcp-server-macos-use.git /tmp/mcp-server-macos-use
+            cd /tmp/mcp-server-macos-use
+            xcrun swift package resolve
+            echo "Building arm64..."
+            xcrun swift build -c release --triple arm64-apple-macosx
+            cp .build/arm64-apple-macosx/release/mcp-server-macos-use /tmp/mcp-macos-use-arm64
+            echo "Building x86_64..."
+            xcrun swift build -c release --triple x86_64-apple-macosx
+            echo "Creating universal binary..."
+            lipo -create /tmp/mcp-macos-use-arm64 .build/x86_64-apple-macosx/release/mcp-server-macos-use \
+              -output /tmp/mcp-server-macos-use-universal
+            file /tmp/mcp-server-macos-use-universal | grep -q "universal binary" || {
+              echo "ERROR: Failed to create universal mcp-server-macos-use binary"
+              exit 1
+            }
+            cp /tmp/mcp-server-macos-use-universal "$CACHE_BINARY"
+          fi
 
-          echo "Building arm64..."
-          xcrun swift build -c release --triple arm64-apple-macosx
-          cp .build/arm64-apple-macosx/release/mcp-server-macos-use /tmp/mcp-macos-use-arm64
-
-          echo "Building x86_64..."
-          xcrun swift build -c release --triple x86_64-apple-macosx
-
-          echo "Creating universal binary..."
-          lipo -create /tmp/mcp-macos-use-arm64 .build/x86_64-apple-macosx/release/mcp-server-macos-use \
-            -output /tmp/mcp-server-macos-use-universal
-          file /tmp/mcp-server-macos-use-universal | grep -q "universal binary" || {
-            echo "ERROR: Failed to create universal mcp-server-macos-use binary"
-            exit 1
-          }
           echo "MCP_MACOS_USE_BINARY=/tmp/mcp-server-macos-use-universal" >> $CM_ENV
           echo "mcp-server-macos-use: $(du -h /tmp/mcp-server-macos-use-universal | cut -f1) universal"
 
       - name: Build whatsapp-mcp (arm64 + x86_64)
         script: |
-          git clone --depth 1 https://github.com/m13v/whatsapp-mcp-macos.git /tmp/whatsapp-mcp-macos
-          cd /tmp/whatsapp-mcp-macos
+          WHATSAPP_MCP_VERSION="v1.0.1"
+          CACHE_DIR="/tmp/mcp-binary-cache"
+          CACHE_BINARY="$CACHE_DIR/whatsapp-mcp-universal-${WHATSAPP_MCP_VERSION}"
+          mkdir -p "$CACHE_DIR"
 
-          xcrun swift package resolve
+          if [ -f "$CACHE_BINARY" ]; then
+            echo "Cache hit: whatsapp-mcp $WHATSAPP_MCP_VERSION — skipping build"
+            cp "$CACHE_BINARY" /tmp/whatsapp-mcp-universal
+          else
+            echo "Cache miss: building whatsapp-mcp $WHATSAPP_MCP_VERSION"
+            git clone --depth 1 --branch "$WHATSAPP_MCP_VERSION" https://github.com/m13v/whatsapp-mcp-macos.git /tmp/whatsapp-mcp-macos
+            cd /tmp/whatsapp-mcp-macos
+            xcrun swift package resolve
+            echo "Building arm64..."
+            xcrun swift build -c release --triple arm64-apple-macosx
+            cp .build/arm64-apple-macosx/release/whatsapp-mcp /tmp/whatsapp-mcp-arm64
+            echo "Building x86_64..."
+            xcrun swift build -c release --triple x86_64-apple-macosx
+            echo "Creating universal binary..."
+            lipo -create /tmp/whatsapp-mcp-arm64 .build/x86_64-apple-macosx/release/whatsapp-mcp \
+              -output /tmp/whatsapp-mcp-universal
+            file /tmp/whatsapp-mcp-universal | grep -q "universal binary" || {
+              echo "ERROR: Failed to create universal whatsapp-mcp binary"
+              exit 1
+            }
+            cp /tmp/whatsapp-mcp-universal "$CACHE_BINARY"
+          fi
 
-          echo "Building arm64..."
-          xcrun swift build -c release --triple arm64-apple-macosx
-          cp .build/arm64-apple-macosx/release/whatsapp-mcp /tmp/whatsapp-mcp-arm64
-
-          echo "Building x86_64..."
-          xcrun swift build -c release --triple x86_64-apple-macosx
-
-          echo "Creating universal binary..."
-          lipo -create /tmp/whatsapp-mcp-arm64 .build/x86_64-apple-macosx/release/whatsapp-mcp \
-            -output /tmp/whatsapp-mcp-universal
-          file /tmp/whatsapp-mcp-universal | grep -q "universal binary" || {
-            echo "ERROR: Failed to create universal whatsapp-mcp binary"
-            exit 1
-          }
           echo "WHATSAPP_MCP_BINARY=/tmp/whatsapp-mcp-universal" >> $CM_ENV
           echo "whatsapp-mcp: $(du -h /tmp/whatsapp-mcp-universal | cut -f1) universal"
 
@@ -645,6 +664,12 @@ workflows:
       - name: Create DMG installer
         script: |
           set -e
+          # Skip DMG for staging builds — staging users auto-update via Sparkle ZIP
+          if [ "$IS_STAGING" = "true" ]; then
+            echo "Skipping DMG creation for staging build"
+            echo "DMG_PATH=" >> $CM_ENV
+            exit 0
+          fi
           # Stage app + DMG assets (background image, pre-built .DS_Store)
           STAGING_DIR="/tmp/fazm-dmg-staging-$$"
           mkdir -p "$STAGING_DIR"
@@ -685,6 +710,11 @@ workflows:
       - name: Sign, notarize, and staple DMG
         script: |
           set -e
+          # Skip for staging — no DMG was created
+          if [ "$IS_STAGING" = "true" ]; then
+            echo "Skipping DMG notarization for staging build"
+            exit 0
+          fi
           codesign --force --sign "$SIGN_IDENTITY" "$DMG_PATH"
 
           mkdir -p ~/private_keys
@@ -790,6 +820,12 @@ workflows:
             PRERELEASE_FLAG="--prerelease"
           fi
 
+          # Build asset list — DMG is skipped for staging builds
+          ASSETS="$SPARKLE_ZIP_PATH"
+          if [ "$IS_STAGING" != "true" ] && [ -n "$DMG_PATH" ] && [ -f "$DMG_PATH" ]; then
+            ASSETS="$ASSETS $DMG_PATH"
+          fi
+
           # Create release and upload assets with retry.
           # Use perl alarm for a cross-platform 1800s timeout (works on macOS + Linux).
           RELEASE_CREATED=false
@@ -800,8 +836,7 @@ workflows:
               --title "Fazm Desktop v${VERSION}" \
               --notes "$RELEASE_NOTES" \
               $PRERELEASE_FLAG \
-              "$SPARKLE_ZIP_PATH" \
-              "$DMG_PATH"; then
+              $ASSETS; then
               RELEASE_CREATED=true
               break
             fi
