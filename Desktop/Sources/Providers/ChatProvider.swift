@@ -324,9 +324,6 @@ class ChatProvider: ObservableObject {
     /// Prevents `sendMessage` from clearing `pendingRetryMessage` on completion.
     private var stoppedForBrowserSetup = false
 
-    /// Whether the user is currently viewing the default chat (syncs with Flutter app)
-    @Published var isInDefaultChat = true
-
     /// Working directory for Claude Agent SDK file-system tools (Read, Write, Bash, etc.)
     /// Set by TaskChatCoordinator to point at the user's project directory.
     var workingDirectory: String?
@@ -1403,7 +1400,6 @@ class ChatProvider: ObservableObject {
     /// Reinitialize after settings change
     func reinitialize() async {
         messages = []
-        isInDefaultChat = true
         await initialize()
     }
 
@@ -2941,7 +2937,6 @@ class ChatProvider: ObservableObject {
         selectedAppId = appId
         messages = []
         errorMessage = nil
-        isInDefaultChat = true
         await loadDefaultChatMessages()
     }
 
