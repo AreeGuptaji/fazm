@@ -70,7 +70,9 @@ struct SettingsSidebar: View {
     @Binding var selectedAdvancedSubsection: SettingsContentView.AdvancedSubsection?
     @Binding var highlightedSettingId: String?
 
+    @ObservedObject private var updaterViewModel = UpdaterViewModel.shared
     @State private var searchQuery = ""
+    @State private var updateGlowAnimating = false
     @FocusState private var isSearchFocused: Bool
 
     private let expandedWidth: CGFloat = 260
@@ -152,9 +154,62 @@ struct SettingsSidebar: View {
             }
 
             Spacer()
+
+            // Update available widget
+            if updaterViewModel.updateAvailable {
+                updateAvailableWidget
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 16)
+                    .transition(.opacity)
+            }
         }
         .frame(width: expandedWidth)
         .background(FazmColors.backgroundPrimary)
+    }
+
+    // MARK: - Update Available Widget
+    private var updateAvailableWidget: some View {
+        Button(action: {
+            updaterViewModel.checkForUpdates()
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .scaledFont(size: 17)
+                    .foregroundColor(.white)
+                    .frame(width: iconWidth)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Update Available")
+                        .scaledFont(size: 13, weight: .semibold)
+                        .foregroundColor(.white)
+
+                    if !updaterViewModel.availableVersion.isEmpty {
+                        Text("v\(updaterViewModel.availableVersion)")
+                            .scaledFont(size: 11)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .scaledFont(size: 12)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(FazmColors.purplePrimary)
+            )
+            .shadow(color: FazmColors.purplePrimary.opacity(updateGlowAnimating ? 0.7 : 0.3), radius: 8)
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                updateGlowAnimating = true
+            }
+        }
     }
 
     private var searchField: some View {
