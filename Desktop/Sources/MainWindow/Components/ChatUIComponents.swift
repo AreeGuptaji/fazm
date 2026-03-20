@@ -376,7 +376,7 @@ struct ObserverCardView: View {
 
                 Spacer()
 
-                // Deny/undo button inline
+                // Deny button inline
                 if autoApproved && !isDenied {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -385,9 +385,9 @@ struct ObserverCardView: View {
                         }
                         onAction?(activityId, "dismiss")
                     } label: {
-                        Image(systemName: "xmark")
-                            .scaledFont(size: 9, weight: .medium)
-                            .foregroundColor(.white.opacity(0.3))
+                        Text("Deny")
+                            .scaledFont(size: 10, weight: .medium)
+                            .foregroundColor(.white.opacity(0.4))
                     }
                     .buttonStyle(.plain)
                 }
