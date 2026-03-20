@@ -2694,11 +2694,12 @@ class ChatProvider: ObservableObject {
                 }
                 let isRollback = action == "dismiss" && previousResponse == "approve"
 
+                let status = action == "approve" ? "acted" : "dismissed"
                 try await dbQueue.write { db in
                     try db.execute(sql: """
-                        UPDATE observer_activity SET status = 'dismissed', userResponse = ?, actedAt = datetime('now')
+                        UPDATE observer_activity SET status = ?, userResponse = ?, actedAt = datetime('now')
                         WHERE id = ?
-                    """, arguments: [action, activityId])
+                    """, arguments: [status, action, activityId])
                 }
                 log("ChatProvider: Observer card action — id=\(activityId) action=\(action)\(isRollback ? " (rollback)" : "")")
 
