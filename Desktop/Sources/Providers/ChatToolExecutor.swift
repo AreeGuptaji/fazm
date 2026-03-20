@@ -717,11 +717,10 @@ class ChatToolExecutor {
             process.executableURL = URL(fileURLWithPath: python)
 
             let tagsExpr = tags.isEmpty ? "None" : "[\(tags.map { "\"\($0)\"" }.joined(separator: ", "))]"
+            let dbPathLiteral = pythonStringLiteral(dbPath)
             let script = """
-                import sys, os
-                sys.path.insert(0, os.path.expanduser("~/ai-browser-profile"))
                 from ai_browser_profile import MemoryDB
-                mem = MemoryDB(os.path.expanduser("~/ai-browser-profile/memories.db"))
+                mem = MemoryDB(\(dbPathLiteral))
                 query = \(queryLiteral)
                 tags = \(tagsExpr)
                 if query in ("full profile", "profile"):
@@ -739,6 +738,18 @@ class ChatToolExecutor {
 
             process.arguments = ["-c", script]
             process.currentDirectoryURL = aiBrowserProfileDir
+
+            // Set PYTHONPATH for bundled module
+            var env = ProcessInfo.processInfo.environment
+            if let pp = pythonPath {
+                let existing = env["PYTHONPATH"] ?? ""
+                env["PYTHONPATH"] = existing.isEmpty ? pp : "\(pp):\(existing)"
+            } else {
+                // Fallback: add user-installed dir to PYTHONPATH
+                env["PYTHONPATH"] = aiBrowserProfileDir.path
+            }
+            process.environment = env
+
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = pipe
@@ -758,11 +769,24 @@ class ChatToolExecutor {
     private static func executeEditBrowserProfile(_ args: [String: Any]) async -> String {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let aiBrowserProfileDir = homeDir.appendingPathComponent("ai-browser-profile")
-        let python = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
         let dbPath = aiBrowserProfileDir.appendingPathComponent("memories.db").path
 
-        guard FileManager.default.fileExists(atPath: python),
-              FileManager.default.fileExists(atPath: dbPath) else {
+        // Resolve Python — prefer bundled, fall back to user-installed
+        let python: String
+        let pythonPath: String?
+        if let bundledPy = bundledPython, let bundledDir = bundledBrowserProfileDir {
+            python = bundledPy
+            pythonPath = bundledDir.path
+        } else {
+            let userPython = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
+            guard FileManager.default.fileExists(atPath: userPython) else {
+                return "Browser profile not available."
+            }
+            python = userPython
+            pythonPath = nil
+        }
+
+        guard FileManager.default.fileExists(atPath: dbPath) else {
             return "Browser profile not available."
         }
 
@@ -771,15 +795,15 @@ class ChatToolExecutor {
         let newValue = args["new_value"] as? String ?? ""
         let queryLiteral = pythonStringLiteral(query)
         let newValueLiteral = pythonStringLiteral(newValue)
+        let dbPathLiteral = pythonStringLiteral(dbPath)
 
         let script: String
         if action == "delete" {
             script = """
-                import sys, os, logging
+                import logging
                 logging.disable(logging.CRITICAL)
-                sys.path.insert(0, os.path.expanduser("~/ai-browser-profile"))
                 from ai_browser_profile import MemoryDB
-                mem = MemoryDB(os.path.expanduser("~/ai-browser-profile/memories.db"), defer_embeddings=True)
+                mem = MemoryDB(\(dbPathLiteral), defer_embeddings=True)
                 q = \(queryLiteral).lower()
                 rows = mem.conn.execute("SELECT id, key, value FROM memories WHERE lower(value) LIKE ? OR lower(key) LIKE ?", (f'%{q}%', f'%{q}%')).fetchall()
                 if not rows:
@@ -792,11 +816,10 @@ class ChatToolExecutor {
                 """
         } else {
             script = """
-                import sys, os, logging
+                import logging
                 logging.disable(logging.CRITICAL)
-                sys.path.insert(0, os.path.expanduser("~/ai-browser-profile"))
                 from ai_browser_profile import MemoryDB
-                mem = MemoryDB(os.path.expanduser("~/ai-browser-profile/memories.db"), defer_embeddings=True)
+                mem = MemoryDB(\(dbPathLiteral), defer_embeddings=True)
                 q = \(queryLiteral).lower()
                 rows = mem.conn.execute("SELECT id, key, value FROM memories WHERE lower(value) LIKE ? OR lower(key) LIKE ?", (f'%{q}%', f'%{q}%')).fetchall()
                 if not rows:
@@ -814,6 +837,17 @@ class ChatToolExecutor {
             process.executableURL = URL(fileURLWithPath: python)
             process.arguments = ["-c", script]
             process.currentDirectoryURL = aiBrowserProfileDir
+
+            // Set PYTHONPATH for bundled module
+            var env = ProcessInfo.processInfo.environment
+            if let pp = pythonPath {
+                let existing = env["PYTHONPATH"] ?? ""
+                env["PYTHONPATH"] = existing.isEmpty ? pp : "\(pp):\(existing)"
+            } else {
+                env["PYTHONPATH"] = aiBrowserProfileDir.path
+            }
+            process.environment = env
+
             let stdoutPipe = Pipe()
             let stderrPipe = Pipe()
             process.standardOutput = stdoutPipe
