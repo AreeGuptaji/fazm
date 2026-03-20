@@ -200,7 +200,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // for every 4xx/5xx response (e.g. Cloud Run 503 cold starts on /v1/crisp/unread).
             // App code already handles HTTP errors and reports meaningful ones explicitly.
             options.enableCaptureFailedRequests = false
-            options.maxBreadcrumbs = 100
+            options.maxBreadcrumbs = 500
             options.beforeSend = { event in
                 // Allow user feedback through from all builds (dev + prod)
                 if event.message?.formatted.hasPrefix("User Report") == true { return event }
