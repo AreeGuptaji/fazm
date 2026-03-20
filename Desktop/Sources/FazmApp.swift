@@ -200,7 +200,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // for every 4xx/5xx response (e.g. Cloud Run 503 cold starts on /v1/crisp/unread).
             // App code already handles HTTP errors and reports meaningful ones explicitly.
             options.enableCaptureFailedRequests = false
-            options.maxBreadcrumbs = 500
+            options.maxBreadcrumbs = 1000
+            // Filter noisy breadcrumbs that fill up the buffer with useless data
+            options.beforeBreadcrumb = { breadcrumb in
+                let msg = breadcrumb.message ?? ""
+                // ResourceMonitor fires every 30s — 86% of all breadcrumbs
+                if msg.contains("ResourceMonitor:") { return nil }
+                // PostHog/Sentry heartbeats every 60s
+                if msg.contains("session_heartbeat") || msg.contains("Session Heartbeat") { return nil }
+                // Session recording flag checks every 5min
+                if msg.contains("session-recording-enabled") { return nil }
+                // Empty HTTP breadcrumbs (auto-captured, no useful info)
+                if breadcrumb.category == "http" && msg.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+                return breadcrumb
+            }
             options.beforeSend = { event in
                 // Allow user feedback through from all builds (dev + prod)
                 if event.message?.formatted.hasPrefix("User Report") == true { return event }
