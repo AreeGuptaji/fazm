@@ -299,6 +299,8 @@ struct AppManagementSetupView: View {
         let canWrite = fm.createFile(atPath: testPath, contents: Data("test".utf8))
         if canWrite {
             try? fm.removeItem(atPath: testPath)
+            log("AppManagementSetup: Permission probe succeeded — permission granted")
+            AnalyticsManager.shared.trackEvent("app_management_permission_granted", properties: ["version": version])
             withAnimation(.easeInOut(duration: 0.3)) {
                 permissionGranted = true
             }
@@ -306,6 +308,8 @@ struct AppManagementSetupView: View {
                 NotificationCenter.default.removeObserver(observer)
                 appBecameActiveObserver = nil
             }
+        } else {
+            log("AppManagementSetup: Permission probe failed — still not granted")
         }
     }
 }
