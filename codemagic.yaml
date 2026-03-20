@@ -363,9 +363,46 @@ workflows:
             # Extract dependencies to requirements.txt — venv is created at runtime
             # (bundling a venv with absolute symlinks breaks Gatekeeper)
             python3 -c 'import tomllib; f=open("/tmp/google_workspace_mcp/pyproject.toml","rb"); deps=tomllib.load(f)["project"]["dependencies"]; [print(d) for d in deps]' > "$WORKSPACE_MCP_BUNDLE/requirements.txt" 2>/dev/null || true
-            echo "Bundled Google Workspace MCP (venv will be created at runtime)"
+            echo "Bundled Google Workspace MCP source"
           else
             echo "WARNING: Google Workspace MCP not cloned — skipping"
+          fi
+
+          # Build Google Workspace MCP venv as tarball (uploaded to GCS, downloaded on first launch)
+          # Not bundled in the app to avoid code signature issues (~38 MB compressed tarball).
+          GWS_MCP_BUILD="/tmp/gws-mcp-build"
+          rm -rf "$GWS_MCP_BUILD"
+          mkdir -p "$GWS_MCP_BUILD"
+          if [ -f "$WORKSPACE_MCP_BUNDLE/requirements.txt" ]; then
+            echo "Creating Google Workspace MCP venv for tarball..."
+            uv venv "$GWS_MCP_BUILD/.venv" --python python3.12 --relocatable --quiet 2>&1 | tail -1 || true
+            uv pip install --python "$GWS_MCP_BUILD/.venv/bin/python3" \
+              -r "$WORKSPACE_MCP_BUNDLE/requirements.txt" --quiet 2>&1 | tail -3 || true
+            # Strip __pycache__ and .dist-info to save space
+            find "$GWS_MCP_BUILD/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+            find "$GWS_MCP_BUILD/.venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+            # Replace absolute Python symlink with a copy so the venv works on other machines
+            GWS_REAL_PYTHON=$(readlink -f "$GWS_MCP_BUILD/.venv/bin/python" 2>/dev/null)
+            if [ -n "$GWS_REAL_PYTHON" ] && [ -f "$GWS_REAL_PYTHON" ]; then
+              rm -f "$GWS_MCP_BUILD/.venv/bin/python"
+              cp "$GWS_REAL_PYTHON" "$GWS_MCP_BUILD/.venv/bin/python"
+              rm -f "$GWS_MCP_BUILD/.venv/bin/python3" "$GWS_MCP_BUILD/.venv/bin/python3.12"
+              ln -s python "$GWS_MCP_BUILD/.venv/bin/python3"
+              ln -s python "$GWS_MCP_BUILD/.venv/bin/python3.12"
+            fi
+            # Sign all Mach-O binaries in the venv before tarballing
+            find "$GWS_MCP_BUILD/.venv" -type f 2>/dev/null | while read bin; do
+              file "$bin" 2>/dev/null | grep -q "Mach-O" && \
+                codesign --force --options runtime --timestamp \
+                  --sign "$SIGN_IDENTITY" "$bin" 2>/dev/null || true
+            done
+            # Create tarball
+            GWS_MCP_TARBALL="/tmp/gws-mcp-venv.tar.gz"
+            tar -czf "$GWS_MCP_TARBALL" -C "$GWS_MCP_BUILD" .venv
+            GWS_MCP_TARBALL_SIZE=$(stat -f%z "$GWS_MCP_TARBALL" 2>/dev/null || stat -c%s "$GWS_MCP_TARBALL")
+            echo "Google Workspace MCP tarball created: $(( GWS_MCP_TARBALL_SIZE / 1024 / 1024 )) MB"
+          else
+            echo "WARNING: Google Workspace MCP requirements.txt not found — skipping tarball"
           fi
 
           # Build Hindsight Memory MCP venv as tarball (uploaded to GCS, downloaded on first launch)
@@ -916,6 +953,13 @@ workflows:
           if [ -f "$HINDSIGHT_TARBALL" ]; then
             gcloud storage cp "$HINDSIGHT_TARBALL" "gs://$BUCKET/hindsight/hindsight-venv.tar.gz"
             echo "Uploaded Hindsight tarball to gs://$BUCKET/hindsight/hindsight-venv.tar.gz"
+          fi
+
+          # Upload Google Workspace MCP tarball (downloaded by app on first launch)
+          GWS_MCP_TARBALL="/tmp/gws-mcp-venv.tar.gz"
+          if [ -f "$GWS_MCP_TARBALL" ]; then
+            gcloud storage cp "$GWS_MCP_TARBALL" "gs://$BUCKET/google-workspace-mcp/gws-mcp-venv.tar.gz"
+            echo "Uploaded GWS MCP tarball to gs://$BUCKET/google-workspace-mcp/gws-mcp-venv.tar.gz"
           fi
 
           # Compute SHA256 and sizes
