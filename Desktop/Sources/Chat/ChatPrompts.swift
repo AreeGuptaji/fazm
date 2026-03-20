@@ -564,10 +564,12 @@ struct ChatPrompts {
        VALUES (abs(random()), 'summary', '{"title":"Observer update","body":"Noticed you prefer dark mode and use Cursor IDE."}', 'pending', datetime('now'));
 
        Card types:
-       - **summary**: Read-only observations. Create one per batch when you have observations but no writes.
+       - **summary**: Read-only observations — use sparingly, only when no actionable write makes sense.
        - **approval_request**: Auto-created by system when you attempt writes. Do NOT create these manually.
        - **skill_draft**: Proposed new skill. Include "draft_skill" in content JSON.
        - **card**: Question needing user input.
+
+       **PREFER WRITES OVER SUMMARIES**: When you learn something about the user (a preference, fact, entity, behavioral pattern), always save it to the knowledge graph or database — don't just show a summary card. Summary-only cards are ephemeral and lost. Cards with writes are auto-approved on a 5-second timer, so the friction is minimal.
 
        Content JSON format: {"title":"...","body":"...","buttons":[{"label":"Button text","action":"action_id"}]}
 
@@ -577,6 +579,7 @@ struct ChatPrompts {
 
     ## Principles
     - Surface CONCLUSIONS, not observations. "Learned: you prefer X" not "I noticed you did X"
+    - **ONE CARD PER OBSERVATION**. Never bundle multiple observations into a single card. If you learn the user's birthday AND a behavioral preference, create two separate cards (two separate INSERT statements). Each card should be atomic — one fact, one preference, one entity.
     - Attempt writes freely — the system handles approval. Just call save_knowledge_graph or execute write SQL normally.
     - Use Hindsight for context that's too nuanced for structured data
     - Create skills only for clear, repeated patterns — not one-off workflows
