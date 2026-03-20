@@ -53,24 +53,61 @@ open class Highlightr
         _ = JSValue(newObjectIn: jsContext)
 
         #if SWIFT_PACKAGE
-        // SPM's auto-generated Bundle.module uses Bundle.main.bundleURL which resolves
-        // to the .app root on macOS. But macOS codesigning requires resources inside
-        // Contents/Resources/. Check resourceURL first (Contents/Resources/), then
-        // fall back to Bundle.module (works for CLI tools / tests).
+        // SPM's auto-generated Bundle.module uses Bundle.main.bundleURL (the .app root)
+        // to locate Highlightr_Highlightr.bundle — but on macOS the bundle is inside
+        // Contents/Resources/. If Bundle.module can't find it there, it calls fatalError().
+        //
+        // Additionally, Bundle(path:) returns nil when the .bundle directory lacks an
+        // Info.plist (SPM doesn't always generate one for processed resources).
+        //
+        // Strategy: try Bundle.main.resourceURL first, then Bundle.module, then
+        // fall back to using the directory directly (wrapping it as a Bundle via URL).
+        let bundleName = "Highlightr_Highlightr.bundle"
         let bundle: Bundle
         if let resourceURL = Foundation.Bundle.main.resourceURL?
-            .appendingPathComponent("Highlightr_Highlightr.bundle"),
+            .appendingPathComponent(bundleName),
            let resourceBundle = Foundation.Bundle(path: resourceURL.path) {
+            // Best case: proper bundle with Info.plist in Contents/Resources/
             bundle = resourceBundle
+        } else if let resourceURL = Foundation.Bundle.main.resourceURL?
+            .appendingPathComponent(bundleName),
+           FileManager.default.fileExists(atPath:
+               resourceURL.appendingPathComponent("highlight.min.js").path),
+           let dirBundle = Foundation.Bundle(url: resourceURL) {
+            // Bundle directory exists with resources but Bundle(path:) failed.
+            // Try Bundle(url:) which can be more lenient with flat directories.
+            bundle = dirBundle
         } else {
-            bundle = Bundle.module
+            // CLI tools, tests, or SwiftUI previews — use SPM's generated accessor.
+            // Wrap in a check to avoid fatalError in production if paths are wrong.
+            let spmMainPath = Foundation.Bundle.main.bundleURL
+                .appendingPathComponent(bundleName).path
+            if Foundation.Bundle(path: spmMainPath) != nil ||
+               FileManager.default.fileExists(atPath: spmMainPath) {
+                bundle = Bundle.module
+            } else {
+                return nil
+            }
         }
         #else
         let bundle = Bundle(for: Highlightr.self)
         #endif
         self.bundle = bundle
-        guard let hgPath = highlightPath ?? bundle.path(forResource: "highlight.min", ofType: "js") else
-        {
+        // If Bundle couldn't resolve resources (missing Info.plist), find the JS file
+        // directly in the known resource directory.
+        let hgPath: String
+        if let path = highlightPath {
+            hgPath = path
+        } else if let path = bundle.path(forResource: "highlight.min", ofType: "js") {
+            hgPath = path
+        } else if let resourceURL = Foundation.Bundle.main.resourceURL?
+            .appendingPathComponent(bundleName)
+            .appendingPathComponent("highlight.min.js"),
+           FileManager.default.fileExists(atPath: resourceURL.path) {
+            // Direct file lookup — handles bundles without Info.plist where
+            // Bundle.path(forResource:ofType:) returns nil.
+            hgPath = resourceURL.path
+        } else {
             return nil
         }
         
@@ -97,8 +134,16 @@ open class Highlightr
     @discardableResult
     open func setTheme(to name: String) -> Bool
     {
-        guard let defTheme = bundle.path(forResource: name+".min", ofType: "css") else
-        {
+        let defTheme: String
+        if let path = bundle.path(forResource: name+".min", ofType: "css") {
+            defTheme = path
+        } else if let resourceURL = Foundation.Bundle.main.resourceURL?
+            .appendingPathComponent("Highlightr_Highlightr.bundle")
+            .appendingPathComponent(name + ".min.css"),
+           FileManager.default.fileExists(atPath: resourceURL.path) {
+            // Direct file lookup for bundles without Info.plist
+            defTheme = resourceURL.path
+        } else {
             return false
         }
         guard let themeString = try? String.init(contentsOfFile: defTheme) else { return false }
@@ -169,12 +214,20 @@ open class Highlightr
      */
     open func availableThemes() -> [String]
     {
-        let paths = bundle.paths(forResourcesOfType: "css", inDirectory: nil) as [NSString]
+        var paths = bundle.paths(forResourcesOfType: "css", inDirectory: nil) as [NSString]
+        // Fallback: if Bundle API returns empty (missing Info.plist), scan directory directly
+        if paths.isEmpty,
+           let resourceURL = Foundation.Bundle.main.resourceURL?
+            .appendingPathComponent("Highlightr_Highlightr.bundle"),
+           let contents = try? FileManager.default.contentsOfDirectory(atPath: resourceURL.path) {
+            paths = contents.filter { $0.hasSuffix(".css") }
+                .map { resourceURL.appendingPathComponent($0).path as NSString }
+        }
         var result = [String]()
         for path in paths {
             result.append(path.lastPathComponent.replacingOccurrences(of: ".min.css", with: ""))
         }
-        
+
         return result
     }
     
