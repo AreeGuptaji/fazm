@@ -150,11 +150,15 @@ const HINDSIGHT_PORT = 18888;
 const HINDSIGHT_TARBALL_URL = "https://storage.googleapis.com/fazm-prod-releases/hindsight/hindsight-venv.tar.gz";
 let hindsightProcess: ChildProcess | null = null;
 let hindsightReady = false;
+let hindsightDownloading = false;
 
 async function ensureHindsightVenv(): Promise<boolean> {
+  // Prevent concurrent downloads (warmup + query can both call startHindsight)
+  if (hindsightDownloading) return false;
   if (existsSync(hindsightPython)) return true;
 
-  // Download pre-built venv tarball from GCS (first launch, ~150 MB)
+  // Download pre-built venv tarball from GCS (first launch, ~300 MB)
+  hindsightDownloading = true;
   logErr("Hindsight: downloading venv tarball (first launch)...");
   try {
     mkdirSync(hindsightAppSupportDir, { recursive: true });
