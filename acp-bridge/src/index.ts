@@ -76,15 +76,15 @@ const whatsappMcpBinary = join(
 
 // Google Workspace MCP — Python server bundled under Contents/Resources/google-workspace-mcp/
 // Both source code and .venv are bundled in the app (created during CI build).
-const gwsMcpDir = join(
+const googleWorkspaceMcpDir = join(
   dirname(process.execPath),
   "..",
   "..",
   "Resources",
   "google-workspace-mcp"
 );
-const gwsMcpPython = join(gwsMcpDir, ".venv", "bin", "python3");
-const gwsMcpMain = join(gwsMcpDir, "main.py");
+const googleWorkspaceMcpPython = join(googleWorkspaceMcpDir, ".venv", "bin", "python3");
+const googleWorkspaceMcpMain = join(googleWorkspaceMcpDir, "main.py");
 
 // Hindsight Memory MCP — Python HTTP server, venv bundled in app bundle
 const hindsightDir = join(dirname(process.execPath), "..", "..", "Resources", "hindsight");
@@ -869,12 +869,12 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
   }
 
   // Google Workspace MCP (Python, stdio transport)
-  if (existsSync(gwsMcpPython) && existsSync(gwsMcpMain)) {
+  if (existsSync(googleWorkspaceMcpPython) && existsSync(googleWorkspaceMcpMain)) {
     servers.push({
       name: "google-workspace",
-      command: gwsMcpPython,
-      args: [gwsMcpMain, "--transport", "stdio"],
-      env: [{ name: "PYTHONHOME", value: join(gwsMcpDir, ".venv") }],
+      command: googleWorkspaceMcpPython,
+      args: [googleWorkspaceMcpMain, "--transport", "stdio"],
+      env: [{ name: "PYTHONHOME", value: join(googleWorkspaceMcpDir, ".venv") }],
     });
   }
 
@@ -1760,7 +1760,7 @@ async function main(): Promise<void> {
   } catch { /* ignore */ }
 
   logErr(`Bridge main() starting (pid=${process.pid}, node=${process.version}, execPath=${process.execPath})`);
-  logErr(`MCP versions: playwright=${playwrightVersion}, macos-use=${existsSync(macosUseBinary) ? "bundled" : "missing"}, whatsapp=${existsSync(whatsappMcpBinary) ? "bundled" : "missing"}, google-workspace=${existsSync(gwsMcpPython) ? "bundled" : "missing"}, hindsight=${existsSync(hindsightPython) ? "bundled" : "missing"}`);
+  logErr(`MCP versions: playwright=${playwrightVersion}, macos-use=${existsSync(macosUseBinary) ? "bundled" : "missing"}, whatsapp=${existsSync(whatsappMcpBinary) ? "bundled" : "missing"}, google-workspace=${existsSync(googleWorkspaceMcpPython) ? "bundled" : "missing"}, hindsight=${existsSync(hindsightPython) ? "bundled" : "missing"}`);
   logErr(`Playwright MCP config: extension=${process.env.PLAYWRIGHT_USE_EXTENSION ?? "false"}, token=${process.env.PLAYWRIGHT_MCP_EXTENSION_TOKEN ? "set" : "unset"}, outputMode=file, imageResponses=omit, outputDir=/tmp/playwright-mcp`);
 
   // Start Hindsight Memory MCP server (HTTP, runs in background)
@@ -1773,7 +1773,7 @@ async function main(): Promise<void> {
   });
 
   // Check Google Workspace MCP availability (venv bundled in app)
-  logErr(`Google Workspace MCP: ${existsSync(gwsMcpPython) ? "ready" : "not available"}`);
+  logErr(`Google Workspace MCP: ${existsSync(googleWorkspaceMcpPython) ? "ready" : "not available"}`);
 
   // Log browser diagnostics for debugging Playwright connection issues
   try {
