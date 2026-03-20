@@ -707,8 +707,15 @@ class ChatToolExecutor {
             pythonPath = nil
         }
 
-        guard FileManager.default.fileExists(atPath: dbPath) else {
-            return "Browser profile not available. Extract browser data first."
+        if !FileManager.default.fileExists(atPath: dbPath) {
+            // Auto-extract browser profile if not yet done
+            log("Browser profile DB not found, auto-extracting...")
+            let extractResult = await executeExtractBrowserProfile([:])
+            // If extraction failed or DB still doesn't exist, return the extraction result
+            // (which contains the profile summary if successful, or error if not)
+            guard FileManager.default.fileExists(atPath: dbPath) else {
+                return extractResult.isEmpty ? "Browser profile extraction failed." : extractResult
+            }
         }
 
         let query = args["query"] as? String ?? "full profile"
