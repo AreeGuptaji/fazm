@@ -156,7 +156,7 @@ struct SettingsSidebar: View {
             Spacer()
 
             // Update available widget
-            if updaterViewModel.updateAvailable {
+            if true || updaterViewModel.updateAvailable { // TODO: remove `true ||` after testing
                 updateAvailableWidget
                     .padding(.horizontal, 8)
                     .padding(.bottom, 16)
