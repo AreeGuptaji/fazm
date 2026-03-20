@@ -75,27 +75,43 @@ const whatsappMcpBinary = join(
 );
 
 // Google Workspace MCP — Python server bundled under Contents/Resources/google-workspace-mcp/
-const gwsMcpDir = join(
+// Source code + requirements.txt live in the app bundle (read-only).
+// The venv is created in ~/Library/Application Support/Fazm/google-workspace-mcp/ (writable)
+// to avoid breaking the code signature and triggering Gatekeeper warnings.
+// Dev builds: run.sh creates a venv inside the bundle; we use that if it exists.
+const gwsMcpBundleDir = join(
   dirname(process.execPath),
   "..",
   "..",
   "Resources",
   "google-workspace-mcp"
 );
+const gwsMcpAppSupportDir = join(
+  process.env.HOME || "",
+  "Library",
+  "Application Support",
+  "Fazm",
+  "google-workspace-mcp"
+);
+// Use dev bundle venv if it exists (local dev builds), otherwise use Application Support
+const gwsMcpDir = existsSync(join(gwsMcpBundleDir, ".venv", "bin", "python3"))
+  ? gwsMcpBundleDir
+  : gwsMcpAppSupportDir;
 const gwsMcpPython = join(gwsMcpDir, ".venv", "bin", "python3");
-const gwsMcpMain = join(gwsMcpDir, "main.py");
+const gwsMcpMain = join(gwsMcpBundleDir, "main.py");
 
 async function ensureGwsVenv(): Promise<boolean> {
   if (existsSync(gwsMcpPython)) return true;
 
-  const requirementsPath = join(gwsMcpDir, "requirements.txt");
+  const requirementsPath = join(gwsMcpBundleDir, "requirements.txt");
   if (!existsSync(requirementsPath)) {
     logErr("Google Workspace MCP: requirements.txt not found, skipping venv creation");
     return false;
   }
 
   logErr("Google Workspace MCP: creating venv from requirements.txt (first launch)...");
-  const venvDir = join(gwsMcpDir, ".venv");
+  mkdirSync(gwsMcpAppSupportDir, { recursive: true });
+  const venvDir = join(gwsMcpAppSupportDir, ".venv");
 
   try {
     // Try uv first (faster)
@@ -1011,8 +1027,8 @@ const OBSERVER_BATCH_SIZE = 10;       // Send batch every N turn pairs
 
 function bufferObserverTurn(role: string, text: string): void {
   observerBuffer.push({ role, text });
-  // Flush if we hit batch size (count turn pairs, not individual messages)
   const turnPairs = Math.floor(observerBuffer.length / 2);
+  logErr(`Observer: buffered ${role} turn (${turnPairs}/${OBSERVER_BATCH_SIZE} pairs)`);
   if (turnPairs >= OBSERVER_BATCH_SIZE) {
     flushObserverBatch();
   }
