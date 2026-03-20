@@ -77,7 +77,9 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
         let version = updateItem.displayVersionString
         if !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate") {
             logSync("Sparkle: Blocking update dialog — showing App Management guide for v\(version)")
+            // Delay slightly so the guide appears after the main window finishes loading
             Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                 self.viewModel?.showAppManagementGuideIfNeeded(version: version)
             }
             throw NSError(
