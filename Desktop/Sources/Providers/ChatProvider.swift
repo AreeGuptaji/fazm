@@ -2591,7 +2591,7 @@ class ChatProvider: ObservableObject {
     // MARK: - Observer Cards
 
     /// Poll observer_activity table for pending cards and inject them into the current chat
-    private func pollObserverCards() {
+    func pollObserverCards() {
         log("ChatProvider: pollObserverCards() called")
         Task {
             guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else {
