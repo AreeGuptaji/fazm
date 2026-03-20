@@ -413,47 +413,35 @@ workflows:
             echo "WARNING: Google Workspace MCP requirements.txt not found — skipping tarball"
           fi
 
-          # Build Hindsight Memory MCP venv as tarball (uploaded to GCS, downloaded on first launch)
-          # Not bundled in the app to keep app size small (~150 MB compressed tarball).
-          HINDSIGHT_BUILD="/tmp/hindsight-build"
-          rm -rf "$HINDSIGHT_BUILD"
-          mkdir -p "$HINDSIGHT_BUILD"
-          echo "Creating Hindsight venv for tarball..."
-          uv venv "$HINDSIGHT_BUILD/.venv" --python python3.12 --relocatable --quiet 2>&1 | tail -1 || true
-          uv pip install --python "$HINDSIGHT_BUILD/.venv/bin/python3" \
+          # Bundle Hindsight Memory MCP (Python venv in app bundle)
+          # Uses uv-managed standalone Python for full portability (no system Python dependency).
+          HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
+          mkdir -p "$HINDSIGHT_BUNDLE"
+          echo "Creating Hindsight venv..."
+          uv python install 3.12 2>&1 | tail -1 || true
+          uv venv "$HINDSIGHT_BUNDLE/.venv" --python 3.12 --relocatable --python-preference only-managed --quiet 2>&1
+          uv pip install --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" \
             'hindsight-api-slim[embedded-db]' sentence-transformers --quiet 2>&1 | tail -3 || true
           # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
-          uv pip uninstall --python "$HINDSIGHT_BUILD/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
+          uv pip uninstall --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
           # Strip __pycache__ and .dist-info to save ~25MB
-          find "$HINDSIGHT_BUILD/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          find "$HINDSIGHT_BUILD/.venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
-          # Replace absolute Python symlink with a copy so the venv works on other machines
-          HINDSIGHT_REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUILD/.venv/bin/python" 2>/dev/null)
+          find "$HINDSIGHT_BUNDLE/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find "$HINDSIGHT_BUNDLE/.venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+          # Replace absolute Python symlink with a copy + bundle libpython for portability
+          HINDSIGHT_REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUNDLE/.venv/bin/python" 2>/dev/null)
+          HINDSIGHT_MANAGED_DIR=$(dirname "$(dirname "$HINDSIGHT_REAL_PYTHON")")
           if [ -n "$HINDSIGHT_REAL_PYTHON" ] && [ -f "$HINDSIGHT_REAL_PYTHON" ]; then
-            rm -f "$HINDSIGHT_BUILD/.venv/bin/python"
-            cp "$HINDSIGHT_REAL_PYTHON" "$HINDSIGHT_BUILD/.venv/bin/python"
-            rm -f "$HINDSIGHT_BUILD/.venv/bin/python3" "$HINDSIGHT_BUILD/.venv/bin/python3.12"
-            ln -s python "$HINDSIGHT_BUILD/.venv/bin/python3"
-            ln -s python "$HINDSIGHT_BUILD/.venv/bin/python3.12"
-          fi
-          # Sign all Mach-O binaries in the venv before tarballing
-          find "$HINDSIGHT_BUILD/.venv" -type f 2>/dev/null | while read bin; do
-            file "$bin" 2>/dev/null | grep -q "Mach-O" && \
-              codesign --force --options runtime --timestamp \
-                --sign "$SIGN_IDENTITY" "$bin" 2>/dev/null || true
-          done
-          if [ -f "$HINDSIGHT_BUILD/.venv/bin/python3" ]; then
-            REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUILD/.venv/bin/python3" 2>/dev/null || echo "$HINDSIGHT_BUILD/.venv/bin/python3")
-            if file "$REAL_PYTHON" 2>/dev/null | grep -q "Mach-O"; then
-              codesign --force --options runtime --timestamp \
-                --sign "$SIGN_IDENTITY" "$REAL_PYTHON"
+            rm -f "$HINDSIGHT_BUNDLE/.venv/bin/python"
+            cp "$HINDSIGHT_REAL_PYTHON" "$HINDSIGHT_BUNDLE/.venv/bin/python"
+            rm -f "$HINDSIGHT_BUNDLE/.venv/bin/python3" "$HINDSIGHT_BUNDLE/.venv/bin/python3.12"
+            ln -s python "$HINDSIGHT_BUNDLE/.venv/bin/python3"
+            ln -s python "$HINDSIGHT_BUNDLE/.venv/bin/python3.12"
+            # Copy libpython so @executable_path/../lib/libpython3.12.dylib resolves
+            if [ -f "$HINDSIGHT_MANAGED_DIR/lib/libpython3.12.dylib" ]; then
+              cp "$HINDSIGHT_MANAGED_DIR/lib/libpython3.12.dylib" "$HINDSIGHT_BUNDLE/.venv/lib/libpython3.12.dylib"
             fi
           fi
-          # Create tarball
-          HINDSIGHT_TARBALL="/tmp/hindsight-venv.tar.gz"
-          tar -czf "$HINDSIGHT_TARBALL" -C "$HINDSIGHT_BUILD" .venv
-          HINDSIGHT_TARBALL_SIZE=$(stat -f%z "$HINDSIGHT_TARBALL" 2>/dev/null || stat -c%s "$HINDSIGHT_TARBALL")
-          echo "Hindsight tarball created: $(( HINDSIGHT_TARBALL_SIZE / 1024 / 1024 )) MB"
+          echo "Bundled Hindsight Memory MCP with venv"
 
           # Update Info.plist metadata
           /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable   $BINARY_NAME"  "$APP_BUNDLE/Contents/Info.plist"
@@ -628,7 +616,15 @@ workflows:
             fi
           fi
 
-          # Hindsight Memory MCP is signed in the tarball build step above (not in app bundle)
+          # Sign Hindsight Memory MCP native binaries (.so/.dylib and executables in venv)
+          HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
+          if [ -d "$HINDSIGHT_BUNDLE/.venv" ]; then
+            find "$HINDSIGHT_BUNDLE/.venv" -type f 2>/dev/null | while read bin; do
+              file "$bin" 2>/dev/null | grep -q "Mach-O" && \
+                codesign --force --options runtime --timestamp \
+                  --sign "$SIGN_IDENTITY" "$bin" 2>/dev/null || true
+            done
+          fi
 
           # Sign Sparkle components — innermost first
           SPARKLE_FW="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
@@ -955,13 +951,6 @@ workflows:
           # Upload arch-specific ZIPs
           gcloud storage cp "$ARCH_ARM64_ZIP"  "gs://$BUCKET/$PREFIX/Fazm-arm64.zip"
           gcloud storage cp "$ARCH_X86_64_ZIP" "gs://$BUCKET/$PREFIX/Fazm-x86_64.zip"
-
-          # Upload Hindsight Memory MCP tarball (downloaded by app on first launch)
-          HINDSIGHT_TARBALL="/tmp/hindsight-venv.tar.gz"
-          if [ -f "$HINDSIGHT_TARBALL" ]; then
-            gcloud storage cp "$HINDSIGHT_TARBALL" "gs://$BUCKET/hindsight/hindsight-venv.tar.gz"
-            echo "Uploaded Hindsight tarball to gs://$BUCKET/hindsight/hindsight-venv.tar.gz"
-          fi
 
           # Upload Google Workspace MCP tarball (downloaded by app on first launch)
           GWS_MCP_TARBALL="/tmp/gws-mcp-venv.tar.gz"

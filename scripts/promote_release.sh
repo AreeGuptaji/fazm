@@ -70,8 +70,10 @@ if [ "$IS_STAGING_TAG" = "true" ]; then
         echo "✓ Production build $PROD_TAG already exists — skipping rebuild"
     else
         echo "Triggering production build: $PROD_TAG"
-        COMMIT=$(gh release view "$TAG" --repo "$REPO" --json targetCommitish --jq .targetCommitish 2>/dev/null || \
-                 git rev-parse HEAD 2>/dev/null || echo "")
+        # Resolve tag → commit SHA (gh release returns branch name, not SHA)
+        COMMIT=$(git rev-parse "$TAG^{commit}" 2>/dev/null || \
+                 gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null || \
+                 echo "")
         if [ -z "$COMMIT" ]; then
             echo "Error: Could not determine commit SHA for $TAG"
             exit 1
