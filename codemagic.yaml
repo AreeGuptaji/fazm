@@ -380,21 +380,21 @@ workflows:
             # Strip __pycache__ to save space (keep .dist-info — needed by importlib.metadata)
             find "$WORKSPACE_MCP_BUNDLE/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
             # Replace absolute Python symlink with a copy + bundle libpython for portability
-            GWS_REAL_PYTHON=$(readlink -f "$WORKSPACE_MCP_BUNDLE/.venv/bin/python" 2>/dev/null)
-            GWS_MANAGED_DIR=$(dirname "$(dirname "$GWS_REAL_PYTHON")")
-            if [ -n "$GWS_REAL_PYTHON" ] && [ -f "$GWS_REAL_PYTHON" ]; then
+            GWMCP_REAL_PYTHON=$(readlink -f "$WORKSPACE_MCP_BUNDLE/.venv/bin/python" 2>/dev/null)
+            GWMCP_MANAGED_DIR=$(dirname "$(dirname "$GWMCP_REAL_PYTHON")")
+            if [ -n "$GWMCP_REAL_PYTHON" ] && [ -f "$GWMCP_REAL_PYTHON" ]; then
               rm -f "$WORKSPACE_MCP_BUNDLE/.venv/bin/python"
-              cp "$GWS_REAL_PYTHON" "$WORKSPACE_MCP_BUNDLE/.venv/bin/python"
+              cp "$GWMCP_REAL_PYTHON" "$WORKSPACE_MCP_BUNDLE/.venv/bin/python"
               rm -f "$WORKSPACE_MCP_BUNDLE/.venv/bin/python3" "$WORKSPACE_MCP_BUNDLE/.venv/bin/python3.12"
               ln -s python "$WORKSPACE_MCP_BUNDLE/.venv/bin/python3"
               ln -s python "$WORKSPACE_MCP_BUNDLE/.venv/bin/python3.12"
               # Copy libpython so @executable_path/../lib/libpython3.12.dylib resolves
-              if [ -f "$GWS_MANAGED_DIR/lib/libpython3.12.dylib" ]; then
-                cp "$GWS_MANAGED_DIR/lib/libpython3.12.dylib" "$WORKSPACE_MCP_BUNDLE/.venv/lib/libpython3.12.dylib"
+              if [ -f "$GWMCP_MANAGED_DIR/lib/libpython3.12.dylib" ]; then
+                cp "$GWMCP_MANAGED_DIR/lib/libpython3.12.dylib" "$WORKSPACE_MCP_BUNDLE/.venv/lib/libpython3.12.dylib"
               fi
               # Copy stdlib so Python can find encodings, os, etc. on machines without uv
-              if [ -d "$GWS_MANAGED_DIR/lib/python3.12" ]; then
-                rsync -a --ignore-existing "$GWS_MANAGED_DIR/lib/python3.12/" "$WORKSPACE_MCP_BUNDLE/.venv/lib/python3.12/"
+              if [ -d "$GWMCP_MANAGED_DIR/lib/python3.12" ]; then
+                rsync -a --ignore-existing "$GWMCP_MANAGED_DIR/lib/python3.12/" "$WORKSPACE_MCP_BUNDLE/.venv/lib/python3.12/"
               fi
               # Rewrite pyvenv.cfg so Python finds stdlib relative to venv, not the managed install
               printf 'home = bin\nimplementation = CPython\nversion_info = 3.12\ninclude-system-site-packages = false\n' > "$WORKSPACE_MCP_BUNDLE/.venv/pyvenv.cfg"
