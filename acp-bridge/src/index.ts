@@ -1065,7 +1065,7 @@ async function flushObserverBatch(): Promise<void> {
   observerRunning = true;
   const batch = observerBuffer.splice(0);
   const batchText = batch.map(t => `[${t.role}]: ${t.text}`).join("\n\n");
-  const prompt = `Here are the latest conversation turns from the main session:\n\n${batchText}\n\nAnalyze these turns. Update the knowledge graph with any new entities, preferences, or relationships you detect. Use Hindsight retain for nuanced observations. If you detect a repeated workflow or integration opportunity, draft a skill and surface a card for user confirmation.`;
+  const prompt = `Here are the latest conversation turns from the main session:\n\n${batchText}\n\nAnalyze these turns. Use Hindsight retain to save each distinct fact, preference, entity, or behavioral pattern you detect — one retain call per observation. If you detect a repeated workflow (3+ times), draft a skill.`;
 
   // Register a per-session notification handler so observer notifications
   // don't get swallowed by the main query's handler or vice versa.
