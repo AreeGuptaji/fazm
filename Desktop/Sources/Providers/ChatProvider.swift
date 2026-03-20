@@ -1216,18 +1216,17 @@ class ChatProvider: ObservableObject {
         let historyInjected = !history.isEmpty
         let historyMessages = messages.filter { !$0.text.isEmpty && !$0.isStreaming }
         let historyCount = min(historyMessages.count, 20)
-        log("ChatProvider: prompt built — schema: \(!cachedDatabaseSchema.isEmpty ? "yes" : "no"), goals: \(activeGoalCount), tasks: \(cachedTasks.count), ai_profile: \(!cachedAIProfile.isEmpty ? "yes" : "no"), memories: \(cachedMemories.count), history: \(historyInjected ? "injected (\(historyCount) msgs)" : "none"), claude_md: \(claudeMdEnabled && claudeMdContent != nil ? "yes" : "no"), project_claude_md: \(projectClaudeMdEnabled && projectClaudeMdContent != nil ? "yes" : "no"), skills: \(enabledSkillNames.count), dev_mode_in_skills: \(devModeEnabled && devModeContext != nil ? "yes" : "no"), prompt_length: \(prompt.count) chars")
+        log("ChatProvider: prompt built — schema: \(!cachedDatabaseSchema.isEmpty ? "yes" : "no"), goals: \(activeGoalCount), tasks: \(cachedTasks.count), ai_profile: \(!cachedAIProfile.isEmpty ? "yes" : "no"), history: \(historyInjected ? "injected (\(historyCount) msgs)" : "none"), claude_md: \(claudeMdEnabled && claudeMdContent != nil ? "yes" : "no"), project_claude_md: \(projectClaudeMdEnabled && projectClaudeMdContent != nil ? "yes" : "no"), skills: \(enabledSkillNames.count), dev_mode_in_skills: \(devModeEnabled && devModeContext != nil ? "yes" : "no"), prompt_length: \(prompt.count) chars")
 
         // Log per-section character breakdown
         let baseTemplate = ChatPromptBuilder.buildDesktopChat(
-            userName: userName, memoriesSection: "", goalSection: "", tasksSection: "", aiProfileSection: "", databaseSchema: "")
+            userName: userName, goalSection: "", tasksSection: "", aiProfileSection: "", databaseSchema: "")
         let allSkillsForSize = (discoveredSkills + projectDiscoveredSkills)
             .filter { enabledSkillNames.contains($0.name) && ($0.name != "dev-mode" || devModeEnabled) }
             .map { $0.name }.joined(separator: ", ")
         let skillsSectionSize = allSkillsForSize.isEmpty ? 0 : allSkillsForSize.count + 80 // names + wrapper
         log("ChatProvider: prompt breakdown — " +
             "base_template:\(baseTemplate.count)c, " +
-            "context:\(contextSection.count)c, " +
             "goals:\(goalSection.count)c, " +
             "tasks:\(tasksSection.count)c, " +
             "ai_profile:\(aiProfileSection.count)c, " +
@@ -1243,14 +1242,12 @@ class ChatProvider: ObservableObject {
     /// Build system prompt for task chat sessions.
     func buildTaskChatSystemPrompt() -> String {
         let userName = AuthService.shared.displayName.isEmpty ? "there" : AuthService.shared.givenName
-        let contextSection = formatMemoriesSection()
         let goalSection = formatGoalSection()
         let tasksSection = formatTasksSection()
         let aiProfileSection = formatAIProfileSection()
 
         var prompt = ChatPromptBuilder.buildDesktopChat(
             userName: userName,
-            memoriesSection: contextSection,
             goalSection: goalSection,
             tasksSection: tasksSection,
             aiProfileSection: aiProfileSection,
