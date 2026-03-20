@@ -48,9 +48,27 @@ struct AIResponseView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // Previous chat exchanges
-                        ForEach(chatHistory) { exchange in
+                        // Previous chat exchanges — consolidate observer-only exchanges
+                        let historyObserverCards = chatHistory.filter { $0.question.isEmpty }.flatMap { exchange in
+                            exchange.aiMessage.contentBlocks.compactMap { block -> ObserverCardItem? in
+                                if case .observerCard(let id, let activityId, let type, let content, let buttons, let actedAction) = block {
+                                    return ObserverCardItem(id: id, activityId: activityId, type: type, content: content, buttons: buttons, actedAction: actedAction)
+                                }
+                                return nil
+                            }
+                        }
+                        ForEach(chatHistory.filter { !$0.question.isEmpty }) { exchange in
                             chatExchangeView(exchange)
+                        }
+                        if !historyObserverCards.isEmpty {
+                            ObserverCardStackView(
+                                cards: historyObserverCards,
+                                onAction: { id, action in
+                                    handleObserverCardAction(activityId: id, action: action)
+                                }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
                         }
 
                         // Current question (hidden when empty, e.g. tutorial guide messages or history-only mode)
@@ -63,9 +81,24 @@ struct AIResponseView: View {
                             currentContentView
                         }
 
-                        // Observer cards that arrived while the current query was streaming
-                        ForEach(state.pendingObserverExchanges) { exchange in
-                            chatExchangeView(exchange)
+                        // Observer cards that arrived while the current query was streaming — consolidated into one stack
+                        let allPendingCards = state.pendingObserverExchanges.flatMap { exchange in
+                            exchange.aiMessage.contentBlocks.compactMap { block -> ObserverCardItem? in
+                                if case .observerCard(let id, let activityId, let type, let content, let buttons, let actedAction) = block {
+                                    return ObserverCardItem(id: id, activityId: activityId, type: type, content: content, buttons: buttons, actedAction: actedAction)
+                                }
+                                return nil
+                            }
+                        }
+                        if !allPendingCards.isEmpty {
+                            ObserverCardStackView(
+                                cards: allPendingCards,
+                                onAction: { id, action in
+                                    handleObserverCardAction(activityId: id, action: action)
+                                }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
                         }
 
                         // Voice follow-up indicator (shown inline when PTT is active during conversation)
