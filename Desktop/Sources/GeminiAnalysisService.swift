@@ -1,4 +1,5 @@
 import Foundation
+import PostHog
 import SessionReplay
 
 /// Accumulates session recording chunks and periodically sends them to the Gemini API
@@ -145,7 +146,18 @@ actor GeminiAnalysisService {
         let chunks = Array(chunkBuffer)
         let analyzedCount = chunks.count
         let result = await runAnalysis(chunks: chunks)
-        if result != nil {
+        if let result {
+            // Track the analysis result in PostHog
+            var properties: [String: Any] = [
+                "verdict": result.verdict,
+                "chunks_analyzed": result.chunksAnalyzed,
+                "response": result.raw,
+            ]
+            if let task = result.task {
+                properties["task"] = task
+            }
+            PostHogSDK.shared.capture("gemini_analysis_completed", properties: properties)
+
             // Success — remove only the chunks we analyzed (new ones may have arrived during analysis)
             let analyzedURLs = Set(chunks.map { $0.localURL })
             chunkBuffer.removeAll { analyzedURLs.contains($0.localURL) }
@@ -155,6 +167,7 @@ actor GeminiAnalysisService {
         } else {
             // Failed — keep buffer intact, set cooldown before retry
             lastFailedAnalysis = Date()
+            PostHogSDK.shared.capture("gemini_analysis_failed", properties: ["chunks_count": analyzedCount])
             log("GeminiAnalysis: analysis failed, keeping \(chunks.count) chunks for retry (cooldown \(Int(retryCooldown))s)")
         }
         return result
