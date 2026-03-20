@@ -438,9 +438,8 @@ workflows:
           else
             echo "WARNING: Failed to clone ai-browser-profile — skipping"
           fi
-          # Strip __pycache__ and .dist-info to save ~25MB
+          # Strip __pycache__ to save space (keep .dist-info — needed by importlib.metadata / entry_points)
           find "$HINDSIGHT_BUNDLE/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          find "$HINDSIGHT_BUNDLE/.venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
           # Replace absolute Python symlink with a copy + bundle libpython for portability
           HINDSIGHT_REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUNDLE/.venv/bin/python" 2>/dev/null)
           HINDSIGHT_MANAGED_DIR=$(dirname "$(dirname "$HINDSIGHT_REAL_PYTHON")")
