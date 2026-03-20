@@ -134,6 +134,8 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
             if isInstallationError {
                 logSync("Sparkle: Installation failed (4005), showing App Management permission alert")
                 UserDefaults.standard.set(true, forKey: "hasSeenAppManagementError")
+                // Reset the success flag so the proactive guide shows again next time
+                UserDefaults.standard.set(false, forKey: "hasSuccessfullyInstalledSparkleUpdate")
                 Task { @MainActor in
                     let alert = NSAlert()
                     alert.alertStyle = .warning
@@ -382,6 +384,53 @@ final class UpdaterViewModel: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     self.checkForUpdatesInBackground()
                 }
+            }
+        }
+    }
+
+    /// Show a one-time guide explaining App Management permission before the user tries to install.
+    /// Only shown once — dismissed permanently after the user acknowledges or after a successful install.
+    private var hasShownAppManagementGuide = false
+
+    func showAppManagementGuideIfNeeded(version: String) {
+        guard !hasShownAppManagementGuide else { return }
+        // Don't show if user already dismissed this session or previously installed successfully
+        guard !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate") else { return }
+        // Don't show more than once per app version to avoid nagging
+        let lastShownVersion = UserDefaults.standard.string(forKey: "appManagementGuideLastShownVersion")
+        guard lastShownVersion != version else { return }
+        hasShownAppManagementGuide = true
+        UserDefaults.standard.set(version, forKey: "appManagementGuideLastShownVersion")
+
+        logSync("Sparkle: Showing App Management permission guide for v\(version)")
+
+        let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+            ?? "Fazm"
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Update v\(version) is available"
+        alert.informativeText = "Before \(appName) can install updates, macOS requires you to allow App Management permission. This is a one-time step.\n\n1. Click \"Open Settings\" below\n2. Find \(appName) in the list and toggle it on\n3. Come back here — the update will install automatically"
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Not Now")
+
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            alert.beginSheetModal(for: window) { [weak self] response in
+                if response == .alertFirstButtonReturn {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
+                        NSWorkspace.shared.open(url)
+                    }
+                    self?.scheduleRetryAfterAppManagementGrant()
+                }
+            }
+        } else {
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
+                    NSWorkspace.shared.open(url)
+                }
+                scheduleRetryAfterAppManagementGrant()
             }
         }
     }
