@@ -1166,8 +1166,9 @@ class FloatingControlBarManager {
             chatProvider?.reorderPendingMessages(from: source, to: dest)
         }
 
-        barWindow.onStopAgent = { [weak chatProvider] in
+        barWindow.onStopAgent = { [weak chatProvider, weak barWindow] in
             chatProvider?.stopAgent()
+            barWindow?.state.clearQueue()
         }
 
         barWindow.onResetSession = { [weak chatProvider] in
@@ -1480,8 +1481,9 @@ class FloatingControlBarManager {
             provider?.reorderPendingMessages(from: source, to: dest)
         }
 
-        window.onStopAgent = { [weak provider] in
+        window.onStopAgent = { [weak provider, weak window] in
             provider?.stopAgent()
+            window?.state.clearQueue()
         }
 
         window.onObserverCardAction = { [weak provider] activityId, action in
