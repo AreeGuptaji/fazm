@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Acquire exclusive lock — prevents concurrent builds/tests by parallel agents
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/scripts/fazm-lock.sh"
+fazm_acquire_lock 300
+
 # Build configuration
 BINARY_NAME="Fazm"  # Package.swift target — binary paths, CFBundleExecutable
 APP_NAME="Fazm"
