@@ -188,6 +188,8 @@ async function ensureHindsightVenv(): Promise<boolean> {
   } catch (err) {
     logErr(`Hindsight: venv download/extract failed: ${err}`);
     return false;
+  } finally {
+    hindsightDownloading = false;
   }
 }
 
