@@ -2624,8 +2624,8 @@ class ChatProvider: ObservableObject {
                             ]
                         } else if type == "insight" || type == "card" || type == "summary" || type == "kg_update" || type == "pattern" {
                             buttons = [
-                                ObserverCardButton(id: "\(activityId)-approve", label: "Useful", action: "approve"),
-                                ObserverCardButton(id: "\(activityId)-dismiss", label: "Dismiss", action: "dismiss"),
+                                ObserverCardButton(id: "\(activityId)-approve", label: "OK", action: "approve"),
+                                ObserverCardButton(id: "\(activityId)-dismiss", label: "Deny", action: "dismiss"),
                             ]
                         }
                     }
