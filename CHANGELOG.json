@@ -119,6 +119,7 @@
     "Added always-on screen observer for Gemini analysis that persists across app restarts",
     "Fixed Google Workspace MCP not working for release-build users by creating venv at runtime",
     "Observer cards now save immediately instead of waiting 5 seconds \u2014 tap Dismiss to undo",
-    "Fixed free trial users being incorrectly prompted to switch to personal account on temporary rate limits"
+    "Fixed free trial users being incorrectly prompted to switch to personal account on temporary rate limits",
+    "Improved memory: Fazm now better understands when to use its knowledge about you from Hindsight and browser profile"
   ]
 }
