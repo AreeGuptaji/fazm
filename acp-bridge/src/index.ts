@@ -99,12 +99,16 @@ async function startHindsight(): Promise<boolean> {
     return false;
   }
 
-  // Check if already running (user's own instance or previous launch)
+  // Check if already running AND healthy (user's own instance or previous launch)
   try {
     const res = await fetch(`http://127.0.0.1:${HINDSIGHT_PORT}/health`);
     if (res.ok) {
-      logErr("Hindsight: already running, reusing existing instance");
-      return true;
+      const body = await res.json() as { status?: string };
+      if (body.status === "healthy") {
+        logErr("Hindsight: already running and healthy, reusing existing instance");
+        return true;
+      }
+      logErr(`Hindsight: existing instance unhealthy (${body.status}), will restart`);
     }
   } catch {}
 
