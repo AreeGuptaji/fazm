@@ -20,8 +20,13 @@ struct SmartTVView: NSViewRepresentable {
         // Register with controller so it can be controlled externally
         SmartTVController.shared.webView = webView
 
-        if let url = URL(string: "https://m.youtube.com/shorts") {
-            webView.load(URLRequest(url: url))
+        // If there's a pending search query, go straight to search instead of /shorts
+        if let pending = SmartTVController.shared.pendingQuery {
+            SmartTVController.shared.searchAndPlay(query: pending)
+        } else {
+            if let url = URL(string: "https://m.youtube.com/shorts") {
+                webView.load(URLRequest(url: url))
+            }
         }
 
         return webView
@@ -34,10 +39,10 @@ struct SmartTVView: NSViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let url = webView.url?.absoluteString ?? ""
-            log("SmartTV: didFinish navigation — url=\(url.prefix(80))")
+            log("SmartTV: didFinish — url=\(url.prefix(80))")
 
             if url.contains("/results") {
-                // On search results page: click the first Shorts result to start playing
+                // On search results page: click the first Shorts result
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     log("SmartTV: clicking first Shorts result")
                     let js = """
@@ -51,11 +56,10 @@ struct SmartTVView: NSViewRepresentable {
                     webView.evaluateJavaScript(js)
                 }
             } else if url.contains("/shorts/") {
-                // On Shorts player page: mark navigation done and let YouTube autoplay
+                // On Shorts player page: navigation done, let YouTube autoplay
                 SmartTVController.shared.navigationFinished()
                 log("SmartTV: on Shorts player, navigation finished")
             } else {
-                // Initial load or other page
                 SmartTVController.shared.navigationFinished()
             }
         }
