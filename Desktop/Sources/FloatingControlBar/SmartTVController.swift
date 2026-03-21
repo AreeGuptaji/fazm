@@ -123,4 +123,31 @@ class SmartTVController {
     func navigationFinished() {
         isNavigating = false
     }
+
+    /// Log diagnostic info about video elements in the WebView.
+    func logVideoDiagnostics() {
+        let js = """
+        (function() {
+            var videos = document.querySelectorAll('video');
+            var info = [];
+            videos.forEach(function(v, i) {
+                info.push('video[' + i + '] loop=' + v.loop + ' muted=' + v.muted +
+                    ' duration=' + (v.duration || 0).toFixed(1) +
+                    ' currentTime=' + (v.currentTime || 0).toFixed(1) +
+                    ' paused=' + v.paused +
+                    ' ended=' + v.ended +
+                    ' __fazmSetup=' + !!v.__fazmSetup +
+                    ' __fazmAdvancing=' + !!v.__fazmAdvancing);
+            });
+            return '__fazmAutoAdvance=' + !!window.__fazmAutoAdvance + ' videos=' + videos.length + ' | ' + info.join(' | ');
+        })();
+        """
+        webView?.evaluateJavaScript(js) { result, error in
+            if let info = result as? String {
+                log("SmartTV diagnostics: \(info)")
+            } else if let error {
+                log("SmartTV diagnostics error: \(error.localizedDescription)")
+            }
+        }
+    }
 }
