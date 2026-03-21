@@ -53,6 +53,28 @@ struct FloatingControlBarView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
+
+                // Hide TV button — centered between TV and response area
+                Button {
+                    state.smartTVHiddenByUser = true
+                    state.smartTVVisible = false
+                    SmartTVController.shared.pauseVideo(source: "user_hide")
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "tv.slash")
+                            .font(.system(size: 10))
+                        Text("Hide TV")
+                            .scaledFont(size: 11)
+                    }
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.black)
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 6)
             }
 
             // AI conversation view - conditionally visible (expands upward above the bar)
