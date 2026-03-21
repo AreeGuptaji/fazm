@@ -1074,6 +1074,20 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         )
     }
 
+    func windowWillStartLiveResize(_ notification: Notification) {
+        isUserResizing = true
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        isUserResizing = false
+        // Save the user's chosen size so it persists across sessions
+        if state.showingAIResponse {
+            UserDefaults.standard.set(
+                NSStringFromSize(self.frame.size), forKey: FloatingControlBarWindow.sizeKey
+            )
+        }
+    }
+
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         var clamped = NSSize(
             width: max(frameSize.width, FloatingControlBarWindow.minBarSize.width),
