@@ -34,13 +34,14 @@ struct SmartTVView: NSViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let url = webView.url?.absoluteString ?? ""
+            log("SmartTV: didFinish navigation — url=\(url.prefix(80))")
 
             if url.contains("/results") {
                 // On search results page: click the first Shorts result to start playing
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    log("SmartTV: clicking first Shorts result")
                     let js = """
                     (function() {
-                        // Find the first Shorts link in search results
                         var links = document.querySelectorAll('a[href*="/shorts/"]');
                         if (links.length > 0) {
                             links[0].click();
@@ -49,11 +50,13 @@ struct SmartTVView: NSViewRepresentable {
                     """
                     webView.evaluateJavaScript(js)
                 }
+            } else if url.contains("/shorts/") {
+                // On Shorts player page: mark navigation done and let YouTube autoplay
+                SmartTVController.shared.navigationFinished()
+                log("SmartTV: on Shorts player, navigation finished")
             } else {
-                // On Shorts player page: auto-play
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    SmartTVController.shared.playVideo()
-                }
+                // Initial load or other page
+                SmartTVController.shared.navigationFinished()
             }
         }
     }
