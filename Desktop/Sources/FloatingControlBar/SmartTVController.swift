@@ -1,3 +1,4 @@
+import Foundation
 import WebKit
 
 /// Controls the Smart TV WKWebView — search, play, pause.
@@ -14,21 +15,81 @@ class SmartTVController {
     /// Consumed by the SmartTVView coordinator after initial page load.
     var pendingQuery: String?
 
+    private let geminiModel = "gemini-flash-latest"
+
     /// Navigate to YouTube Shorts search results for the given query.
     func searchAndPlay(query: String) {
         guard let webView else {
-            // WebView not ready yet — store for later
             log("SmartTV: searchAndPlay deferred (webView nil) — query: \(query.prefix(50))")
             pendingQuery = query
             return
         }
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://m.youtube.com/results?search_query=\(encoded)&sp=EgIYAQ%3D%3D")
-        else { return }
         pendingQuery = nil
         isNavigating = true
-        log("SmartTV: searchAndPlay — navigating to: \(query.prefix(50))")
-        webView.load(URLRequest(url: url))
+
+        Task {
+            let optimized = await optimizeQuery(query)
+            let searchQuery = optimized ?? query
+            log("SmartTV: searchAndPlay — query: \(query.prefix(50)) → optimized: \(searchQuery.prefix(50))")
+            guard let encoded = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "https://m.youtube.com/results?search_query=\(encoded)&sp=EgIYAQ%3D%3D")
+            else {
+                isNavigating = false
+                return
+            }
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    /// Ask Gemini Flash to rewrite the user's query into an optimal YouTube search query.
+    private func optimizeQuery(_ query: String) async -> String? {
+        await KeyService.shared.ensureKeys(timeout: 3)
+        guard let apiKey = KeyService.shared.geminiAPIKey else {
+            log("SmartTV: no Gemini API key, skipping query optimization")
+            return nil
+        }
+
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(geminiModel):generateContent?key=\(apiKey)") else { return nil }
+
+        let body: [String: Any] = [
+            "contents": [["parts": [["text": """
+                You are a YouTube Shorts search query optimizer. Given a user's request, output the single best YouTube search query to find relevant Shorts videos. Reply with ONLY the search query — no explanation, no quotes, no extra text.
+
+                User request: \(query)
+                """]]]],
+            "generationConfig": [
+                "temperature": 0.3,
+                "maxOutputTokens": 64
+            ]
+        ]
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 3
+
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        req.httpBody = httpBody
+
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse,
+                  (200...299).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let candidates = json["candidates"] as? [[String: Any]],
+                  let content = candidates.first?["content"] as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]],
+                  let text = parts.first?["text"] as? String else {
+                let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+                log("SmartTV: Gemini query optimization failed (status=\(status))")
+                return nil
+            }
+            let result = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return result.isEmpty ? nil : result
+        } catch {
+            log("SmartTV: Gemini query optimization error: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     func pauseVideo(source: String = "") {
@@ -43,6 +104,11 @@ class SmartTVController {
     func playVideo(source: String = "") {
         log("SmartTV: playVideo source=\(source)")
         webView?.evaluateJavaScript("document.querySelectorAll('video').forEach(v => v.play())")
+    }
+
+    func setMuted(_ muted: Bool) {
+        log("SmartTV: setMuted=\(muted)")
+        webView?.evaluateJavaScript("document.querySelectorAll('video').forEach(v => v.muted = \(muted))")
     }
 
     /// Called when navigation completes and the Shorts player is ready.
