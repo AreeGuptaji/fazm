@@ -50,28 +50,6 @@ struct FloatingControlBarView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-
-                    // Hide TV button (top-right corner)
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button {
-                                state.smartTVHiddenByUser = true
-                                state.smartTVVisible = false
-                                SmartTVController.shared.pauseVideo(source: "user_hide")
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .frame(width: 24, height: 24)
-                                    .background(Color.black.opacity(0.4))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(8)
-                        }
-                        Spacer()
-                    }
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
