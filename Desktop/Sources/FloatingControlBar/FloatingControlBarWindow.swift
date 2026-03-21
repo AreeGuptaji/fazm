@@ -1745,9 +1745,9 @@ class FloatingControlBarManager {
 
         // Smart TV: search YouTube Shorts for the user's query and show the TV
         if ShortcutSettings.shared.smartTVEnabled {
-            state.smartTVHiddenByUser = false
-            state.smartTVVisible = true
-            state.smartTVMuted = true  // always start muted on new query
+            barWindow.state.smartTVHiddenByUser = false
+            barWindow.state.smartTVVisible = true
+            barWindow.state.smartTVMuted = true  // always start muted on new query
             SmartTVController.shared.searchAndPlay(query: message)
         }
 
