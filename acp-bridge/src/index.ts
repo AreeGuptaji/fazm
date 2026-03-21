@@ -133,7 +133,8 @@ async function startHindsight(): Promise<boolean> {
     HOME: home,
     TMPDIR: process.env.TMPDIR || "/tmp",
     LANG: process.env.LANG || "en_US.UTF-8",
-    PYTHONHOME: join(hindsightDir, ".venv"),
+    // Do NOT set PYTHONHOME — the venv's pyvenv.cfg handles path resolution.
+    // Setting PYTHONHOME to the venv breaks stdlib lookup (no 'encodings' module).
     // pg0's extracted postgres binary links to /opt/homebrew/opt/openssl@3/lib/libssl.3.dylib
     // which doesn't exist on clean Macs — DYLD_LIBRARY_PATH makes dyld find our bundled copies
     DYLD_LIBRARY_PATH: frameworksDir,
