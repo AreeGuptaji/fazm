@@ -291,7 +291,6 @@ class ChatProvider: ObservableObject {
     @Published var showCreditExhaustedAlert = false
     /// True while the agent is compacting conversation context
     @Published var isCompacting = false
-    @Published var isObserverRunning = false
 
     /// Set to true during onboarding so the ACP session ID is persisted for restart recovery.
     var isOnboarding = false
@@ -752,9 +751,9 @@ class ChatProvider: ObservableObject {
                     self?.pollObserverCards()
                 }
             }
-            await acpBridge.setObserverStatusHandler { [weak self] running in
-                Task { @MainActor [weak self] in
-                    self?.isObserverRunning = running
+            await acpBridge.setObserverStatusHandler { running in
+                Task { @MainActor in
+                    FloatingControlBarManager.shared.barState?.isObserverRunning = running
                 }
             }
             // Set up background tool call handler for observer session tool calls
