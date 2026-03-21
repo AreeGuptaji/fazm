@@ -45,6 +45,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     private var inputHeightCancellable: AnyCancellable?
     private var responseHeightCancellable: AnyCancellable?
     private var smartTVCancellable: AnyCancellable?
+    private var smartTVPauseCancellables = Set<AnyCancellable>()
     /// Height of the Smart TV video area (9:16 aspect ratio based on window width).
     private static let smartTVHeight: CGFloat = 640
     /// Total window height when Smart TV is active (video + control bar).
@@ -148,6 +149,42 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             .sink { [weak self] enabled in
                 self?.handleSmartTVToggle(enabled)
             }
+
+        // Pause Smart TV video when PTT starts
+        state.$isVoiceListening
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { listening in
+                guard ShortcutSettings.shared.smartTVEnabled else { return }
+                if listening {
+                    SmartTVController.shared.pauseVideo()
+                }
+            }
+            .store(in: &smartTVPauseCancellables)
+
+        // Pause Smart TV video when AI conversation input opens (user clicked input)
+        state.$showingAIConversation
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { showing in
+                guard ShortcutSettings.shared.smartTVEnabled else { return }
+                if showing {
+                    SmartTVController.shared.pauseVideo()
+                }
+            }
+            .store(in: &smartTVPauseCancellables)
+
+        // Play Smart TV video when AI response starts streaming
+        state.$showingAIResponse
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { showingResponse in
+                guard ShortcutSettings.shared.smartTVEnabled else { return }
+                if showingResponse {
+                    SmartTVController.shared.playVideo()
+                }
+            }
+            .store(in: &smartTVPauseCancellables)
     }
 
     override var canBecomeKey: Bool { true }
@@ -1731,6 +1768,11 @@ class FloatingControlBarManager {
         }
 
         AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotPath != nil, queryText: message)
+
+        // Smart TV: search YouTube Shorts for the user's query
+        if ShortcutSettings.shared.smartTVEnabled {
+            SmartTVController.shared.searchAndPlay(query: message)
+        }
 
         // Provider is already initialized by ViewModelContainer at app launch
 
