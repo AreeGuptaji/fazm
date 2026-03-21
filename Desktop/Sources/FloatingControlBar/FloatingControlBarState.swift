@@ -32,6 +32,7 @@ class FloatingControlBarState: NSObject, ObservableObject {
     @Published var showingAIResponse: Bool = false
     @Published var isAILoading: Bool = true
     @Published var isCompacting: Bool = false
+    @Published var isObserverRunning: Bool = false
     @Published var aiInputText: String = ""
     @Published var currentAIMessage: ChatMessage? = nil
     @Published var displayedQuery: String = ""
