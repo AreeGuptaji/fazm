@@ -660,6 +660,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         }
 
         state.showingAIConversation = true
+        state.smartTVVisible = false
         state.chatHistory = []
         state.displayedQuery = ""
         state.currentAIMessage = nil
