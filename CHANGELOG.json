@@ -126,6 +126,7 @@
     "Browser profile now auto-extracts when queried for users who skipped the initial import",
     "Fixed Hindsight Memory not starting on clean Macs (missing OpenSSL for embedded PostgreSQL)",
     "Fixed typing indicator (bouncing dots) lingering after AI response completes",
-    "Fixed PTT audio level bars not animating when conversation history is open"
+    "Fixed PTT audio level bars not animating when conversation history is open",
+    "Smart TV now auto-advances to the next YouTube Short instead of replaying the same one"
   ]
 }
