@@ -48,54 +48,11 @@ echo "Promoting release: $TAG"
 echo "  Backend: $BACKEND_URL"
 echo ""
 
-# If promoting from staging, first trigger a full production build (with DMG)
-# before touching Firestore channels. The production build uses a non-staging tag.
-IS_STAGING_TAG=false
-if echo "$TAG" | grep -q "\-staging$"; then
-    IS_STAGING_TAG=true
-fi
+# Extract version from tag: v1.1.2+86-macos-staging -> 1.1.2
+VERSION=$(echo "$TAG" | sed 's/^v//' | sed 's/+.*//')
 
-if [ "$IS_STAGING_TAG" = "true" ]; then
-    # Derive production tag: v1.0.1+69-macos-staging -> v1.0.1+69-macos
-    PROD_TAG=$(echo "$TAG" | sed 's/-staging$//')
-
-    if ! command -v gh &>/dev/null; then
-        echo "Error: gh CLI is required to trigger a production build"
-        exit 1
-    fi
-
-    # Check if a production build for this tag already exists on GitHub
-    REPO=$(gh repo view m13v/fazm --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo "m13v/fazm")
-    if gh release view "$PROD_TAG" --repo "$REPO" &>/dev/null; then
-        echo "✓ Production build $PROD_TAG already exists — skipping rebuild"
-    else
-        echo "Triggering production build: $PROD_TAG"
-        # Resolve tag → commit SHA (gh release returns branch name, not SHA)
-        COMMIT=$(git rev-parse "$TAG^{commit}" 2>/dev/null || \
-                 gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null || \
-                 echo "")
-        if [ -z "$COMMIT" ]; then
-            echo "Error: Could not determine commit SHA for $TAG"
-            exit 1
-        fi
-        # Push the production tag to trigger Codemagic
-        gh api "repos/$REPO/git/refs" \
-            --method POST \
-            -f ref="refs/tags/$PROD_TAG" \
-            -f sha="$COMMIT" \
-            --jq '.ref' 2>/dev/null && \
-            echo "✓ Production tag $PROD_TAG pushed — Codemagic build triggered" || \
-            echo "⚠ Could not push tag (may already exist). Check Codemagic manually."
-        echo ""
-        echo "NOTE: Wait for the production build to complete before the beta release"
-        echo "      is available for fresh installs (DMG). Auto-update (Sparkle ZIP)"
-        echo "      will be available once the Firestore channel is promoted below."
-    fi
-
-    # Promote using the production tag in Firestore
-    TAG="$PROD_TAG"
-fi
-
+# Promote in Firestore (the backend handles deactivating previous releases
+# on the target channel automatically)
 RESPONSE=$(curl -s -w "\n%{http_code}" \
     -X PATCH \
     -H "Content-Type: application/json" \
@@ -115,12 +72,10 @@ else
     exit 1
 fi
 
-# When promoted to beta, update desktop/latest.json on GCS so the stub
-# installer serves this version to new users.
+# When promoted to beta or stable, update desktop/latest.json on GCS so the
+# stub installer serves this version to new users.
 NEW_CHANNEL=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('new_channel',''))" 2>/dev/null)
-if [ "$NEW_CHANNEL" = "beta" ]; then
-    # Extract version from tag: v1.0.1+65-macos -> 1.0.1
-    VERSION=$(echo "$TAG" | sed 's/^v//' | sed 's/+.*//')
+if [ "$NEW_CHANNEL" = "beta" ] || [ "$NEW_CHANNEL" = "stable" ]; then
     BUCKET="fazm-prod-releases"
 
     echo ""
