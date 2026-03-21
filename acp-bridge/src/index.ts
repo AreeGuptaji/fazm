@@ -31,7 +31,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
 import { tmpdir } from "os";
-import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync } from "fs";
+import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, copyFileSync, readdirSync } from "fs";
 import type {
   InboundMessage,
   OutboundMessage,
@@ -126,12 +126,32 @@ async function startHindsight(): Promise<boolean> {
   const pg0DataDir = join(home, ".pg0", "instances", "fazm");
   try { mkdirSync(pg0DataDir, { recursive: true }); } catch {}
 
-  // Use a clean environment to avoid conflicting Google auth vars
-  // (e.g. CLOUD_ML_REGION, ANTHROPIC_VERTEX_PROJECT_ID) from the parent
-  // OpenSSL dylibs are bundled in Contents/Frameworks/ for pg0's PostgreSQL binary
+  // Copy bundled OpenSSL dylibs into pg0's lib directory so libpq can find them.
+  // DYLD_LIBRARY_PATH doesn't work because the Python binary is signed with
+  // hardened runtime (--options runtime), which causes macOS to strip DYLD_* vars.
+  // Instead, we place the dylibs where libpq already looks: alongside the pg0 postgres libs.
   const frameworksDir = join(
     dirname(process.execPath), "..", "..", "Frameworks"
   );
+  const pg0Base = join(home, ".pg0", "installation");
+  try {
+    if (existsSync(pg0Base)) {
+      for (const ver of readdirSync(pg0Base)) {
+        const pg0Lib = join(pg0Base, ver, "lib");
+        if (!existsSync(pg0Lib)) continue;
+        for (const lib of ["libssl.3.dylib", "libcrypto.3.dylib"]) {
+          const src = join(frameworksDir, lib);
+          const dst = join(pg0Lib, lib);
+          if (existsSync(src) && !existsSync(dst)) {
+            copyFileSync(src, dst);
+            logErr(`Hindsight: copied ${lib} to pg0 lib dir`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    logErr(`Hindsight: failed to copy OpenSSL dylibs to pg0: ${e}`);
+  }
   const hindsightEnv: Record<string, string> = {
     PATH: process.env.PATH || "/usr/bin:/bin",
     HOME: home,
