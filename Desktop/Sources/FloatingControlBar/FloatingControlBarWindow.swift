@@ -44,6 +44,11 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     private var canonicalBottomY: CGFloat = 0
     private var inputHeightCancellable: AnyCancellable?
     private var responseHeightCancellable: AnyCancellable?
+    private var smartTVCancellable: AnyCancellable?
+    /// Height of the Smart TV video area (9:16 aspect ratio based on window width).
+    private static let smartTVHeight: CGFloat = 640
+    /// Total window height when Smart TV is active (video + control bar).
+    private static let smartTVWindowHeight: CGFloat = 700
     private var resizeWorkItem: DispatchWorkItem?
     /// Token incremented each time a windowDidResignKey dismiss animation starts.
     /// Checked in the completion block so a new PTT query can cancel a stale close.
@@ -135,6 +140,14 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         } else {
             centerOnMainScreen()
         }
+
+        // Observe Smart TV toggle and resize accordingly
+        smartTVCancellable = ShortcutSettings.shared.$smartTVEnabled
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                self?.handleSmartTVToggle(enabled)
+            }
     }
 
     override var canBecomeKey: Bool { true }
@@ -385,12 +398,20 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         // fires mid-animation, reads an intermediate frame, and causes position drift.
         suppressHoverResize = true
 
-        // Restore the pill to the screen it's already on (don't follow focus to another monitor).
-        let size = FloatingControlBarWindow.minBarSize
-        let restoreOrigin = NSPoint(
-            x: defaultPillOrigin(followFocus: false).x,
-            y: canonicalBottomY + FloatingControlBarWindow.collapsedYOffset
-        )
+        // Restore to Smart TV size or pill depending on setting.
+        let size: NSSize
+        let restoreOrigin: NSPoint
+        if ShortcutSettings.shared.smartTVEnabled {
+            let width = max(Self.expandedWidth, frame.width)
+            size = NSSize(width: width, height: Self.smartTVWindowHeight)
+            restoreOrigin = originForBottomCenterAnchor(newSize: size)
+        } else {
+            size = FloatingControlBarWindow.minBarSize
+            restoreOrigin = NSPoint(
+                x: defaultPillOrigin(followFocus: false).x,
+                y: canonicalBottomY + FloatingControlBarWindow.collapsedYOffset
+            )
+        }
         // NOTE: offset applied here because this path doesn't go through originForBottomCenterAnchor
 
         resizeWorkItem?.cancel()
@@ -759,9 +780,37 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         }
     }
 
+    // MARK: - Smart TV
+
+    private func handleSmartTVToggle(_ enabled: Bool) {
+        if enabled {
+            // Expand to show the Smart TV video area
+            let width = max(Self.expandedWidth, frame.width)
+            let size = NSSize(width: width, height: Self.smartTVWindowHeight)
+            resizeAnchored(to: size, makeResizable: false, animated: true)
+            makeKeyAndOrderFront(nil)
+        } else if !state.showingAIConversation {
+            // Collapse back to pill
+            let size = FloatingControlBarWindow.minBarSize
+            let newOrigin = NSPoint(
+                x: defaultPillOrigin(followFocus: false).x,
+                y: canonicalBottomY + FloatingControlBarWindow.collapsedYOffset
+            )
+            isResizingProgrammatically = true
+            NSAnimationContext.beginGrouping()
+            NSAnimationContext.current.duration = 0.35
+            NSAnimationContext.current.allowsImplicitAnimation = false
+            self.setFrame(NSRect(origin: newOrigin, size: size), display: true, animate: true)
+            NSAnimationContext.endGrouping()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.isResizingProgrammatically = false
+            }
+        }
+    }
+
     /// Resize for hover expand/collapse — anchored from bottom so the pill expands upward.
     func resizeForHover(expanded: Bool) {
-        guard !state.showingAIConversation, !state.isVoiceListening, !suppressHoverResize else { return }
+        guard !state.showingAIConversation, !state.isVoiceListening, !suppressHoverResize, !ShortcutSettings.shared.smartTVEnabled else { return }
         resizeWorkItem?.cancel()
         resizeWorkItem = nil
 
