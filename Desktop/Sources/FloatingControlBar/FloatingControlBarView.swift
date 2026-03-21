@@ -136,14 +136,18 @@ struct FloatingControlBarView: View {
                     .frame(height: 50)
                     .transition(.opacity)
             } else if isHovering || state.showingAIConversation {
-                VStack(spacing: 4) {
+                HStack(spacing: 0) {
                     if updaterViewModel.updateAvailable {
                         updateButton
+                            .padding(.leading, 4)
                     }
-                    compactButton(title: "Push to talk", keys: [shortcutSettings.pttKey.symbol]) {
-                        onAskAI()
+                    VStack(spacing: 4) {
+                        compactButton(title: "Push to talk", keys: [shortcutSettings.pttKey.symbol]) {
+                            onAskAI()
+                        }
+                        compactLabel("Open chat", keys: shortcutSettings.askFazmKey.hintKeys)
                     }
-                    compactLabel("Open chat", keys: shortcutSettings.askFazmKey.hintKeys)
+                    .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
@@ -189,22 +193,13 @@ struct FloatingControlBarView: View {
         Button {
             updaterViewModel.checkForUpdates()
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 10))
-                Text("Update")
-                    .scaledFont(size: 11, weight: .semibold)
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(FazmColors.purplePrimary)
-            )
-            .shadow(color: FazmColors.purplePrimary.opacity(updatePulse ? 0.8 : 0.2), radius: 6)
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 16))
+                .foregroundColor(FazmColors.purplePrimary)
+                .shadow(color: FazmColors.purplePrimary.opacity(updatePulse ? 0.9 : 0.2), radius: updatePulse ? 6 : 2)
         }
         .buttonStyle(.plain)
+        .help("Update available — v\(updaterViewModel.availableVersion)")
     }
 
     private func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
