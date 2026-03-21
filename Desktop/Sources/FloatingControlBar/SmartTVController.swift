@@ -53,20 +53,26 @@ class SmartTVController {
 
         let body: [String: Any] = [
             "contents": [["parts": [["text": """
-                You are a YouTube Shorts search query optimizer. Given a user's request, output the single best YouTube search query to find relevant Shorts videos. Reply with ONLY the search query — no explanation, no quotes, no extra text.
+                Convert this user request into a YouTube search query (2-5 words) that will find the best matching Shorts videos. Output ONLY the search query, nothing else.
+
+                Examples:
+                - "I want to learn about space exploration" → "space exploration facts shorts"
+                - "show me something relaxing" → "satisfying relaxing videos"
+                - "hi" → "trending viral shorts"
+                - "funny animals" → "funny animals compilation"
 
                 User request: \(query)
                 """]]]],
             "generationConfig": [
                 "temperature": 0.3,
-                "maxOutputTokens": 64
+                "maxOutputTokens": 32
             ]
         ]
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 3
+        req.timeoutInterval = 5
 
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         req.httpBody = httpBody
