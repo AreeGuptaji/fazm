@@ -813,7 +813,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         let savedWidth = UserDefaults.standard.string(forKey: FloatingControlBarWindow.sizeKey)
             .map(NSSizeFromString)?.width ?? 0
         let width = max(FloatingControlBarWindow.expandedWidth, savedWidth)
-        let size = NSSize(width: width, height: height)
+        let size = NSSize(width: width, height: height + smartTVExtraHeight)
         resizeWorkItem = DispatchWorkItem { [weak self] in
             self?.resizeAnchored(to: size, makeResizable: false, animated: animated)
         }
@@ -913,8 +913,9 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         let preferredWidth = savedSize?.width ?? Self.expandedWidth
         // The saved height is the user's chosen maximum. Start at half of it
         // and auto-expand up to it as content streams in.
-        let maxHeight = max(savedSize?.height ?? Self.defaultBaseResponseHeight * 2, Self.defaultBaseResponseHeight * 2)
-        let startHeight = max(Self.minResponseHeight, max(maxHeight / 2, frame.height))
+        let tvExtra = smartTVExtraHeight
+        let maxHeight = max(savedSize?.height ?? Self.defaultBaseResponseHeight * 2, Self.defaultBaseResponseHeight * 2) + tvExtra
+        let startHeight = max(Self.minResponseHeight + tvExtra, max(maxHeight / 2, frame.height))
         let startWidth = max(Self.expandedWidth, preferredWidth)
         let initialSize = NSSize(width: startWidth, height: startHeight)
         resizeAnchored(to: initialSize, makeResizable: true, animated: animated)
