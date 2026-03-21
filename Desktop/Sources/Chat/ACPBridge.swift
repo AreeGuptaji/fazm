@@ -113,6 +113,8 @@ actor ACPBridge {
   var onAuthTimeoutGlobal: AuthTimeoutHandler?
   /// Called when the observer session completes a batch and new cards may be available
   var onObserverPoll: (() -> Void)?
+  /// Called when the observer starts or stops processing a batch
+  var onObserverStatusChange: ((_ running: Bool) -> Void)?
   /// Global tool call handler for background sessions (observer) — processes tool_use even when no query is active
   var onBackgroundToolCall: ToolCallHandler?
 
