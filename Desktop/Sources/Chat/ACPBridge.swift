@@ -88,6 +88,7 @@ actor ACPBridge {
     case toolProgress(toolUseId: String, toolName: String, elapsedTimeSeconds: Double)
     case toolUseSummary(summary: String)
     case observerPoll
+    case observerStatus(running: Bool)
   }
 
   // MARK: - Configuration
@@ -817,6 +818,10 @@ actor ACPBridge {
     case "observer_poll":
       return .observerPoll
 
+    case "observer_status":
+      let running = dict["running"] as? Bool ?? false
+      return .observerStatus(running: running)
+
     default:
       log("ACPBridge: unknown message type: \(type)")
       return nil
@@ -846,6 +851,10 @@ actor ACPBridge {
       // Always handle immediately — observer runs independently of any active query
       log("ACPBridge: received observer_poll, handler=\(onObserverPoll != nil)")
       onObserverPoll?()
+      return
+    case .observerStatus(let running):
+      log("ACPBridge: observer status running=\(running)")
+      onObserverStatusChange?(running)
       return
     case .toolUse(let callId, let name, let input):
       // If no active query is waiting, handle tool calls from background sessions (observer)
