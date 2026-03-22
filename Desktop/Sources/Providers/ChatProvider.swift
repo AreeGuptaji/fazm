@@ -357,6 +357,9 @@ class ChatProvider: ObservableObject {
     @Published var claudeAuthMethods: [[String: Any]] = []
     /// OAuth URL to open in browser (sent by bridge when auth is needed)
     @Published var claudeAuthUrl: String?
+    /// When true, auto-open the next auth URL that arrives from the bridge
+    /// (set when startClaudeAuth restarts the bridge because no URL was available)
+    private var pendingAutoOpenAuth = false
     /// Whether the user has a cached Claude OAuth token
     @Published var isClaudeConnected = false
     /// Cumulative tokens used in the current session
@@ -484,6 +487,11 @@ class ChatProvider: ObservableObject {
                         self?.isClaudeAuthRequired = true
                         self?.claudeAuthMethods = methods
                         self?.claudeAuthUrl = authUrl
+                        if self?.pendingAutoOpenAuth == true, let url = authUrl {
+                            self?.pendingAutoOpenAuth = false
+                            log("ChatProvider: Auto-opening auth URL after bridge restart")
+                            BrowserExtensionSetup.openURLInChrome(url)
+                        }
                     }
                 },
                 onAuthSuccess: { [weak self] in
@@ -726,6 +734,11 @@ class ChatProvider: ObservableObject {
                         self?.claudeAuthMethods = methods
                         self?.claudeAuthUrl = authUrl
                         self?.isClaudeAuthRequired = true
+                        if self?.pendingAutoOpenAuth == true, let url = authUrl {
+                            self?.pendingAutoOpenAuth = false
+                            log("ChatProvider: Auto-opening auth URL after bridge restart")
+                            BrowserExtensionSetup.openURLInChrome(url)
+                        }
                     }
                 },
                 onAuthSuccess: { [weak self] in
@@ -816,13 +829,13 @@ class ChatProvider: ObservableObject {
             // This happens when isClaudeAuthRequired was set by error-handling paths
             // (credit exhaustion, auth errors) without an active OAuth flow.
             log("ChatProvider: No auth URL available, restarting bridge to trigger OAuth")
+            pendingAutoOpenAuth = true
             Task {
                 acpBridgeStarted = false
                 await acpBridge.stop()
                 _ = await ensureBridgeStarted()
-                // After restart, the bridge will fire auth_required with a URL,
-                // which sets claudeAuthUrl and isClaudeAuthRequired via the handler.
-                // The auth sheet will re-appear with a working Connect button.
+                // After restart, the bridge will fire auth_required with a URL.
+                // The pendingAutoOpenAuth flag tells the auth handler to auto-open it.
             }
         }
     }
@@ -832,6 +845,7 @@ class ChatProvider: ObservableObject {
         log("ChatProvider: Cancelling Claude OAuth")
         isClaudeAuthRequired = false
         claudeAuthUrl = nil
+        pendingAutoOpenAuth = false
         Task {
             await acpBridge.cancelAuth()
         }
