@@ -173,16 +173,21 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
                             }
                         }
                     } else {
-                        // No window available — fall back to runModal
-                        let response = alert.runModal()
-                        if response == .alertFirstButtonReturn {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
-                                NSWorkspace.shared.open(url)
-                            }
-                            self.viewModel?.scheduleRetryAfterAppManagementGrant()
-                        } else {
-                            if let url = URL(string: "https://github.com/m13v/fazm/releases") {
-                                NSWorkspace.shared.open(url)
+                        // No window available — create a temporary one for the sheet to avoid blocking runModal()
+                        let tempWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: [], backing: .buffered, defer: true)
+                        tempWindow.center()
+                        tempWindow.makeKeyAndOrderFront(nil)
+                        alert.beginSheetModal(for: tempWindow) { [weak self] response in
+                            tempWindow.close()
+                            if response == .alertFirstButtonReturn {
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                                self?.viewModel?.scheduleRetryAfterAppManagementGrant()
+                            } else {
+                                if let url = URL(string: "https://github.com/m13v/fazm/releases") {
+                                    NSWorkspace.shared.open(url)
+                                }
                             }
                         }
                     }
