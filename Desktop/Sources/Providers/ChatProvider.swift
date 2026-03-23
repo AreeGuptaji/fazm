@@ -292,6 +292,16 @@ class ChatProvider: ObservableObject {
     /// True while the agent is compacting conversation context
     @Published var isCompacting = false
 
+    // MARK: - Rate Limit State
+    /// Latest rate limit status from Claude API ("allowed", "allowed_warning", "rejected")
+    @Published var rateLimitStatus: String?
+    /// Unix timestamp when the current rate limit resets
+    @Published var rateLimitResetsAt: Double?
+    /// Type of rate limit ("five_hour", "seven_day", etc.)
+    @Published var rateLimitType: String?
+    /// Current utilization (0-1) of the rate limit
+    @Published var rateLimitUtilization: Double?
+
     /// Set to true during onboarding so the ACP session ID is persisted for restart recovery.
     var isOnboarding = false
 
@@ -2125,6 +2135,8 @@ class ChatProvider: ObservableObject {
                             self.logToolProgress(toolUseId: toolUseId, toolName: toolName, elapsed: elapsed)
                         case .toolUseSummary(let summary):
                             log("ChatProvider: Tool summary — \(summary.prefix(100))")
+                        case .rateLimit(let status, let resetsAt, let rateLimitType, let utilization):
+                            self.handleRateLimitEvent(status: status, resetsAt: resetsAt, rateLimitType: rateLimitType, utilization: utilization)
                         }
                     }
                 }
