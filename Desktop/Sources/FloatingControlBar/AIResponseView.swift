@@ -82,6 +82,7 @@ struct AIResponseView: View {
                                     let scrollHeight = geo.frame(in: .named("chatScroll")).height
                                     // Consider "at bottom" if the anchor is within 60pt of the visible area bottom
                                     let atBottom = bottomY >= 0 && bottomY <= scrollHeight + 60
+                                    print("[SCROLL] bottomY=\(Int(bottomY)) scrollH=\(Int(scrollHeight)) atBottom=\(atBottom) userScrolled=\(userHasScrolledUp)")
                                     if atBottom != isAtBottom {
                                         DispatchQueue.main.async {
                                             isAtBottom = atBottom
