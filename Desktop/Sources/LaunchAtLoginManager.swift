@@ -8,6 +8,8 @@ class LaunchAtLoginManager: ObservableObject {
 
     @Published private(set) var isEnabled: Bool = false
     @Published private(set) var statusDescription: String = "Checking..."
+    private var consecutiveFailures: Int = 0
+    private static let maxRetries = 3
 
     private init() {
         // Check current status on init
@@ -26,9 +28,9 @@ class LaunchAtLoginManager: ObservableObject {
             case .notRegistered:
                 description = "App won't start automatically"
             case .notFound:
-                description = "Login item not found"
+                description = "Login item not found — open System Settings → General → Login Items to add manually"
             case .requiresApproval:
-                description = "Requires approval in System Settings"
+                description = "Requires approval in System Settings → General → Login Items"
             @unknown default:
                 description = "Unknown status"
             }
@@ -44,18 +46,29 @@ class LaunchAtLoginManager: ObservableObject {
     /// - Returns: true if the operation succeeded
     @discardableResult
     func setEnabled(_ enabled: Bool) -> Bool {
+        if enabled && consecutiveFailures >= Self.maxRetries {
+            log("LaunchAtLogin: Skipping register attempt — failed \(consecutiveFailures) times (Operation not permitted). User should add manually via System Settings → General → Login Items.")
+            statusDescription = "Could not register — open System Settings → General → Login Items to add manually"
+            return false
+        }
+
         do {
             if enabled {
                 try SMAppService.mainApp.register()
                 log("LaunchAtLogin: Successfully registered for launch at login")
+                consecutiveFailures = 0
             } else {
                 try SMAppService.mainApp.unregister()
                 log("LaunchAtLogin: Successfully unregistered from launch at login")
+                consecutiveFailures = 0
             }
             updateStatus()
             return true
         } catch {
-            log("LaunchAtLogin: Failed to \(enabled ? "register" : "unregister"): \(error.localizedDescription)")
+            if enabled {
+                consecutiveFailures += 1
+            }
+            log("LaunchAtLogin: Failed to \(enabled ? "register" : "unregister") (attempt \(consecutiveFailures)/\(Self.maxRetries)): \(error.localizedDescription)")
             updateStatus()
             return false
         }
