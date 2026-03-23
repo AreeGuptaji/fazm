@@ -245,6 +245,7 @@ Use for: app usage stats, time queries, task management, aggregations, anything 
       type: "object" as const,
       properties: {
         query: { type: "string" as const, description: "SQL query to execute" },
+        description: { type: "string" as const, description: "Human-readable description of what this write does (used for observer approval cards)" },
       },
       required: ["query"],
     },
