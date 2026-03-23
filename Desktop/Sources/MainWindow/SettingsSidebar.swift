@@ -36,6 +36,9 @@ struct SettingsSearchItem: Identifiable {
         SettingsSearchItem(name: "AI Provider", subtitle: "Choose between Agent SDK and Claude Code for AI chat", keywords: ["provider", "agent sdk", "claude code", "acp", "bridge mode"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.provider"),
         SettingsSearchItem(name: "Dev Mode", subtitle: "Developer tools and debugging options", keywords: ["developer", "debug", "dev mode", "development"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.devmode"),
 
+        // Permissions
+        SettingsSearchItem(name: "Permissions", subtitle: "Manage screen recording, microphone, and accessibility permissions", keywords: ["permissions", "screen recording", "microphone", "accessibility", "privacy", "security"], section: .permissions, advancedSubsection: nil, icon: "lock.shield", settingId: "permissions.permissions"),
+
         // Dictionary
         SettingsSearchItem(name: "Dictionary", subtitle: "Custom words to improve transcription accuracy", keywords: ["dictionary", "vocabulary", "transcription", "words", "phrases", "keyterm"], section: .dictionary, advancedSubsection: nil, icon: "character.book.closed", settingId: "dictionary.dictionary"),
 
@@ -319,6 +322,12 @@ struct SettingsSidebarItem: View {
                     .foregroundColor(isSelected ? FazmColors.textPrimary : FazmColors.textSecondary)
 
                 Spacer()
+
+                if showWarning {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 8, height: 8)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
@@ -455,7 +464,8 @@ struct SettingHighlightModifier: ViewModifier {
     SettingsSidebar(
         selectedSection: .constant(.advanced),
         selectedAdvancedSubsection: .constant(.aiChat),
-        highlightedSettingId: .constant(nil)
+        highlightedSettingId: .constant(nil),
+        appState: AppState()
     )
     .preferredColorScheme(.dark)
 }
