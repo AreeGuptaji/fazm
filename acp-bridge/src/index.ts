@@ -94,6 +94,13 @@ let hindsightProcess: ChildProcess | null = null;
 let hindsightReady = false;
 
 async function startHindsight(): Promise<boolean> {
+  // pg0's embedded PostgreSQL binaries are architecture-specific.
+  // On Intel Macs (x86_64), the ARM-only binaries fail with EBADARCH (error -86).
+  if (process.arch !== "arm64") {
+    logErr(`Hindsight: skipping on ${process.arch} (PostgreSQL binaries require arm64)`);
+    return false;
+  }
+
   if (!existsSync(hindsightPython)) {
     logErr("Hindsight: python not found in app bundle, skipping");
     return false;
