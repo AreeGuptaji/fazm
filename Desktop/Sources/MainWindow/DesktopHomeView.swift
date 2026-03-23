@@ -123,7 +123,8 @@ struct DesktopHomeView: View {
             SettingsSidebar(
                 selectedSection: $selectedSettingsSection,
                 selectedAdvancedSubsection: $selectedAdvancedSubsection,
-                highlightedSettingId: $highlightedSettingId
+                highlightedSettingId: $highlightedSettingId,
+                appState: appState
             )
             .fixedSize(horizontal: true, vertical: false)
             .clipped()
