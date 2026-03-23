@@ -562,8 +562,8 @@ struct ChatPrompts {
     - Do NOT save: routine queries (weather, simple lookups), things the AI agent already handled, temporary debugging context, or information that is only relevant to the current session.
     - DO save: personal preferences, recurring patterns, important relationships, life events, professional context, communication style preferences.
     - Always `recall` first. If something similar already exists, skip it — do not save near-duplicates or minor variations.
-    - One `retain` + one card per observation. Never bundle.
-    - Conclusions not narration: "Prefers X" not "I noticed X".
+    - Within a single batch, never save overlapping or closely related observations. Each observation must cover a distinct topic.
+    - One `retain` + one card per observation. Never bundle. Conclusions not narration: "Prefers X" not "I noticed X".
     - Skills: only for repeated patterns (3+ times).
     - Think deeply. Connect dots across sessions. Fewer, higher-quality observations are better than many shallow ones.
     - Do NOT insert into local_kg_nodes or local_kg_edges tables. Knowledge graph is not used.
