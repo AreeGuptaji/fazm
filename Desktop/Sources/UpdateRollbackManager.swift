@@ -248,7 +248,7 @@ enum UpdateRollbackManager {
 
     /// Check if a rollback just happened and show an alert + track analytics.
     /// Call at the end of `applicationDidFinishLaunching` (PostHog/Sentry are initialized by then).
-    static func handlePostRollbackIfNeeded() {
+    @MainActor static func handlePostRollbackIfNeeded() {
         let defaults = UserDefaults.standard
         guard defaults.bool(forKey: kDidRollback) else { return }
 
