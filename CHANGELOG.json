@@ -133,6 +133,7 @@
     "Fixed new chat still remembering previous conversation context",
     "Fixed false \"Failed to get a response\" error when AI used tools without text output",
     "Fixed Connect Claude button not responding in floating bar when credits run out",
-    "Fixed Intel Mac support: skip Hindsight/PostgreSQL on x86_64, fix __dirname error in skills, improve Login Item error handling"
+    "Fixed Intel Mac support: skip Hindsight/PostgreSQL on x86_64, fix __dirname error in skills, improve Login Item error handling",
+    "Fixed a crash caused by a race condition in audio capture during rapid PTT toggling"
   ]
 }
