@@ -1,7 +1,4 @@
 import SwiftUI
-import os
-
-private let scrollLog = Logger(subsystem: "com.fazm.desktop-dev", category: "scroll")
 
 /// Streaming markdown response view for the floating control bar.
 struct AIResponseView: View {
@@ -80,23 +77,13 @@ struct AIResponseView: View {
                         Color.clear.frame(height: 1).id("bottom")
                     }
                 }
-                .coordinateSpace(name: "chatScroll")
-                .background {
+                .overlay {
                     ScrollWheelDetector {
-                        if let fh = FileHandle(forWritingAtPath: "/private/tmp/fazm-scroll.log") {
-                            fh.seekToEndOfFile()
-                            fh.write("[WHEEL] scroll up detected\n".data(using: .utf8)!)
-                            fh.closeFile()
-                        }
                         userHasScrolledUp = true
                     }
+                    .allowsHitTesting(false)
                 }
                 .onChange(of: currentMessage?.text) {
-                    if let fh = FileHandle(forWritingAtPath: "/private/tmp/fazm-scroll.log") {
-                        fh.seekToEndOfFile()
-                        fh.write("[TEXT] changed — userScrolled=\(userHasScrolledUp) isAtBottom=\(isAtBottom)\n".data(using: .utf8)!)
-                        fh.closeFile()
-                    }
                     if !userHasScrolledUp {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
@@ -111,7 +98,8 @@ struct AIResponseView: View {
                     }
                 }
                 .onChange(of: chatHistory.count) {
-                    // New exchange added — always scroll to bottom
+                    // New exchange added — always scroll to bottom and reset
+                    userHasScrolledUp = false
                     withAnimation(.easeOut(duration: 0.15)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
@@ -135,6 +123,7 @@ struct AIResponseView: View {
                 }
                 .onChange(of: isVoiceFollowUp) {
                     if isVoiceFollowUp {
+                        userHasScrolledUp = false
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("voiceFollowUp", anchor: .bottom)
                         }
@@ -186,6 +175,7 @@ struct AIResponseView: View {
         }
         .onChange(of: isLoading) {
             if isLoading {
+                userHasScrolledUp = false
                 hangTask?.cancel()
                 hangTask = Task { [onStopAgent] in
                     // If no streaming data arrives within 60s, the query is failing silently
@@ -813,6 +803,7 @@ struct AIResponseView: View {
             // Agent is busy — queue the message instead of interrupting
             onEnqueueMessage?(trimmed)
         } else {
+            userHasScrolledUp = false
             onSendFollowUp?(trimmed)
         }
     }
