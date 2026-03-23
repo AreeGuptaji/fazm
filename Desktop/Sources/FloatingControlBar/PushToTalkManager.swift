@@ -65,6 +65,11 @@ class PushToTalkManager: ObservableObject {
   private let maxPTTDuration: TimeInterval = 300  // 5 minutes
   private var maxDurationTimer: DispatchWorkItem?
 
+  // Debounce: minimum interval between PTT activations to prevent
+  // rapid start/stop cycling that can crash the audio subsystem.
+  private var lastPTTStartTime: TimeInterval = 0
+  private let pttDebounceInterval: TimeInterval = 0.5
+
   private init() {}
 
   // MARK: - Setup / Teardown
@@ -308,6 +313,14 @@ class PushToTalkManager: ObservableObject {
   // MARK: - Listening Lifecycle
 
   private func startListening() {
+    // Debounce: reject rapid re-activation to avoid overlapping audio sessions
+    let now = ProcessInfo.processInfo.systemUptime
+    guard (now - lastPTTStartTime) >= pttDebounceInterval else {
+      log("PushToTalkManager: debounced — too soon since last PTT (\(String(format: "%.0f", (now - lastPTTStartTime) * 1000))ms)")
+      return
+    }
+    lastPTTStartTime = now
+
     state = .listening
     transcriptSegments = []
     lastInterimText = ""
