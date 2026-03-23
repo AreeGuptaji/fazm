@@ -1177,7 +1177,13 @@ class ChatToolExecutor {
         if mode == "window" {
             let pid = FloatingControlBarManager.shared.lastActiveAppPID
             if pid != 0 {
-                url = ScreenCaptureManager.captureAppWindow(pid: pid)
+                switch ScreenCaptureManager.captureAppWindow(pid: pid) {
+                case .success(let capturedURL):
+                    url = capturedURL
+                case .permissionDenied:
+                    log("capture_screenshot tool: Screen Recording permission missing/stale")
+                    return "ERROR: Screen Recording permission is not granted. Tell the user to open System Settings → Privacy & Security → Screen Recording, toggle Fazm off and back on, then quit and reopen Fazm."
+                }
             } else {
                 url = ScreenCaptureManager.captureScreen()
             }
