@@ -419,6 +419,53 @@ class ChatProvider: ObservableObject {
         }
     }
 
+    // MARK: - Rate Limit Handling
+
+    /// Process rate limit events from the Claude API (forwarded via ACP bridge).
+    /// Updates published state so the UI can show warnings or upgrade prompts.
+    func handleRateLimitEvent(status: String, resetsAt: Double?, rateLimitType: String?, utilization: Double?) {
+        rateLimitStatus = status
+        rateLimitResetsAt = resetsAt
+        rateLimitType = rateLimitType
+        rateLimitUtilization = utilization
+
+        let typeLabel = Self.rateLimitTypeLabel(rateLimitType)
+
+        switch status {
+        case "allowed_warning":
+            let pct = utilization.map { Int($0 * 100) } ?? 0
+            log("ChatProvider: Rate limit warning — \(pct)% of \(typeLabel) used")
+        case "rejected":
+            let resetDesc = Self.formatResetTime(resetsAt)
+            log("ChatProvider: Rate limit REJECTED — \(typeLabel), resets \(resetDesc)")
+        default:
+            // "allowed" — clear any previous warning
+            break
+        }
+    }
+
+    /// Human-readable label for rate limit types
+    static func rateLimitTypeLabel(_ type: String?) -> String {
+        switch type {
+        case "five_hour": return "session limit"
+        case "seven_day": return "weekly limit"
+        case "seven_day_opus": return "Opus weekly limit"
+        case "seven_day_sonnet": return "Sonnet weekly limit"
+        case "overage": return "extra usage limit"
+        default: return "usage limit"
+        }
+    }
+
+    /// Format a Unix timestamp into a user-friendly reset time string
+    static func formatResetTime(_ resetsAt: Double?) -> String {
+        guard let resetsAt else { return "soon" }
+        let resetDate = Date(timeIntervalSince1970: resetsAt)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        formatter.timeZone = .current
+        return formatter.string(from: resetDate)
+    }
+
     /// Switch bridge mode, tearing down old bridge and setting up new one.
     /// If a query is in-flight (`isSending`), the switch is deferred until the query completes.
     func switchBridgeMode(to newMode: String) async {
@@ -2382,9 +2429,7 @@ class ChatProvider: ObservableObject {
                     errorMessage = bridgeError.errorDescription
                 } else {
                     // Personal mode — user hit their own Claude rate limit.
-                    // Show a clear message with upgrade suggestion.
-                    let base = bridgeError.errorDescription ?? "You've hit Claude's usage limit."
-                    errorMessage = "\(base)\n\nYou can get higher limits by upgrading your Claude plan at [claude.ai/upgrade](https://claude.ai/upgrade)."
+                    errorMessage = bridgeError.errorDescription
                 }
             } else if bridgeMode == "builtin",
                       let bridgeError = error as? BridgeError,
