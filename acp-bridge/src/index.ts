@@ -1778,6 +1778,30 @@ function handleSessionUpdate(
       break;
     }
 
+    case "rate_limit": {
+      const status = (update.status as string) ?? "unknown";
+      const resetsAt = (update.resetsAt as number) ?? null;
+      const rateLimitType = (update.rateLimitType as string) ?? null;
+      const utilization = (update.utilization as number) ?? null;
+      const overageStatus = (update.overageStatus as string) ?? null;
+      const overageDisabledReason = (update.overageDisabledReason as string) ?? null;
+      const isUsingOverage = (update.isUsingOverage as boolean) ?? false;
+      const surpassedThreshold = (update.surpassedThreshold as number) ?? null;
+      send({
+        type: "rate_limit",
+        status,
+        resetsAt,
+        rateLimitType,
+        utilization,
+        overageStatus,
+        overageDisabledReason,
+        isUsingOverage,
+        surpassedThreshold,
+      });
+      logErr(`Rate limit: status=${status}, type=${rateLimitType}, utilization=${utilization}, resets=${resetsAt ? new Date(resetsAt * 1000).toISOString() : "n/a"}`);
+      break;
+    }
+
     default:
       logErr(
         `Unknown session update type: ${sessionUpdate} — ${JSON.stringify(update).slice(0, 200)}`
