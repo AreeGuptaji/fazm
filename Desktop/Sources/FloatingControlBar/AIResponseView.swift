@@ -96,8 +96,8 @@ struct AIResponseView: View {
                     }
                 }
                 .coordinateSpace(name: "chatScroll")
-                .overlay {
-                    ScrollWheelInterceptor {
+                .background {
+                    ScrollWheelDetector {
                         userHasScrolledUp = true
                     }
                 }
@@ -1019,6 +1019,69 @@ class ModelMenuTarget: NSObject {
     @objc func selectModel(_ sender: NSMenuItem) {
         if let modelId = sender.representedObject as? String {
             onSelect?(modelId)
+        }
+    }
+}
+
+// MARK: - Scroll Wheel Detector
+
+/// Detects user scroll-wheel / trackpad gestures on the enclosing NSScrollView
+/// and fires a callback immediately — before the scroll position settles.
+/// This wins the race against programmatic scrolls during streaming.
+private struct ScrollWheelDetector: NSViewRepresentable {
+    let onUserScrollUp: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            context.coordinator.install(for: view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onUserScrollUp: onUserScrollUp)
+    }
+
+    class Coordinator: NSObject {
+        let onUserScrollUp: () -> Void
+        private var monitor: Any?
+
+        init(onUserScrollUp: @escaping () -> Void) {
+            self.onUserScrollUp = onUserScrollUp
+        }
+
+        func install(for view: NSView) {
+            var scrollView: NSScrollView?
+            var current: NSView? = view
+            while let v = current {
+                if let sv = v as? NSScrollView {
+                    scrollView = sv
+                    break
+                }
+                current = v.superview
+            }
+            let targetScrollView = scrollView
+
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self = self, let targetScrollView = targetScrollView else { return event }
+                guard event.window == targetScrollView.window else { return event }
+                let locationInScrollView = targetScrollView.convert(event.locationInWindow, from: nil)
+                guard targetScrollView.bounds.contains(locationInScrollView) else { return event }
+                // deltaY > 0 means scrolling up (towards earlier content)
+                if event.scrollingDeltaY > 0 {
+                    self.onUserScrollUp()
+                }
+                return event
+            }
+        }
+
+        deinit {
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+            }
         }
     }
 }
