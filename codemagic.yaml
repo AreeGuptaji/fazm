@@ -980,6 +980,14 @@ workflows:
 
       - name: Register release in Firestore
         script: |
+          # Source the decoded .env.app so FAZM_BACKEND_URL is available in this step
+          ENV_FILE="$CM_BUILD_DIR/build/$APP_NAME.app/Contents/Resources/.env"
+          if [ -f "$ENV_FILE" ]; then
+            set -a
+            source "$ENV_FILE"
+            set +a
+          fi
+
           # Register this release in Firestore as "staging" channel so the appcast
           # picks it up. The RELEASE_SECRET authenticates to the Fazm backend.
           if [ -z "$RELEASE_SECRET" ]; then
