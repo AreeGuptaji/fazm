@@ -9,6 +9,7 @@ struct AIResponseView: View {
     @State private var followUpText: String = ""
     @State private var preVoiceFollowUpText: String = ""
     @State private var userHasScrolledUp: Bool = false
+    @State private var scrollViewHeight: CGFloat = 0
     @State private var followUpTextHeight: CGFloat = 36
     @State private var isHanging = false
     @State private var hangTask: Task<Void, Never>?
@@ -75,8 +76,30 @@ struct AIResponseView: View {
 
                         // Anchor for auto-scroll
                         Color.clear.frame(height: 1).id("bottom")
+                            .background(
+                                GeometryReader { geo -> Color in
+                                    let bottomY = geo.frame(in: .named("chatScroll")).maxY
+                                    let atBottom = bottomY >= 0 && bottomY <= scrollViewHeight + 60
+                                    if atBottom && userHasScrolledUp {
+                                        DispatchQueue.main.async {
+                                            userHasScrolledUp = false
+                                        }
+                                    }
+                                    return Color.clear
+                                }
+                            )
                     }
                 }
+                .coordinateSpace(name: "chatScroll")
+                .background(
+                    GeometryReader { geo -> Color in
+                        let h = geo.size.height
+                        if h != scrollViewHeight {
+                            DispatchQueue.main.async { scrollViewHeight = h }
+                        }
+                        return Color.clear
+                    }
+                )
                 .overlay {
                     ScrollWheelDetector {
                         userHasScrolledUp = true
