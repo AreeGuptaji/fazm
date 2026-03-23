@@ -176,15 +176,23 @@ struct SelectableMarkdown: View {
     @State private var cachedSegments: [Segment]
 
     // Cached NSAttributedStrings keyed by segment content.
-    // Populated on first appear; reused on subsequent renders.
-    @State private var attrCache: [String: NSAttributedString?] = [:]
+    // Populated asynchronously on a background queue; reused on subsequent renders.
+    @State private var attrCache: [String: NSAttributedString] = [:]
     // Font scale at time of caching — used to invalidate when scale changes.
     @State private var cachedFontScale: CGFloat = 0
+    // Debounce work item for streaming updates
+    @State private var debounceWork: DispatchWorkItem?
+    // The text that has been parsed into segments (may lag behind `text` during streaming)
+    @State private var parsedText: String
+
+    /// Background queue for markdown parsing — keeps CoreText off the main thread.
+    private static let parseQueue = DispatchQueue(label: "fazm.markdown.parse", qos: .userInitiated)
 
     init(text: String, sender: ChatSender) {
         self.text = text
         self.sender = sender
         self._cachedSegments = State(initialValue: Self.splitSegments(text))
+        self._parsedText = State(initialValue: text)
     }
 
     var body: some View {
@@ -206,8 +214,24 @@ struct SelectableMarkdown: View {
             }
         }
         .onChange(of: text) { _, newText in
-            cachedSegments = Self.splitSegments(newText)
-            attrCache.removeAll()
+            // Debounce rapid streaming updates — parse at most every 100ms
+            debounceWork?.cancel()
+            let work = DispatchWorkItem { [newText] in
+                let segments = Self.splitSegments(newText)
+                DispatchQueue.main.async {
+                    cachedSegments = segments
+                    parsedText = newText
+                }
+            }
+            debounceWork = work
+            // If text grew by a small amount (streaming token), debounce.
+            // If it changed substantially (new message, edit), apply immediately.
+            let delta = abs(newText.count - parsedText.count)
+            if delta < 200 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+            } else {
+                work.perform()
+            }
         }
         .onChange(of: fontScale) {
             // Font scale changed — cached attributed strings are stale
@@ -222,20 +246,13 @@ struct SelectableMarkdown: View {
     private func textView(_ content: String) -> some View {
         let fontSize = round(14 * fontScale)
         // Use cached NSAttributedString if available for the current font scale
-        let styled: NSAttributedString? = {
-            if cachedFontScale == fontScale, let cached = attrCache[content] {
-                return cached
-            }
-            let processed = Self.preprocessText(content)
-            return Self.styledNSAttributedString(
-                from: processed, sender: sender, fontSize: fontSize, fontScale: fontScale
-            )
-        }()
+        let cached: NSAttributedString? = (cachedFontScale == fontScale) ? attrCache[content] : nil
 
         Group {
-            if let s = styled {
+            if let s = cached {
                 PlainCopyText(attributedString: s)
             } else {
+                // Show plain unstyled text immediately while background parsing runs
                 let baseColor: NSColor = sender == .user ? .white : NSColor(FazmColors.textPrimary)
                 let fallbackAttr = NSAttributedString(
                     string: content,
@@ -248,13 +265,37 @@ struct SelectableMarkdown: View {
             }
         }
         .onAppear {
-            // Populate cache on first appearance so future renders skip computation
-            if cachedFontScale != fontScale {
-                attrCache.removeAll()
-                cachedFontScale = fontScale
-            }
-            if attrCache[content] == nil {
-                attrCache[content] = styled
+            parseOnBackground(content: content)
+        }
+        .onChange(of: content) { _, newContent in
+            parseOnBackground(content: newContent)
+        }
+    }
+
+    /// Parses markdown into NSAttributedString on a background queue, then updates cache on main.
+    private func parseOnBackground(content: String) {
+        if cachedFontScale != fontScale {
+            attrCache.removeAll()
+            cachedFontScale = fontScale
+        }
+        // Already cached — nothing to do
+        if attrCache[content] != nil { return }
+
+        let scale = fontScale
+        let senderCopy = sender
+        let fontSize = round(14 * scale)
+
+        Self.parseQueue.async {
+            let processed = Self.preprocessText(content)
+            guard let result = Self.styledNSAttributedString(
+                from: processed, sender: senderCopy, fontSize: fontSize, fontScale: scale
+            ) else { return }
+
+            DispatchQueue.main.async {
+                // Double-check scale hasn't changed while we were parsing
+                guard cachedFontScale == scale || cachedFontScale == 0 else { return }
+                cachedFontScale = scale
+                attrCache[content] = result
             }
         }
     }
