@@ -597,8 +597,8 @@ async function handleJsonRpc(
 
         // Observer mode: intercept all writes
         if (isObserver && isWriteQuery) {
-          // Block writes to non-existent tables (e.g. hallucinated "hindsight_retains"
-          // when Hindsight MCP is unavailable and the LLM falls back to execute_sql)
+          // Block writes to non-existent tables (e.g. hallucinated tables
+          // when the LLM falls back to execute_sql instead of using proper tools)
           const tableMatch = normalized.match(/INSERT\s+INTO\s+(\w+)/i) ||
                              normalized.match(/UPDATE\s+(\w+)/i);
           if (tableMatch) {
@@ -615,7 +615,7 @@ async function handleJsonRpc(
                   result: {
                     content: [{
                       type: "text",
-                      text: `Blocked: table "${targetTable}" does not exist in the app database. To save observations, use the Hindsight retain tool or save_observer_card tool instead — do NOT write raw SQL.`,
+                      text: `Blocked: table "${targetTable}" does not exist in the app database. To save observations, use the save_memory tool or save_observer_card tool instead — do NOT write raw SQL.`,
                     }],
                   },
                 });
