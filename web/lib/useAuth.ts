@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { auth, googleProvider, signInWithPopup, onAuthStateChanged, type User } from "./firebase";
+import { getFirebaseAuth, googleProvider, signInWithPopup, onAuthStateChanged, type User } from "./firebase";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -9,6 +9,7 @@ export function useAuth() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
+    const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
@@ -33,10 +34,12 @@ export function useAuth() {
   }, [user]);
 
   const signIn = useCallback(async () => {
+    const auth = getFirebaseAuth();
     await signInWithPopup(auth, googleProvider);
   }, []);
 
   const signOut = useCallback(async () => {
+    const auth = getFirebaseAuth();
     await auth.signOut();
   }, []);
 
