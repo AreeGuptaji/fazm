@@ -558,6 +558,7 @@ class ChatProvider: ObservableObject {
                 },
                 onAuthSuccess: { [weak self] in
                     Task { @MainActor in
+                        self?.oauthAutoReopenTask?.cancel()
                         self?.isClaudeAuthRequired = false
                         self?.isClaudeConnected = true
                         // Retry any query that was interrupted by the auth flow
@@ -834,6 +835,7 @@ class ChatProvider: ObservableObject {
                 },
                 onAuthSuccess: { [weak self] in
                     Task { @MainActor [weak self] in
+                        self?.oauthAutoReopenTask?.cancel()
                         self?.isClaudeAuthRequired = false
                         self?.claudeAuthTimedOut = false
                         self?.isClaudeConnected = true
@@ -915,6 +917,7 @@ class ChatProvider: ObservableObject {
         if let urlString = claudeAuthUrl, URL(string: urlString) != nil {
             log("ChatProvider: Opening Claude OAuth URL in Chrome: \(urlString.prefix(200))")
             BrowserExtensionSetup.openURLInChrome(urlString)
+            scheduleOAuthAutoReopen(urlString)
         } else {
             // No auth URL yet — restart the bridge to trigger a fresh OAuth flow.
             // This happens when isClaudeAuthRequired was set by error-handling paths
@@ -931,9 +934,25 @@ class ChatProvider: ObservableObject {
         }
     }
 
+    /// Claude's OAuth page sometimes fails on first attempt when the user has no active
+    /// session on claude.ai. Auto-reopen the URL after a short delay to handle the
+    /// "fails first, works second" pattern silently.
+    private var oauthAutoReopenTask: Task<Void, Never>?
+
+    private func scheduleOAuthAutoReopen(_ urlString: String) {
+        oauthAutoReopenTask?.cancel()
+        oauthAutoReopenTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+            guard !Task.isCancelled, isClaudeAuthRequired, !isClaudeConnected else { return }
+            log("ChatProvider: Auto-reopening OAuth URL (workaround for first-attempt failure)")
+            BrowserExtensionSetup.openURLInChrome(urlString)
+        }
+    }
+
     /// Cancel the active Claude OAuth flow so the next attempt starts fresh
     func cancelClaudeAuth() {
         log("ChatProvider: Cancelling Claude OAuth")
+        oauthAutoReopenTask?.cancel()
         isClaudeAuthRequired = false
         claudeAuthUrl = nil
         pendingAutoOpenAuth = false
