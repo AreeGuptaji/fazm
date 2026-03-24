@@ -14,6 +14,12 @@ console.info = console.error;
 console.warn = console.error;
 console.debug = console.error;
 
+import { appendFileSync } from "node:fs";
+function debugLog(msg) {
+  try { appendFileSync("/tmp/patched-acp-debug.log", `[${new Date().toISOString()}] ${msg}\n`); } catch {}
+  console.error(msg);
+}
+
 import { ClaudeAcpAgent, runAcp } from "@zed-industries/claude-agent-acp/dist/acp-agent.js";
 
 // Patch newSession to:
@@ -35,7 +41,7 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
 
       // Debug: log ALL items from the SDK iterator
       if (item.value?.type) {
-        console.error(`[patched-acp] SDK item: type=${item.value.type}, subtype=${item.value.subtype ?? "none"}, keys=${Object.keys(item.value).join(",")}`);
+        debugLog(`[patched-acp] SDK item: type=${item.value.type}, subtype=${item.value.subtype ?? "none"}, keys=${Object.keys(item.value).join(",")}`);
       }
 
       // Capture cost/usage from SDKResultSuccess
@@ -43,8 +49,8 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
         item.value?.type === "result" &&
         item.value?.subtype === "success"
       ) {
-        console.error(`[patched-acp] SDKResultSuccess keys: ${Object.keys(item.value).join(", ")}`);
-        console.error(`[patched-acp] total_cost_usd=${item.value.total_cost_usd}, usage=${JSON.stringify(item.value.usage)}, modelUsage keys=${item.value.modelUsage ? Object.keys(item.value.modelUsage).join(",") : "none"}`);
+        debugLog(`[patched-acp] SDKResultSuccess keys: ${Object.keys(item.value).join(", ")}`);
+        debugLog(`[patched-acp] total_cost_usd=${item.value.total_cost_usd}, usage=${JSON.stringify(item.value.usage)}, modelUsage keys=${item.value.modelUsage ? Object.keys(item.value.modelUsage).join(",") : "none"}`);
         const prevSessionCost = session._sessionCostUsd ?? 0;
         session._lastCostUsd = item.value.total_cost_usd - prevSessionCost;
         session._sessionCostUsd = item.value.total_cost_usd;
@@ -54,7 +60,7 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
 
       // Debug: log all result types to see what we get
       if (item.value?.type === "result") {
-        console.error(`[patched-acp] Result item: type=${item.value.type}, subtype=${item.value.subtype}, keys=${Object.keys(item.value).join(", ")}`);
+        debugLog(`[patched-acp] Result item: type=${item.value.type}, subtype=${item.value.subtype}, keys=${Object.keys(item.value).join(", ")}`);
       }
 
       // --- Forward dropped system messages ---
@@ -96,7 +102,7 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
             });
           }
         } catch (e) {
-          console.error(`[patched-acp] Forward system/${subtype}: ${e}`);
+          debugLog(`[patched-acp] Forward system/${subtype}: ${e}`);
         }
       }
 
@@ -119,7 +125,7 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
             },
           });
         } catch (e) {
-          console.error(`[patched-acp] Forward rate_limit_event: ${e}`);
+          debugLog(`[patched-acp] Forward rate_limit_event: ${e}`);
         }
       }
 
@@ -147,7 +153,7 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
           });
         }
       } catch (e) {
-        console.error(`[patched-acp] Forward ${item.value?.type}: ${e}`);
+        debugLog(`[patched-acp] Forward ${item.value?.type}: ${e}`);
       }
 
       // --- Forward compaction stream chunks ---
@@ -208,7 +214,7 @@ ClaudeAcpAgent.prototype.prompt = async function (params) {
     );
     // Log per-model breakdown
     for (const [model, usage] of Object.entries(modelUsage)) {
-      console.error(`[patched-acp]   ${model}: input=${usage.input_tokens??0}, output=${usage.output_tokens??0}, cacheRead=${usage.cache_read_input_tokens??0}, cacheWrite=${usage.cache_creation_input_tokens??0}`);
+      debugLog(`[patched-acp]   ${model}: input=${usage.input_tokens??0}, output=${usage.output_tokens??0}, cacheRead=${usage.cache_read_input_tokens??0}, cacheWrite=${usage.cache_creation_input_tokens??0}`);
     }
 
     const augmented = {
