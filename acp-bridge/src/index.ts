@@ -39,7 +39,7 @@ import type {
   WarmupMessage,
   AuthMethod,
 } from "./protocol.js";
-import { startOAuthFlow, type OAuthFlowHandle } from "./oauth-flow.js";
+import { startOAuthFlow, OAuthTokenExchangeError, type OAuthFlowHandle } from "./oauth-flow.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -773,8 +773,14 @@ async function startAuthFlow(): Promise<void> {
       send({ type: "auth_success" });
     } catch (err) {
       logErr(`OAuth flow failed: ${err}`);
-      const isTimeout = err instanceof Error && err.message.includes("timed out");
-      send({ type: "auth_timeout", reason: isTimeout ? "timeout" : String(err) });
+      if (err instanceof OAuthTokenExchangeError) {
+        // Token endpoint rejected the exchange (e.g. 403 forbidden) —
+        // send a distinct message so Swift can show a specific error.
+        send({ type: "auth_failed", reason: err.message, httpStatus: err.httpStatus });
+      } else {
+        const isTimeout = err instanceof Error && err.message.includes("timed out");
+        send({ type: "auth_timeout", reason: isTimeout ? "timeout" : String(err) });
+      }
       throw err;
     } finally {
       activeOAuthFlow = null;
