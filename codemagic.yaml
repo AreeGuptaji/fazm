@@ -404,25 +404,16 @@ workflows:
             echo "WARNING: Google Workspace MCP requirements.txt not found — skipping venv"
           fi
 
-          # Bundle Hindsight Memory MCP (Python venv in app bundle)
+          # Bundle standalone Python venv for browser profile tools
           # Uses uv-managed standalone Python for full portability (no system Python dependency).
-          HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
-          mkdir -p "$HINDSIGHT_BUNDLE"
-          echo "Creating Hindsight venv..."
+          PYTHON_VENV_BUNDLE="$APP_BUNDLE/Contents/Resources/python-venv"
+          mkdir -p "$PYTHON_VENV_BUNDLE"
+          echo "Creating standalone Python venv for browser profile..."
           uv python install 3.12 2>&1 | tail -1 || true
-          uv venv "$HINDSIGHT_BUNDLE/.venv" --python 3.12 --relocatable --python-preference only-managed 2>&1
-          echo "Installing Hindsight packages (this may take a few minutes)..."
-          uv pip install --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" \
-            'hindsight-api-slim[embedded-db]' sentence-transformers 2>&1 || {
-            echo "ERROR: Hindsight pip install failed"
-            exit 1
-          }
-          echo "Hindsight packages installed successfully"
-          # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
-          uv pip uninstall --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
+          uv venv "$PYTHON_VENV_BUNDLE" --python 3.12 --relocatable --python-preference only-managed 2>&1
+          echo "Standalone Python venv created"
 
-          # Bundle ai-browser-profile into the app (shared Python venv)
-          # Uses the same Hindsight venv Python for portability — no system Python needed.
+          # Bundle ai-browser-profile into the app
           BROWSER_PROFILE_BUNDLE="$APP_BUNDLE/Contents/Resources/ai-browser-profile"
           mkdir -p "$BROWSER_PROFILE_BUNDLE"
           echo "Cloning ai-browser-profile..."
@@ -438,55 +429,29 @@ workflows:
           else
             echo "WARNING: Failed to clone ai-browser-profile — skipping"
           fi
-          # Strip __pycache__ to save space (keep .dist-info — needed by importlib.metadata / entry_points)
-          find "$HINDSIGHT_BUNDLE/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          # Strip __pycache__ to save space
+          find "$PYTHON_VENV_BUNDLE" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           # Replace absolute Python symlink with a copy + bundle libpython for portability
-          HINDSIGHT_REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUNDLE/.venv/bin/python" 2>/dev/null)
-          HINDSIGHT_MANAGED_DIR=$(dirname "$(dirname "$HINDSIGHT_REAL_PYTHON")")
-          if [ -n "$HINDSIGHT_REAL_PYTHON" ] && [ -f "$HINDSIGHT_REAL_PYTHON" ]; then
-            rm -f "$HINDSIGHT_BUNDLE/.venv/bin/python"
-            cp "$HINDSIGHT_REAL_PYTHON" "$HINDSIGHT_BUNDLE/.venv/bin/python"
-            rm -f "$HINDSIGHT_BUNDLE/.venv/bin/python3" "$HINDSIGHT_BUNDLE/.venv/bin/python3.12"
-            ln -s python "$HINDSIGHT_BUNDLE/.venv/bin/python3"
-            ln -s python "$HINDSIGHT_BUNDLE/.venv/bin/python3.12"
+          VENV_REAL_PYTHON=$(readlink -f "$PYTHON_VENV_BUNDLE/bin/python" 2>/dev/null)
+          VENV_MANAGED_DIR=$(dirname "$(dirname "$VENV_REAL_PYTHON")")
+          if [ -n "$VENV_REAL_PYTHON" ] && [ -f "$VENV_REAL_PYTHON" ]; then
+            rm -f "$PYTHON_VENV_BUNDLE/bin/python"
+            cp "$VENV_REAL_PYTHON" "$PYTHON_VENV_BUNDLE/bin/python"
+            rm -f "$PYTHON_VENV_BUNDLE/bin/python3" "$PYTHON_VENV_BUNDLE/bin/python3.12"
+            ln -s python "$PYTHON_VENV_BUNDLE/bin/python3"
+            ln -s python "$PYTHON_VENV_BUNDLE/bin/python3.12"
             # Copy libpython so @executable_path/../lib/libpython3.12.dylib resolves
-            if [ -f "$HINDSIGHT_MANAGED_DIR/lib/libpython3.12.dylib" ]; then
-              cp "$HINDSIGHT_MANAGED_DIR/lib/libpython3.12.dylib" "$HINDSIGHT_BUNDLE/.venv/lib/libpython3.12.dylib"
+            if [ -f "$VENV_MANAGED_DIR/lib/libpython3.12.dylib" ]; then
+              cp "$VENV_MANAGED_DIR/lib/libpython3.12.dylib" "$PYTHON_VENV_BUNDLE/lib/libpython3.12.dylib"
             fi
             # Copy stdlib so Python can find encodings, os, etc. on machines without uv
-            if [ -d "$HINDSIGHT_MANAGED_DIR/lib/python3.12" ]; then
-              rsync -a --ignore-existing "$HINDSIGHT_MANAGED_DIR/lib/python3.12/" "$HINDSIGHT_BUNDLE/.venv/lib/python3.12/"
+            if [ -d "$VENV_MANAGED_DIR/lib/python3.12" ]; then
+              rsync -a --ignore-existing "$VENV_MANAGED_DIR/lib/python3.12/" "$PYTHON_VENV_BUNDLE/lib/python3.12/"
             fi
             # Rewrite pyvenv.cfg so Python finds stdlib relative to venv, not the managed install
-            printf 'home = bin\nimplementation = CPython\nversion_info = 3.12\ninclude-system-site-packages = false\n' > "$HINDSIGHT_BUNDLE/.venv/pyvenv.cfg"
+            printf 'home = bin\nimplementation = CPython\nversion_info = 3.12\ninclude-system-site-packages = false\n' > "$PYTHON_VENV_BUNDLE/pyvenv.cfg"
           fi
-          echo "Bundled Hindsight Memory MCP with venv"
-
-          # Bundle OpenSSL 3 dylibs for pg0's embedded PostgreSQL
-          # pg0 downloads a postgres binary linked against /opt/homebrew/opt/openssl@3/lib/libssl.3.dylib
-          # which doesn't exist on clean Macs without Homebrew.
-          # We copy the dylibs to Contents/Frameworks/ and rewrite their internal references
-          # to use @loader_path so libssl can find libcrypto regardless of install location.
-          # The Python binary is signed with allow-dyld-environment-variables entitlement
-          # so DYLD_LIBRARY_PATH works even with hardened runtime.
-          OPENSSL_LIB="/opt/homebrew/opt/openssl@3/lib"
-          OPENSSL_DEST="$APP_BUNDLE/Contents/Frameworks"
-          if [ -f "$OPENSSL_LIB/libssl.3.dylib" ] && [ -f "$OPENSSL_LIB/libcrypto.3.dylib" ]; then
-            cp "$OPENSSL_LIB/libssl.3.dylib" "$OPENSSL_DEST/"
-            cp "$OPENSSL_LIB/libcrypto.3.dylib" "$OPENSSL_DEST/"
-            chmod u+w "$OPENSSL_DEST/libssl.3.dylib" "$OPENSSL_DEST/libcrypto.3.dylib"
-            # Rewrite libssl's reference to libcrypto from absolute Cellar path to @loader_path
-            CELLAR_CRYPTO=$(otool -L "$OPENSSL_DEST/libssl.3.dylib" | grep libcrypto | awk '{print $1}')
-            if [ -n "$CELLAR_CRYPTO" ]; then
-              install_name_tool -change "$CELLAR_CRYPTO" "@loader_path/libcrypto.3.dylib" "$OPENSSL_DEST/libssl.3.dylib"
-            fi
-            # Rewrite install names to @loader_path for clean resolution
-            install_name_tool -id "@loader_path/libssl.3.dylib" "$OPENSSL_DEST/libssl.3.dylib"
-            install_name_tool -id "@loader_path/libcrypto.3.dylib" "$OPENSSL_DEST/libcrypto.3.dylib"
-            echo "Bundled and relinked OpenSSL 3 dylibs for pg0 PostgreSQL"
-          else
-            echo "WARNING: OpenSSL 3 dylibs not found at $OPENSSL_LIB — pg0 may fail on clean Macs"
-          fi
+          echo "Bundled standalone Python venv for browser profile"
 
           # Update Info.plist metadata
           /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable   $BINARY_NAME"  "$APP_BUNDLE/Contents/Info.plist"
