@@ -441,7 +441,7 @@ actor GeminiAnalysisService {
     private func persistAndShowOverlay(task: String, result: AnalysisResult) async {
         // 1. Persist to observer_activity
         var activityId: Int64 = 0
-        if let dbQueue = AppDatabase.shared.getDatabaseQueue() {
+        if let dbQueue = await AppDatabase.shared.getDatabaseQueue() {
             do {
                 let contentJson: [String: Any] = [
                     "task": task,
@@ -450,7 +450,7 @@ actor GeminiAnalysisService {
                 ]
                 let contentString = String(data: try JSONSerialization.data(withJSONObject: contentJson), encoding: .utf8) ?? task
 
-                activityId = try dbQueue.write { db -> Int64 in
+                activityId = try await dbQueue.write { db -> Int64 in
                     try db.execute(
                         sql: """
                             INSERT INTO observer_activity (type, content, status, createdAt)
@@ -467,9 +467,10 @@ actor GeminiAnalysisService {
         }
 
         // 2. Show overlay on main thread
+        let savedId = activityId
         await MainActor.run {
             if let barFrame = FloatingControlBarManager.shared.barWindowFrame {
-                AnalysisOverlayWindow.shared.show(below: barFrame, task: task, activityId: activityId)
+                AnalysisOverlayWindow.shared.show(below: barFrame, task: task, activityId: savedId)
             } else {
                 log("GeminiAnalysis: no bar frame available, skipping overlay")
             }
