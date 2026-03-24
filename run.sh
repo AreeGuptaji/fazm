@@ -394,6 +394,27 @@ echo ""
 auth_debug "BEFORE launch: $(defaults read "$BUNDLE_ID" auth_isSignedIn 2>&1 || true)"
 open "$APP_PATH" || "$APP_PATH/Contents/MacOS/$BINARY_NAME" &
 
-# Keep script running so Ctrl+C can be used to stop
-echo "Press Ctrl+C to stop..."
-wait
+# Watchdog: monitor app process and log activity.
+# Releases lock and exits if the app dies or logs go stale (no updates for 60s).
+DEV_LOG="/private/tmp/fazm-dev.log"
+STALE_THRESHOLD=60
+
+echo "Watching app (log: $DEV_LOG, stale threshold: ${STALE_THRESHOLD}s)..."
+while true; do
+    sleep 10
+
+    # Check 1: is the app process still running?
+    if ! pgrep -f "$APP_PATH/Contents/MacOS" > /dev/null 2>&1; then
+        echo "[watchdog] App process not found — releasing lock and exiting."
+        break
+    fi
+
+    # Check 2: is the log file being updated?
+    if [ -f "$DEV_LOG" ]; then
+        log_age=$(( $(date +%s) - $(stat -f %m "$DEV_LOG") ))
+        if [ "$log_age" -gt "$STALE_THRESHOLD" ]; then
+            echo "[watchdog] Log stale for ${log_age}s (threshold: ${STALE_THRESHOLD}s) — releasing lock and exiting."
+            break
+        fi
+    fi
+done
