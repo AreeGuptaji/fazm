@@ -61,7 +61,7 @@ enum SkillInstaller {
 
     /// Skills that were previously bundled but have since been removed.
     /// These will be deleted from ~/.claude/skills/ on every app launch.
-    private static let obsoleteSkills: [String] = []
+    private static let obsoleteSkills: [String] = ["hindsight-memory"]
 
     /// Install specified skills (by name). Returns a summary of what was done.
     /// Installs missing skills and updates existing ones when the bundled content has changed.
