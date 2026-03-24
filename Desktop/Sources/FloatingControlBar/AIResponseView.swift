@@ -579,47 +579,38 @@ struct AIResponseView: View {
     // MARK: - Current Question & Response
 
     private var questionBar: some View {
-        MessageWithCopyButton(alignment: .topTrailing) {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(userInput, forType: .string)
-        } content: {
-            HStack(alignment: .top, spacing: 8) {
-                Group {
-                    if isQuestionExpanded {
-                        ScrollView {
-                            Text(userInput)
-                                .scaledFont(size: 13)
-                                .foregroundColor(.white)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxHeight: 120)
-                    } else {
+        HStack(alignment: .top, spacing: 4) {
+            Group {
+                if isQuestionExpanded {
+                    ScrollView {
                         Text(userInput)
                             .scaledFont(size: 13)
                             .foregroundColor(.white)
                             .textSelection(.enabled)
-                            .lineLimit(1)
-                            .truncationMode(.head)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
-
-                if needsExpansion {
-                    Button(action: { isQuestionExpanded.toggle() }) {
-                        Image(systemName: isQuestionExpanded ? "chevron.up" : "chevron.down")
-                            .scaledFont(size: 10)
-                            .foregroundColor(.secondary)
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.plain)
+                    .frame(maxHeight: 120)
+                } else {
+                    Text(userInput)
+                        .scaledFont(size: 13)
+                        .foregroundColor(.white)
+                        .textSelection(.enabled)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.white.opacity(0.1))
-            .cornerRadius(8)
+
+            QuestionBarButtons(
+                needsExpansion: needsExpansion,
+                isExpanded: $isQuestionExpanded,
+                userInput: userInput
+            )
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.1))
+        .cornerRadius(8)
     }
 
     private var needsExpansion: Bool {
@@ -866,6 +857,52 @@ struct AIResponseView: View {
             userHasScrolledUp = false
             onSendFollowUp?(trimmed)
         }
+    }
+}
+
+// MARK: - Question Bar Buttons (copy + expand, inline)
+
+/// Inline buttons for the question bar — copy and expand sit side by side to avoid overlap.
+private struct QuestionBarButtons: View {
+    let needsExpansion: Bool
+    @Binding var isExpanded: Bool
+    let userInput: String
+
+    @State private var isHovered = false
+    @State private var showCopied = false
+
+    var body: some View {
+        HStack(spacing: 2) {
+            if isHovered || showCopied {
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(userInput, forType: .string)
+                    showCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        showCopied = false
+                    }
+                }) {
+                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundColor(showCopied ? .green : .secondary)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity)
+            }
+
+            if needsExpansion {
+                Button(action: { isExpanded.toggle() }) {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .scaledFont(size: 10)
+                        .foregroundColor(.secondary)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
     }
 }
 
