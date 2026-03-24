@@ -1141,7 +1141,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if let name = _dyld_get_image_name(i) {
                     let path = String(cString: name)
                     let header = _dyld_get_image_header(i)
-                    let slide = _dyld_get_image_vmaddr_slide(i)
                     // Only log non-system images (our app + embedded binaries)
                     if path.contains("Fazm") || path.contains("fazm") || path.contains("Sparkle") {
                         let addr = UInt(bitPattern: header)
@@ -1152,6 +1151,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             let prevStr = previousVersion.map { "\($0)+\(previousBuild ?? "?")" } ?? "none"
             log("CodeSign: verify=\(verifyOK ? "OK" : "FAILED") pageSize=\(pageSize) version=\(currentVersion)+\(currentBuild) prevVersion=\(prevStr) install=\(installMethod) quarantine=\(quarantineValue) appMod=\(appModDate) binMod=\(binModDate)\(imageList.isEmpty ? "" : " images=[\(imageList.trimmingCharacters(in: .whitespaces))]")\(verifyOK ? "" : " error=\(verifyOutput)")")
+
+            // Set Sentry tags so we can filter crashes by install method and codesign status
+            SentrySDK.configureScope { scope in
+                scope.setTag(value: installMethod, key: "install_method")
+                scope.setTag(value: verifyOK ? "valid" : "invalid", key: "codesign_status")
+                scope.setTag(value: pageSize, key: "codesign_page_size")
+                if isVersionChange {
+                    scope.setTag(value: prevStr, key: "previous_version")
+                }
+            }
         }
     }
 }
