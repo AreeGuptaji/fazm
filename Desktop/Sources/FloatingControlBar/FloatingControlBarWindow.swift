@@ -1754,14 +1754,6 @@ class FloatingControlBarManager {
 
         AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotPath != nil, queryText: message)
 
-        // Smart TV: search YouTube Shorts for the user's query and show the TV
-        if ShortcutSettings.shared.smartTVEnabled {
-            barWindow.state.smartTVHiddenByUser = false
-            barWindow.state.smartTVVisible = true
-            barWindow.state.smartTVMuted = true  // always start muted on new query
-            SmartTVController.shared.searchAndPlay(query: message)
-        }
-
         // Provider is already initialized by ViewModelContainer at app launch
 
         // Record message count before sending so we can detect the new AI response
