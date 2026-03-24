@@ -368,12 +368,27 @@ struct BrowserProfileMigrationView: View {
                       lastMessage.sender == .ai else { return }
 
                 let marker = "[[BROWSER_MIGRATION_DONE]]"
-                if lastMessage.text.contains(marker) {
-                    // Strip it
+                // Check both flat text and content blocks for the marker
+                let foundInText = lastMessage.text.contains(marker)
+                let foundInBlocks = lastMessage.contentBlocks.contains { block in
+                    if case .text(_, let t) = block { return t.contains(marker) }
+                    return false
+                }
+                if foundInText || foundInBlocks {
                     if let idx = chatProvider.messages.indices.last {
+                        // Strip from flat text
                         chatProvider.messages[idx].text = lastMessage.text
                             .replacingOccurrences(of: marker, with: "")
                             .trimmingCharacters(in: .whitespacesAndNewlines)
+                        // Strip from content blocks
+                        chatProvider.messages[idx].contentBlocks = lastMessage.contentBlocks.map { block in
+                            if case .text(let id, let t) = block {
+                                let cleaned = t.replacingOccurrences(of: marker, with: "")
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                return .text(id: id, text: cleaned)
+                            }
+                            return block
+                        }
                     }
                     doneMarkerSeen = true
                     timer.invalidate()
