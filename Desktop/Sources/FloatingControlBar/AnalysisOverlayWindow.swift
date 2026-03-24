@@ -106,7 +106,7 @@ class AnalysisOverlayWindow {
     // MARK: - Discuss Action
 
     /// Send the analysis context as a user message into the existing floating bar session.
-    private static func sendDiscussMessage(task: String, description: String?, document: String?) {
+    static func sendDiscussMessage(task: String, description: String?, document: String?) {
         // Build the message that gets sent as if the user typed it
         var message = """
         The screen observer analyzed my last ~60 minutes of activity and identified a task that could be done by AI:
@@ -143,7 +143,7 @@ class AnalysisOverlayWindow {
     // MARK: - DB
 
     /// Update observer_activity row status.
-    private static func updateActivityStatus(activityId: Int64, status: String, response: String) async {
+    static func updateActivityStatus(activityId: Int64, status: String, response: String) async {
         guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
         do {
             try await dbQueue.write { db in
