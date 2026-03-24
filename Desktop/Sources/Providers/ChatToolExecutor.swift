@@ -1256,8 +1256,4 @@ class ChatToolExecutor {
             return "Error: \(error.localizedDescription)"
         }
     }
-
-    // MARK: - Knowledge Graph → Hindsight
-
-    /// Convert KG nodes and edges to a natural language description
 }
