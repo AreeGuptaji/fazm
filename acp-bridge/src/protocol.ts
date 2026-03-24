@@ -157,6 +157,13 @@ export interface AuthTimeoutMessage {
   reason: string;
 }
 
+/** Sent when OAuth token exchange is rejected (e.g. 403 forbidden) */
+export interface AuthFailedMessage {
+  type: "auth_failed";
+  reason: string;
+  httpStatus?: number;
+}
+
 /** Sent when built-in credit balance is exhausted */
 export interface CreditExhaustedMessage {
   type: "credit_exhausted";
@@ -237,6 +244,7 @@ export type OutboundMessage =
   | AuthRequiredMessage
   | AuthSuccessMessage
   | AuthTimeoutMessage
+  | AuthFailedMessage
   | CreditExhaustedMessage
   | StatusChangeMessage
   | CompactBoundaryMessage
