@@ -1381,6 +1381,24 @@ class FloatingControlBarManager {
             }
         }
 
+        // Debug: force Gemini analysis with current buffered chunks (no need to wait for 60)
+        // Trigger: xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.testAnalyzeNow"), object: nil, userInfo: nil, deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.fazm.testAnalyzeNow"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task {
+                log("FloatingControlBarManager: Force analyzeNow triggered (\(await GeminiAnalysisService.shared.bufferedChunkCount) chunks)")
+                let result = await GeminiAnalysisService.shared.analyzeNow()
+                if let result {
+                    log("FloatingControlBarManager: analyzeNow result: verdict=\(result.verdict) task=\(result.task ?? "nil")")
+                } else {
+                    log("FloatingControlBarManager: analyzeNow returned nil (no chunks or already analyzing)")
+                }
+            }
+        }
+
     }
 
     /// Whether the floating bar window is currently visible.
