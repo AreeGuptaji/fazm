@@ -134,6 +134,7 @@ async function requestSwiftTool(
 
 const isOnboarding = (process.env.FAZM_ONBOARDING || process.env.OMI_ONBOARDING) === "true";
 const isObserver = process.env.FAZM_OBSERVER === "true";
+const isVoiceResponseEnabled = process.env.FAZM_VOICE_RESPONSE === "true";
 
 /** Escape a string for use inside a SQL single-quoted literal.
  *  Handles both single quotes (doubled for SQL) and ensures the
@@ -480,17 +481,37 @@ Aim for 15-40 nodes with meaningful edges connecting them.`,
       required: ["body"],
     },
   },
+  {
+    name: "speak_response",
+    description: `Speak a short summary of your response aloud to the user using text-to-speech. Call this on EVERY final response to deliver a concise spoken version. The text should be a natural, conversational summary (1-3 sentences) — not the full written response. Keep it brief and direct, as if you're speaking to the user face-to-face.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        text: {
+          type: "string" as const,
+          description: "The text to speak aloud. Keep it short and conversational (1-3 sentences).",
+        },
+      },
+      required: ["text"],
+    },
+  },
 ];
 
+// Tools gated behind the voice response toggle
+const VOICE_RESPONSE_TOOL_NAMES = new Set(["speak_response"]);
+
 // Filter tools based on session type:
-// - onboarding: all tools
+// - onboarding: all tools (except voice-gated unless enabled)
 // - observer: only observer-specific tools (KG, SQL, screenshots, skills)
 // - regular: all tools except onboarding-only tools
-const TOOLS = ALL_TOOLS.filter((t) =>
-  isOnboarding ? true
-  : isObserver ? OBSERVER_TOOL_NAMES.has(t.name)
-  : !ONBOARDING_TOOL_NAMES.has(t.name)
-);
+// speak_response is only included when FAZM_VOICE_RESPONSE is enabled
+const TOOLS = ALL_TOOLS.filter((t) => {
+  // Gate voice response tools behind the toggle
+  if (VOICE_RESPONSE_TOOL_NAMES.has(t.name) && !isVoiceResponseEnabled) return false;
+  if (isOnboarding) return true;
+  if (isObserver) return OBSERVER_TOOL_NAMES.has(t.name);
+  return !ONBOARDING_TOOL_NAMES.has(t.name);
+});
 
 // --- JSON-RPC handling ---
 
@@ -814,6 +835,16 @@ async function handleJsonRpc(
             jsonrpc: "2.0",
             id,
             result: { content: [{ type: "text", text: "Card created." }] },
+          });
+        }
+      } else if (toolName === "speak_response") {
+        // Voice response — forward to Swift for TTS playback
+        const result = await requestSwiftTool("speak_response", args);
+        if (!isNotification) {
+          send({
+            jsonrpc: "2.0",
+            id,
+            result: { content: [{ type: "text", text: result }] },
           });
         }
       } else if (toolName === "query_browser_profile" || toolName === "edit_browser_profile") {
