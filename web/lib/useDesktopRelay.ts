@@ -26,7 +26,23 @@ export function useDesktopRelay(token: string | null): RelayHook {
   const wsRef = useRef<WebSocket | null>(null);
   const currentAiMessageId = useRef<string | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const offlineTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const hasConnected = useRef(false);
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+
+  // Debounced offline setter — don't flicker on brief WS reconnects
+  const setOffline = useCallback(() => {
+    if (offlineTimer.current) clearTimeout(offlineTimer.current);
+    offlineTimer.current = setTimeout(() => {
+      setIsDesktopOnline(false);
+    }, hasConnected.current ? 5000 : 0);
+  }, []);
+
+  const setOnline = useCallback(() => {
+    if (offlineTimer.current) clearTimeout(offlineTimer.current);
+    hasConnected.current = true;
+    setIsDesktopOnline(true);
+  }, []);
 
   // Discover tunnel URL and connect
   const connect = useCallback(async () => {
@@ -38,15 +54,14 @@ export function useDesktopRelay(token: string | null): RelayHook {
       });
 
       if (!res.ok) {
-        setIsDesktopOnline(false);
-        // Retry in 5s
+        setOffline();
         reconnectTimer.current = setTimeout(connect, 5000);
         return;
       }
 
       const { tunnel_url } = await res.json();
       if (!tunnel_url) {
-        setIsDesktopOnline(false);
+        setOffline();
         reconnectTimer.current = setTimeout(connect, 5000);
         return;
       }
@@ -58,8 +73,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
 
       ws.onopen = () => {
         setIsConnected(true);
-        setIsDesktopOnline(true);
-        // Request chat history
+        setOnline();
         ws.send(JSON.stringify({ type: "request_history" }));
       };
 
@@ -70,10 +84,9 @@ export function useDesktopRelay(token: string | null): RelayHook {
 
       ws.onclose = () => {
         setIsConnected(false);
-        setIsDesktopOnline(false);
+        setOffline();
         setIsSending(false);
         wsRef.current = null;
-        // Reconnect after 3s
         reconnectTimer.current = setTimeout(connect, 3000);
       };
 
@@ -83,7 +96,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
     } catch {
       reconnectTimer.current = setTimeout(connect, 5000);
     }
-  }, [token, backendUrl]);
+  }, [token, backendUrl, setOffline, setOnline]);
 
   const handleMessage = useCallback((msg: Record<string, unknown>) => {
     switch (msg.type) {
@@ -165,6 +178,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
     connect();
     return () => {
       clearTimeout(reconnectTimer.current);
+      clearTimeout(offlineTimer.current);
       wsRef.current?.close();
     };
   }, [connect]);
