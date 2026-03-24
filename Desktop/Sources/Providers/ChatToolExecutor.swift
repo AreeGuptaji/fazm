@@ -1,4 +1,5 @@
 import AppKit
+import AutofillExtractor
 import AVFoundation
 import Foundation
 import GRDB
