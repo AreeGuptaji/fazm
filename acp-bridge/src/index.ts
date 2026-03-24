@@ -788,11 +788,17 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
 
   // Google Workspace MCP (Python, stdio transport)
   if (existsSync(googleWorkspaceMcpPython) && existsSync(googleWorkspaceMcpMain)) {
+    const googleWorkspaceMcpVenv = join(googleWorkspaceMcpDir, ".venv");
     servers.push({
       name: "google-workspace",
       command: googleWorkspaceMcpPython,
       args: [googleWorkspaceMcpMain, "--transport", "stdio"],
-      env: [],
+      env: [
+        // The bundled Python (from UV) has /install as its prefix. PYTHONHOME
+        // redirects stdlib resolution to the bundled .venv which contains the
+        // actual lib/python3.12 directory and site-packages.
+        { name: "PYTHONHOME", value: googleWorkspaceMcpVenv },
+      ],
     });
   }
 
