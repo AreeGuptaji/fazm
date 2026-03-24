@@ -84,7 +84,7 @@ Uses Workload Identity Federation (no stored keys) → `github-actions-deploy@fa
 - App ID: `69a8b2c779d9075efc609b8d`
 - List builds: `curl -s -H "x-auth-token: $CODEMAGIC_API_TOKEN" "https://api.codemagic.io/builds?appId=69a8b2c779d9075efc609b8d" | python3 -c "import json,sys; [print(f\"{b.get('status','?'):12} tag={b.get('tag','-'):30} start={(b.get('startedAt') or '-')[:19]}\") for b in json.load(sys.stdin).get('builds',[])[:5]]"`
 
-To promote: `./scripts/promote_release.sh <tag>` (staging → beta → stable).
+To promote: `./scripts/promote_release.sh <tag>` (staging → beta → stable). **Never promote without explicit user approval** — releasing to staging, beta, and stable are separate decisions.
 
 **Runtime env vars (`.env.app`):**
 - Local: edit `.env.app` (gitignored, contains secrets)
