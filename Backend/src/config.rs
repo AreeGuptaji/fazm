@@ -75,6 +75,12 @@ impl Config {
                 .unwrap_or_default(),
             gemini_api_key: std::env::var("GEMINI_API_KEY")
                 .unwrap_or_default(),
+            builtin_key_blocklist: std::env::var("BUILTIN_KEY_BLOCKLIST")
+                .unwrap_or_default()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
         }
     }
 }
