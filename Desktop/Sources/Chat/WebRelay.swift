@@ -239,6 +239,14 @@ final class WebRelay: ObservableObject {
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = ["tunnel", "--url", "http://localhost:\(port)"]
 
+        // Use a clean HOME so cloudflared doesn't pick up existing named tunnel credentials
+        // that override the quick tunnel mode
+        var env = ProcessInfo.processInfo.environment
+        let tempHome = FileManager.default.temporaryDirectory.appendingPathComponent("cloudflared-\(UUID().uuidString)").path
+        try? FileManager.default.createDirectory(atPath: tempHome, withIntermediateDirectories: true)
+        env["HOME"] = tempHome
+        process.environment = env
+
         let pipe = Pipe()
         process.standardError = pipe
 
