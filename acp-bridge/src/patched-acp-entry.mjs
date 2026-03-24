@@ -38,11 +38,18 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
         item.value?.type === "result" &&
         item.value?.subtype === "success"
       ) {
+        console.error(`[patched-acp] SDKResultSuccess keys: ${Object.keys(item.value).join(", ")}`);
+        console.error(`[patched-acp] total_cost_usd=${item.value.total_cost_usd}, usage=${JSON.stringify(item.value.usage)}, modelUsage keys=${item.value.modelUsage ? Object.keys(item.value.modelUsage).join(",") : "none"}`);
         const prevSessionCost = session._sessionCostUsd ?? 0;
         session._lastCostUsd = item.value.total_cost_usd - prevSessionCost;
         session._sessionCostUsd = item.value.total_cost_usd;
         session._lastUsage = item.value.usage;
         session._lastModelUsage = item.value.modelUsage;
+      }
+
+      // Debug: log all result types to see what we get
+      if (item.value?.type === "result") {
+        console.error(`[patched-acp] Result item: type=${item.value.type}, subtype=${item.value.subtype}, keys=${Object.keys(item.value).join(", ")}`);
       }
 
       // --- Forward dropped system messages ---
