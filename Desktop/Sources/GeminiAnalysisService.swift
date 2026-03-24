@@ -29,6 +29,7 @@ actor GeminiAnalysisService {
         VERDICT: NO_TASK or TASK_FOUND
         TASK: (only if TASK_FOUND) One sentence: what the user is trying to accomplish overall, and one concrete action the agent would take to help.
         DESCRIPTION: (only if TASK_FOUND) 3-5 sentences: what you observed the user doing, what apps/tools they were using, what patterns you noticed (e.g. repetitive actions, context switching, manual work that could be automated), and why this specific task is a strong candidate for AI assistance.
+        DOCUMENT: (only if TASK_FOUND) A detailed write-up in markdown format. Include: ## What Was Observed (timeline of what the user did, apps used, files touched), ## The Task (exactly what needs to be done, scope, inputs/outputs), ## Why AI Can Help (what makes this suitable for automation — repetitive, mechanical, well-defined pattern), ## Recommended Approach (step-by-step how an AI agent would execute this). Be specific and reference actual apps, filenames, or patterns you saw in the recording.
         """
 
     private let model = "gemini-pro-latest"
@@ -59,6 +60,7 @@ actor GeminiAnalysisService {
         let verdict: String  // "NO_TASK" or "TASK_FOUND"
         let task: String?
         let description: String?
+        let document: String?
         let raw: String
         let chunksAnalyzed: Int
     }
@@ -163,7 +165,7 @@ actor GeminiAnalysisService {
 
             // Persist TASK_FOUND results to observer_activity and show overlay
             if result.verdict == "TASK_FOUND", let task = result.task {
-                await persistAndShowOverlay(task: task, description: result.description, result: result)
+                await persistAndShowOverlay(task: task, description: result.description, document: result.document, result: result)
             }
 
             // Success — remove only the chunks we analyzed (new ones may have arrived during analysis)
@@ -415,23 +417,39 @@ actor GeminiAnalysisService {
     // MARK: - Helpers
 
     private func parseResult(_ raw: String, chunksAnalyzed: Int) -> AnalysisResult {
-        let lines = raw.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let lines = raw.components(separatedBy: "\n")
 
         var verdict = "NO_TASK"
         var task: String?
         var description: String?
+        var document: String?
+        var inDocument = false
+        var documentLines: [String] = []
 
         for line in lines {
-            if line.hasPrefix("VERDICT:") {
-                verdict = line.replacingOccurrences(of: "VERDICT:", with: "").trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("TASK:") {
-                task = line.replacingOccurrences(of: "TASK:", with: "").trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("DESCRIPTION:") {
-                description = line.replacingOccurrences(of: "DESCRIPTION:", with: "").trimmingCharacters(in: .whitespaces)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if inDocument {
+                // Everything after DOCUMENT: is part of the document
+                documentLines.append(line)
+            } else if trimmed.hasPrefix("VERDICT:") {
+                verdict = trimmed.replacingOccurrences(of: "VERDICT:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("TASK:") {
+                task = trimmed.replacingOccurrences(of: "TASK:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("DESCRIPTION:") {
+                description = trimmed.replacingOccurrences(of: "DESCRIPTION:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("DOCUMENT:") {
+                inDocument = true
+                let firstLine = trimmed.replacingOccurrences(of: "DOCUMENT:", with: "").trimmingCharacters(in: .whitespaces)
+                if !firstLine.isEmpty { documentLines.append(firstLine) }
             }
         }
 
-        return AnalysisResult(verdict: verdict, task: task, description: description, raw: raw, chunksAnalyzed: chunksAnalyzed)
+        if !documentLines.isEmpty {
+            document = documentLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return AnalysisResult(verdict: verdict, task: task, description: description, document: document, raw: raw, chunksAnalyzed: chunksAnalyzed)
     }
 
     private func cleanupChunkFiles(chunks: [ChunkEntry]) {
