@@ -172,50 +172,23 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
             // Show an alert guiding the user to enable App Management permission.
             let isInstallationError = nsError.domain == SUSparkleErrorDomain && nsError.code == 4005
             if isInstallationError {
-                logSync("Sparkle: Installation failed (4005), showing App Management permission alert")
+                logSync("Sparkle: Installation failed (4005), showing App Management permission guide")
                 UserDefaults.standard.set(true, forKey: "hasSeenAppManagementError")
                 // Reset the success flag so the proactive guide shows again next time
                 UserDefaults.standard.set(false, forKey: "hasSuccessfullyInstalledSparkleUpdate")
                 Task { @MainActor in
-                    let alert = NSAlert()
-                    alert.alertStyle = .warning
-                    alert.messageText = "Update requires permission"
-                    alert.informativeText = "macOS blocked the update because Fazm needs App Management permission. To enable auto-updates:\n\n1. Open System Settings → Privacy & Security → App Management\n2. Toggle Fazm on\n\nFazm will retry the update automatically when you return."
-                    alert.addButton(withTitle: "Open Settings")
-                    alert.addButton(withTitle: "Download Manually")
-                    // Use window-modal sheet instead of app-modal runModal() to avoid blocking the main thread
-                    if let window = NSApp.keyWindow ?? NSApp.mainWindow {
-                        alert.beginSheetModal(for: window) { [weak self] response in
-                            if response == .alertFirstButtonReturn {
-                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                                self?.viewModel?.scheduleRetryAfterAppManagementGrant()
-                            } else {
-                                if let url = URL(string: "https://github.com/m13v/fazm/releases") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                            }
+                    let version = self.viewModel?.availableVersion ?? "unknown"
+                    AppManagementSetupWindowController.shared.show(
+                        version: version,
+                        onDone: { [weak self] in
+                            logSync("Sparkle: User granted App Management after install error, retrying update")
+                            UserDefaults.standard.set(true, forKey: "hasSuccessfullyInstalledSparkleUpdate")
+                            self?.viewModel?.checkForUpdatesInBackground()
+                        },
+                        onDismiss: {
+                            logSync("Sparkle: User dismissed App Management guide after install error")
                         }
-                    } else {
-                        // No window available — create a temporary one for the sheet to avoid blocking runModal()
-                        let tempWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: [], backing: .buffered, defer: true)
-                        tempWindow.center()
-                        tempWindow.makeKeyAndOrderFront(nil)
-                        alert.beginSheetModal(for: tempWindow) { [weak self] response in
-                            tempWindow.close()
-                            if response == .alertFirstButtonReturn {
-                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                                self?.viewModel?.scheduleRetryAfterAppManagementGrant()
-                            } else {
-                                if let url = URL(string: "https://github.com/m13v/fazm/releases") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                            }
-                        }
-                    }
+                    )
                 }
             }
         }
