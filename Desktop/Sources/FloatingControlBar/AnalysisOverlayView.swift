@@ -20,9 +20,10 @@ struct AnalysisOverlayView: View {
                     onHide()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
-                        .frame(width: 16, height: 16)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
