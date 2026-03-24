@@ -176,7 +176,7 @@ struct ClaudeAuthSheet: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }
-        .frame(width: 400, height: 380)
+        .frame(width: 400, height: (isConnecting && showRetryOption && !hasTimedOut) ? 430 : 380)
         .background(FazmColors.backgroundPrimary)
         .onChange(of: hasTimedOut) {
             if hasTimedOut {
@@ -238,10 +238,10 @@ final class ClaudeAuthWindowController {
         )
 
         let hostingView = NSHostingView(rootView: AnyView(content))
-        hostingView.setFrameSize(NSSize(width: 400, height: 380))
+        hostingView.setFrameSize(NSSize(width: 400, height: 430))
 
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: NSSize(width: 400, height: 380)),
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 400, height: 430)),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -261,8 +261,8 @@ final class ClaudeAuthWindowController {
         if let screen = mouseScreen {
             let sf = screen.visibleFrame
             let x = sf.origin.x + (sf.width - 400) / 2
-            let y = sf.origin.y + (sf.height - 380) / 2
-            window.setFrame(NSRect(x: x, y: y, width: 400, height: 380), display: true)
+            let y = sf.origin.y + (sf.height - 430) / 2
+            window.setFrame(NSRect(x: x, y: y, width: 400, height: 430), display: true)
         } else {
             window.center()
         }
