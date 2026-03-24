@@ -399,12 +399,15 @@ open "$APP_PATH" || "$APP_PATH/Contents/MacOS/$BINARY_NAME" &
 DEV_LOG="/private/tmp/fazm-dev.log"
 STALE_THRESHOLD=60
 
+# Wait for the app to actually start (open is async)
+sleep 5
+
 echo "Watching app (log: $DEV_LOG, stale threshold: ${STALE_THRESHOLD}s)..."
 while true; do
     sleep 10
 
     # Check 1: is the app process still running?
-    if ! pgrep -f "$APP_PATH/Contents/MacOS" > /dev/null 2>&1; then
+    if ! pgrep -f "Fazm Dev.app/Contents/MacOS/Fazm" > /dev/null 2>&1; then
         echo "[watchdog] App process not found — releasing lock and exiting."
         break
     fi
