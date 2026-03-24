@@ -121,8 +121,47 @@ Do NOT touch `~/fazm/skills/` for bundling purposes — that directory is for pu
 - To check which app is currently running: `ps aux | grep "Fazm"`
 - Legacy `com.omi.*` bundle IDs still appear in cleanup/migration code (TCC permission resets, old app bundle removal) for users who had the app when it was called Omi
 
+### App Testing Lock (Multi-Agent Safety)
+
+Multiple agents work on this codebase simultaneously. **You MUST use the test lock before running `run.sh`, killing the app, or any operation that restarts the app.**
+
+**Lock file:** `/tmp/fazm-test.lock`
+
+#### Before running `run.sh` or killing the app:
+```bash
+# 1. Check if lock exists and is still active
+if [ -f /tmp/fazm-test.lock ]; then
+    lock_age=$(( $(date +%s) - $(stat -f %m /tmp/fazm-test.lock) ))
+    lock_holder=$(cat /tmp/fazm-test.lock 2>/dev/null)
+    if [ "$lock_age" -lt 600 ]; then
+        echo "BLOCKED: Test lock held by: $lock_holder (${lock_age}s ago)"
+        echo "Another agent is testing. Do NOT proceed."
+        # STOP HERE — do not run run.sh, do not kill the app
+    fi
+fi
+```
+
+#### Acquire the lock before testing:
+```bash
+echo "agent=$(date +%s) task=<your-task-description>" > /tmp/fazm-test.lock
+```
+
+#### Release the lock when done testing:
+```bash
+rm -f /tmp/fazm-test.lock
+```
+
+#### Rules:
+- **NEVER run `run.sh` without checking the lock first.** `run.sh` kills the running app — this destroys another agent's active test session.
+- **If the lock is held (< 600s old), STOP.** Do not wait and retry. Do not kill the app. Ask the user for guidance.
+- **Auto-stale after 10 minutes (600s).** If the lock file is older than 600s, it's stale — the agent that created it likely finished or crashed. You may remove it and proceed.
+- **If you only need to test with distributed notifications** (e.g., `com.fazm.testQuery`) and the app is already running, you do NOT need to acquire the lock or restart the app. Just send the notification to the running app.
+- **If you need your code changes compiled into the running app**, you MUST acquire the lock, then run `run.sh`.
+- **Always release the lock** (`rm -f /tmp/fazm-test.lock`) after your test is complete, even if the test failed.
+
 ### After Implementing Changes
 - **ALWAYS test your changes** — see global CLAUDE.md "After Implementing Changes — MANDATORY Testing" for the full workflow
+- **⚠️ ALWAYS check the test lock** before running `run.sh` or killing the app (see "App Testing Lock" above)
 - **UI/visual changes**: build with `./run.sh`, then use macOS automation (MCP macos-use) to navigate to the relevant screen and screenshot to verify
 - **Logic/backend changes**: use programmatic test hooks (distributed notifications, etc.) to trigger and verify
 - Use the `test-local` skill for the build → run → test → iterate workflow
