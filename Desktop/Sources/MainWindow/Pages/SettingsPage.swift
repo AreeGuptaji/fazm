@@ -129,6 +129,7 @@ struct SettingsContentView: View {
 
     enum SettingsSection: String, CaseIterable {
         case home = "Home"
+        case discoveredTasks = "Discovered Tasks"
         case general = "General"
         case shortcuts = "Shortcuts"
         case permissions = "Permissions"
@@ -176,6 +177,8 @@ struct SettingsContentView: View {
                 switch selectedSection {
                 case .home:
                     HomeSection()
+                case .discoveredTasks:
+                    DiscoveredTasksSection()
                 case .general:
                     generalSection
                 case .shortcuts:
