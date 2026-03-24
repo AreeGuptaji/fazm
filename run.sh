@@ -81,8 +81,10 @@ find ~/Library/Application\ Support/Fazm/users -name ".fazm_running" -delete 2>/
 auth_debug "AFTER pkill: auth_isSignedIn=$(defaults read "$BUNDLE_ID" auth_isSignedIn 2>&1 || true)"
 auth_debug "AFTER pkill: ALL_KEYS=$(defaults read "$BUNDLE_ID" 2>&1 | grep -E 'auth_|hasCompleted|hasLaunched|currentTier|userShow' || true)"
 
-# Clear log file for fresh run (must be before backend starts)
+# Clear and initialize log file for fresh run (must be before backend starts)
+# Write immediately so agents can monitor run.sh progress from the start
 rm -f /tmp/fazm-dev.log 2>/dev/null || true
+echo "[$(date '+%H:%M:%S.000')] [run.sh] Build started (PID $$)" > /private/tmp/fazm-dev.log
 
 step "Cleaning up conflicting app bundles..."
 # Clean old build names from local build dir
