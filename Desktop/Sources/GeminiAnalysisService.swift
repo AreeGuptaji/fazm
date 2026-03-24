@@ -28,6 +28,7 @@ actor GeminiAnalysisService {
 
         VERDICT: NO_TASK or TASK_FOUND
         TASK: (only if TASK_FOUND) One sentence: what the user is trying to accomplish overall, and one concrete action the agent would take to help.
+        DESCRIPTION: (only if TASK_FOUND) 3-5 sentences: what you observed the user doing, what apps/tools they were using, what patterns you noticed (e.g. repetitive actions, context switching, manual work that could be automated), and why this specific task is a strong candidate for AI assistance.
         """
 
     private let model = "gemini-pro-latest"
@@ -57,6 +58,7 @@ actor GeminiAnalysisService {
     struct AnalysisResult: Sendable {
         let verdict: String  // "NO_TASK" or "TASK_FOUND"
         let task: String?
+        let description: String?
         let raw: String
         let chunksAnalyzed: Int
     }
@@ -417,16 +419,19 @@ actor GeminiAnalysisService {
 
         var verdict = "NO_TASK"
         var task: String?
+        var description: String?
 
         for line in lines {
             if line.hasPrefix("VERDICT:") {
                 verdict = line.replacingOccurrences(of: "VERDICT:", with: "").trimmingCharacters(in: .whitespaces)
             } else if line.hasPrefix("TASK:") {
                 task = line.replacingOccurrences(of: "TASK:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("DESCRIPTION:") {
+                description = line.replacingOccurrences(of: "DESCRIPTION:", with: "").trimmingCharacters(in: .whitespaces)
             }
         }
 
-        return AnalysisResult(verdict: verdict, task: task, raw: raw, chunksAnalyzed: chunksAnalyzed)
+        return AnalysisResult(verdict: verdict, task: task, description: description, raw: raw, chunksAnalyzed: chunksAnalyzed)
     }
 
     private func cleanupChunkFiles(chunks: [ChunkEntry]) {
