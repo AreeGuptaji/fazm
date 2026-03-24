@@ -143,6 +143,8 @@
     "Added automatic rollback when an update crashes on launch \u2014 restores the previous version and blocks the bad update",
     "Added Voice Response setting \u2014 AI can speak its answers aloud using text-to-speech (Deepgram Luna voice)",
     "Knowledge graph data from onboarding is now also saved to Hindsight for long-term memory recall",
-    "Added Discovered Tasks tab showing AI-identified tasks from screen analysis"
+    "Added Discovered Tasks tab showing AI-identified tasks from screen analysis",
+    "Fixed Claude OAuth sign-in failing on first attempt when not logged in to claude.ai",
+    "Fixed Connect Claude button staying visible after successful authentication"
   ]
 }
