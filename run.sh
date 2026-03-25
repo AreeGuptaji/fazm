@@ -396,15 +396,20 @@ echo ""
 auth_debug "BEFORE launch: $(defaults read "$BUNDLE_ID" auth_isSignedIn 2>&1 || true)"
 open "$APP_PATH" || "$APP_PATH/Contents/MacOS/$BINARY_NAME" &
 
-# Watchdog: monitor app process and log activity.
-# Releases lock and exits if the app dies or logs go stale (no updates for 60s).
-DEV_LOG="/private/tmp/fazm-dev.log"
-STALE_THRESHOLD=60
+# Watchdog: monitor app process and user interaction.
+# Releases lock and exits if the app dies or user is idle (no interaction for 120s).
+# The app touches /tmp/fazm-dev-interaction on user interaction (PTT, bar expand,
+# app activate, etc.) — separate from the main log which background tasks write constantly.
+INTERACTION_MARKER="/tmp/fazm-dev-interaction"
+IDLE_THRESHOLD=120
 
 # Wait for the app to actually start (open is async)
 sleep 5
 
-echo "Watching app (log: $DEV_LOG, stale threshold: ${STALE_THRESHOLD}s)..."
+# Seed the interaction marker so we don't exit immediately
+touch "$INTERACTION_MARKER"
+
+echo "Watching app (interaction marker: $INTERACTION_MARKER, idle threshold: ${IDLE_THRESHOLD}s)..."
 while true; do
     sleep 10
 
@@ -414,11 +419,11 @@ while true; do
         break
     fi
 
-    # Check 2: is the log file being updated?
-    if [ -f "$DEV_LOG" ]; then
-        log_age=$(( $(date +%s) - $(stat -f %m "$DEV_LOG") ))
-        if [ "$log_age" -gt "$STALE_THRESHOLD" ]; then
-            echo "[watchdog] Log stale for ${log_age}s (threshold: ${STALE_THRESHOLD}s) — releasing lock and exiting."
+    # Check 2: has the user interacted recently?
+    if [ -f "$INTERACTION_MARKER" ]; then
+        idle_time=$(( $(date +%s) - $(stat -f %m "$INTERACTION_MARKER") ))
+        if [ "$idle_time" -gt "$IDLE_THRESHOLD" ]; then
+            echo "[watchdog] User idle for ${idle_time}s (threshold: ${IDLE_THRESHOLD}s) — releasing lock and exiting."
             break
         fi
     fi
