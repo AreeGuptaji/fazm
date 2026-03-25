@@ -649,6 +649,14 @@ extension PostHogManager {
         ])
     }
 
+    func nodeBinaryCorrupted(version: String, installMethod: String) {
+        track("Node Binary Corrupted", properties: [
+            "version": version,
+            "install_method": installMethod,
+            "os_version": ProcessInfo.processInfo.operatingSystemVersionString,
+        ])
+    }
+
     func updateNotFound() {
         track("Update Not Found")
     }
