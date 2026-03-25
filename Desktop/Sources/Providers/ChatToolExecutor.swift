@@ -300,10 +300,6 @@ class ChatToolExecutor {
         return "OK: \(changes) row(s) affected"
     }
 
-    // MARK: - Task Tools
-
-    /// Toggle a task's completion status via TasksStore (handles local + API sync)
-
     // MARK: - Onboarding Tools
 
     /// Request a specific macOS permission
