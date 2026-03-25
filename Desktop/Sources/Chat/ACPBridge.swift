@@ -269,6 +269,12 @@ actor ACPBridge {
       }
     }
 
+    // Pass app bundle path so acp-bridge can find bundled binaries/resources
+    // (Node may run from /tmp due to NodeBinaryHelper, so process.execPath is unreliable)
+    if let resourcePath = Bundle.main.resourcePath {
+      env["FAZM_RESOURCES_PATH"] = resourcePath
+    }
+
     proc.environment = env
 
     let stdin = Pipe()
