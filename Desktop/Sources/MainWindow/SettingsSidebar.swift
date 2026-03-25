@@ -78,7 +78,10 @@ struct SettingsSidebar: View {
     @ObservedObject private var updaterViewModel = UpdaterViewModel.shared
     @State private var searchQuery = ""
     @State private var updateGlowAnimating = false
+    @State private var discoveredTasksUnread = 0
     @FocusState private var isSearchFocused: Bool
+
+    private let unreadRefreshTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
 
     private let expandedWidth: CGFloat = 260
     private let iconWidth: CGFloat = 20
@@ -124,6 +127,7 @@ struct SettingsSidebar: View {
                                 isSelected: selectedSection == section,
                                 iconWidth: iconWidth,
                                 showWarning: section == .permissions && appState.hasMissingPermissions,
+                                badgeCount: section == .discoveredTasks ? discoveredTasksUnread : 0,
                                 onTap: {
                                     withAnimation(.easeInOut(duration: 0.15)) {
                                         selectedSection = section
@@ -171,6 +175,15 @@ struct SettingsSidebar: View {
         }
         .frame(width: expandedWidth)
         .background(FazmColors.backgroundPrimary)
+        .onAppear { refreshUnreadCount() }
+        .onReceive(unreadRefreshTimer) { _ in refreshUnreadCount() }
+    }
+
+    private func refreshUnreadCount() {
+        Task {
+            let count = await DiscoveredTasksStore.unreadCount()
+            await MainActor.run { discoveredTasksUnread = count }
+        }
     }
 
     // MARK: - Update Available Widget
@@ -294,6 +307,7 @@ struct SettingsSidebarItem: View {
     let isSelected: Bool
     let iconWidth: CGFloat
     var showWarning: Bool = false
+    var badgeCount: Int = 0
     let onTap: () -> Void
 
     @State private var isHovered = false
@@ -324,6 +338,15 @@ struct SettingsSidebarItem: View {
                     .foregroundColor(isSelected ? FazmColors.textPrimary : FazmColors.textSecondary)
 
                 Spacer()
+
+                if badgeCount > 0 {
+                    Text("\(badgeCount)")
+                        .scaledFont(size: 11, weight: .semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.purple))
+                }
 
                 if showWarning {
                     Circle()
