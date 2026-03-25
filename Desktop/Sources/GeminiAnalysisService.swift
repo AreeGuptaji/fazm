@@ -626,11 +626,6 @@ actor GeminiAnalysisService {
         let allLines = content.components(separatedBy: "\n")
         let recentLines = allLines.suffix(200)
 
-        // Look for ACP-related patterns in the last 120 seconds
-        let cutoff = Date().addingTimeInterval(-120)
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH:mm:ss.SSS"
-
         var acpActivity: [String] = []
         var activeQueries: [String] = []
 
