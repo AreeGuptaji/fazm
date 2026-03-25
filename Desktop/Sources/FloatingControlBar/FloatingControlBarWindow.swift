@@ -1760,8 +1760,10 @@ class FloatingControlBarManager {
 
         // Wire up suggested replies callback before sending
         barWindow.state.suggestedReplies = []
-        ChatToolExecutor.onQuickReplyOptions = { [weak barWindow] _, options in
+        barWindow.state.suggestedReplyQuestion = ""
+        ChatToolExecutor.onQuickReplyOptions = { [weak barWindow] question, options in
             Task { @MainActor in
+                barWindow?.state.suggestedReplyQuestion = question
                 barWindow?.state.suggestedReplies = options
             }
         }
@@ -1772,6 +1774,7 @@ class FloatingControlBarManager {
             Task { @MainActor in
                 log("Auto-sending follow-up: \(message)")
                 barWindow.state.suggestedReplies = []
+                barWindow.state.suggestedReplyQuestion = ""
                 await self.sendAIQuery(message, barWindow: barWindow, provider: provider)
             }
         }
