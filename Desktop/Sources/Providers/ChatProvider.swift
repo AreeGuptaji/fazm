@@ -106,9 +106,9 @@ enum ChatContentBlock: Identifiable {
         let summary: String?
         switch cleanName {
         case "Read":
-            summary = input["file_path"] as? String
+            summary = Self.shortenPath(input["file_path"] as? String)
         case "Write", "Edit":
-            summary = input["file_path"] as? String
+            summary = Self.shortenPath(input["file_path"] as? String)
         case "Bash":
             if let cmd = input["command"] as? String {
                 summary = cmd.count > 80 ? String(cmd.prefix(80)) + "…" : cmd
@@ -117,12 +117,16 @@ enum ChatContentBlock: Identifiable {
             }
         case "Grep":
             let pattern = input["pattern"] as? String ?? ""
-            let path = input["path"] as? String
-            summary = path != nil ? "\(pattern) in \(path!)" : pattern
+            let path = Self.shortenPath(input["path"] as? String)
+            summary = path != nil ? "\"\(pattern)\" in \(path!)" : "\"\(pattern)\""
         case "Glob":
             summary = input["pattern"] as? String
         case "WebSearch":
-            summary = input["query"] as? String
+            if let query = input["query"] as? String {
+                summary = "\"\(query)\""
+            } else {
+                summary = nil
+            }
         case "WebFetch":
             summary = input["url"] as? String
         case "execute_sql":
@@ -136,8 +140,18 @@ enum ChatContentBlock: Identifiable {
         case "ask_followup":
             summary = input["question"] as? String
         default:
-            // Try common key names
-            summary = (input["file_path"] ?? input["path"] ?? input["query"] ?? input["command"]) as? String
+            // Try common key names, shorten paths
+            if let filePath = input["file_path"] as? String {
+                summary = Self.shortenPath(filePath)
+            } else if let path = input["path"] as? String {
+                summary = Self.shortenPath(path)
+            } else if let query = input["query"] as? String {
+                summary = query
+            } else if let cmd = input["command"] as? String {
+                summary = cmd.count > 80 ? String(cmd.prefix(80)) + "…" : cmd
+            } else {
+                summary = nil
+            }
         }
 
         guard let summary = summary, !summary.isEmpty else { return nil }
@@ -152,6 +166,14 @@ enum ChatContentBlock: Identifiable {
         }
 
         return ToolCallInput(summary: summary, details: details)
+    }
+
+    /// Shorten a file path to just the filename (or last two components if useful)
+    private static func shortenPath(_ path: String?) -> String? {
+        guard let path = path, !path.isEmpty else { return nil }
+        let components = path.split(separator: "/")
+        if components.count <= 2 { return path }
+        return components.suffix(2).joined(separator: "/")
     }
 }
 
@@ -1370,7 +1392,7 @@ class ChatProvider: ObservableObject {
         // at session creation time.
         let history = buildConversationHistory()
         if !history.isEmpty {
-            prompt += "\n\n<conversation_history>\nBelow is the recent conversation history between you and the user. Use this to maintain continuity — the user can see these messages in the chat UI and expects you to be aware of them.\n\(history)\n</conversation_history>"
+            prompt += "\n\n<conversation_history>\nBelow is recent conversation history. The user can see these messages and expects you to be aware of them. For older conversations, query chat_messages with execute_sql.\n\(history)\n</conversation_history>"
         }
 
         // Append global CLAUDE.md instructions if enabled
@@ -1480,7 +1502,7 @@ class ChatProvider: ObservableObject {
     /// Formats the last 10 non-empty messages in the current session as a conversation history string.
     /// Used to seed new ACP sessions with context from the existing chat UI history.
     private func buildConversationHistory() -> String {
-        let recent = messages.filter { !$0.text.isEmpty }.suffix(10)
+        let recent = messages.filter { !$0.text.isEmpty }.suffix(20)
         return recent.map { msg in
             let role = msg.sender == .user ? "User" : "Assistant"
             return "\(role): \(msg.text)"
