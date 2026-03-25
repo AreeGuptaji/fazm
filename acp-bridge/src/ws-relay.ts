@@ -60,6 +60,26 @@ rl.on("line", (line) => {
   }
 });
 
+// Exit cleanly on signals or stdin close (parent died)
+function shutdown() {
+  wss.close();
+  server.close();
+  process.exit(0);
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+rl.on("close", shutdown);
+
+// Watchdog: exit if parent process dies (kill(pid, 0) throws when process is gone)
+const parentPid = process.ppid;
+setInterval(() => {
+  try {
+    process.kill(parentPid, 0); // signal 0 = just check if alive
+  } catch {
+    shutdown();
+  }
+}, 5000);
+
 // Listen on random port
 server.listen(0, "127.0.0.1", () => {
   const addr = server.address();
