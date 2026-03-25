@@ -383,9 +383,11 @@ final class UpdaterViewModel: ObservableObject {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.updateAvailable = true
-                self?.availableVersion = "9.9.9"
-                logSync("UpdaterViewModel: Faked update available for testing")
+                MainActor.assumeIsolated {
+                    self?.updateAvailable = true
+                    self?.availableVersion = "9.9.9"
+                    logSync("UpdaterViewModel: Faked update available for testing")
+                }
             }
         }
 
