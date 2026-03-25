@@ -670,7 +670,6 @@ struct ChatPromptBuilder {
         currentDatetime: String? = nil,
         currentDatetimeISO: String? = nil,
         memoriesStr: String = "",
-        goalSection: String = "",
         fileContextSection: String = "",
         contextSection: String = "",
         pluginSection: String = "",
@@ -706,7 +705,7 @@ struct ChatPromptBuilder {
         prompt = prompt.replacingOccurrences(of: "{current_datetime_iso}", with: datetimeISO)
         prompt = prompt.replacingOccurrences(of: "{current_datetime_utc}", with: currentDatetimeUTC)
         prompt = prompt.replacingOccurrences(of: "{memories_str}", with: memoriesStr)
-        prompt = prompt.replacingOccurrences(of: "{goal_section}", with: goalSection)
+        prompt = prompt.replacingOccurrences(of: "{goal_section}", with: "")
         prompt = prompt.replacingOccurrences(of: "{file_context_section}", with: fileContextSection)
         prompt = prompt.replacingOccurrences(of: "{context_section}", with: contextSection)
         prompt = prompt.replacingOccurrences(of: "{plugin_section}", with: pluginSection)
@@ -725,17 +724,14 @@ struct ChatPromptBuilder {
     /// Build the desktop chat system prompt
     static func buildDesktopChat(
         userName: String,
-        goalSection: String = "",
-        tasksSection: String = "",
         aiProfileSection: String = "",
         databaseSchema: String = ""
     ) -> String {
         var prompt = build(
             template: ChatPrompts.desktopChat,
-            userName: userName,
-            goalSection: goalSection
+            userName: userName
         )
-        prompt = prompt.replacingOccurrences(of: "{tasks_section}", with: tasksSection)
+        prompt = prompt.replacingOccurrences(of: "{tasks_section}", with: "")
         prompt = prompt.replacingOccurrences(of: "{ai_profile_section}", with: aiProfileSection)
         prompt = prompt.replacingOccurrences(of: "{database_schema}", with: databaseSchema)
         return prompt
