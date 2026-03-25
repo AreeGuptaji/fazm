@@ -635,6 +635,10 @@ class AnalyticsManager {
         PostHogManager.shared.updateInstalled(version: version)
     }
 
+    func nodeBinaryCorrupted(version: String, installMethod: String) {
+        PostHogManager.shared.nodeBinaryCorrupted(version: version, installMethod: installMethod)
+    }
+
     func updateNotFound() {
         PostHogManager.shared.updateNotFound()
     }
