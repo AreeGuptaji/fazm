@@ -423,9 +423,6 @@ class APIClient {
     // Search
     func searchApps(query: String = "", installedOnly: Bool = false) async throws -> [AppInfo] { [] }
 
-    // Goals
-    func getGoals() async throws -> [Goal] { [] }
-
     // Settings API
     func setRecordingPermission(enabled: Bool) async throws {}
     func getRecordingPermission() async throws -> (enabled: Bool, Void) { (enabled: false, ()) }
