@@ -1,5 +1,6 @@
 import SwiftUI
 import GRDB
+import PostHog
 
 /// Discovered Tasks tab — shows tasks identified by the Gemini session analysis.
 struct DiscoveredTasksSection: View {
@@ -20,7 +21,10 @@ struct DiscoveredTasksSection: View {
                 taskList
             }
         }
-        .onAppear { loadTasks() }
+        .onAppear {
+            loadTasks()
+            PostHogSDK.shared.capture("discovered_tasks_tab_viewed")
+        }
         .onReceive(refreshTimer) { _ in loadTasks() }
     }
 
@@ -54,9 +58,19 @@ struct DiscoveredTasksSection: View {
 
     private var taskList: some View {
         VStack(spacing: 8) {
-            ForEach(tasks) { task in
+            ForEach(sortedTasks) { task in
                 taskRow(task)
             }
+        }
+    }
+
+    /// Pending (unread) tasks first, then by createdAt desc
+    private var sortedTasks: [DiscoveredTask] {
+        tasks.sorted { a, b in
+            let aUnread = a.status == "pending"
+            let bUnread = b.status == "pending"
+            if aUnread != bUnread { return aUnread }
+            return a.createdAt > b.createdAt
         }
     }
 
@@ -67,7 +81,17 @@ struct DiscoveredTasksSection: View {
             // Header row
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    selectedTaskId = isExpanded ? nil : task.id
+                    if isExpanded {
+                        selectedTaskId = nil
+                    } else {
+                        selectedTaskId = task.id
+                        markAsRead(task)
+                        PostHogSDK.shared.capture("discovered_task_expanded", properties: [
+                            "task_id": task.id,
+                            "task_status": task.status,
+                            "task_title": String(task.taskTitle.prefix(100)),
+                        ])
+                    }
                 }
             } label: {
                 HStack(spacing: 12) {
@@ -92,6 +116,13 @@ struct DiscoveredTasksSection: View {
                     }
 
                     Spacer()
+
+                    // Unread indicator dot
+                    if task.status == "pending" {
+                        Circle()
+                            .fill(Color.purple)
+                            .frame(width: 8, height: 8)
+                    }
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 11))
@@ -126,7 +157,7 @@ struct DiscoveredTasksSection: View {
 
                     // Action buttons
                     HStack(spacing: 8) {
-                        if task.status == "pending" {
+                        if task.status == "pending" || task.status == "read" {
                             Button {
                                 discussTask(task)
                             } label: {
@@ -171,6 +202,7 @@ struct DiscoveredTasksSection: View {
             switch status {
             case "acted": return ("Discussed", .green)
             case "dismissed": return ("Dismissed", .gray)
+            case "read": return ("Read", FazmColors.textTertiary)
             default: return ("New", .purple)
             }
         }()
@@ -186,7 +218,19 @@ struct DiscoveredTasksSection: View {
 
     // MARK: - Actions
 
+    private func markAsRead(_ task: DiscoveredTask) {
+        guard task.status == "pending" else { return }
+        Task {
+            await AnalysisOverlayWindow.updateActivityStatus(activityId: task.id, status: "read", response: "viewed")
+            loadTasks()
+        }
+    }
+
     private func discussTask(_ task: DiscoveredTask) {
+        PostHogSDK.shared.capture("discovered_task_discuss", properties: [
+            "task_id": task.id,
+            "task_title": String(task.taskTitle.prefix(100)),
+        ])
         Task {
             await AnalysisOverlayWindow.updateActivityStatus(activityId: task.id, status: "acted", response: "discuss")
             AnalysisOverlayWindow.sendDiscussMessage(task: task.taskTitle, description: task.description, document: task.document)
@@ -195,6 +239,10 @@ struct DiscoveredTasksSection: View {
     }
 
     private func dismissTask(_ task: DiscoveredTask) {
+        PostHogSDK.shared.capture("discovered_task_dismissed", properties: [
+            "task_id": task.id,
+            "task_title": String(task.taskTitle.prefix(100)),
+        ])
         Task {
             await AnalysisOverlayWindow.updateActivityStatus(activityId: task.id, status: "dismissed", response: "hide")
             loadTasks()
@@ -258,6 +306,22 @@ struct DiscoveredTasksSection: View {
                     isLoading = false
                 }
             }
+        }
+    }
+}
+
+// MARK: - Unread Count (for sidebar badge)
+
+enum DiscoveredTasksStore {
+    /// Returns the number of unread (pending) discovered tasks.
+    static func unreadCount() async -> Int {
+        guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return 0 }
+        do {
+            return try await dbQueue.read { db in
+                try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM observer_activity WHERE type = 'gemini_analysis' AND status = 'pending'") ?? 0
+            }
+        } catch {
+            return 0
         }
     }
 }
