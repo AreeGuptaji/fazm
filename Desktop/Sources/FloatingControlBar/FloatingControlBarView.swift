@@ -364,10 +364,15 @@ struct FloatingControlBarView: View {
                 get: { state.suggestedReplies },
                 set: { state.suggestedReplies = $0 }
             ),
+            suggestedReplyQuestion: Binding(
+                get: { state.suggestedReplyQuestion },
+                set: { state.suggestedReplyQuestion = $0 }
+            ),
             onClose: onCloseAI,
             onNewChat: onNewChat,
             onSendFollowUp: { message in
                 state.suggestedReplies = []
+                state.suggestedReplyQuestion = ""
                 // Archive current exchange to chat history
                 let currentQuery = state.displayedQuery
                 if let currentMessage = state.currentAIMessage, !currentQuery.isEmpty, !currentMessage.text.isEmpty {
