@@ -55,34 +55,16 @@ const playwrightCli = join(
 
 const fazmToolsStdioScript = join(__dirname, "fazm-tools-stdio.js");
 
-// mcp-server-macos-use binary lives in Contents/MacOS/ alongside the main app binary.
-// Node runs from Contents/Resources/Fazm_Fazm.bundle/node, so navigate up to Contents/.
-const macosUseBinary = join(
-  dirname(process.execPath),
-  "..",
-  "..",
-  "MacOS",
-  "mcp-server-macos-use"
-);
+// App bundle paths — FAZM_RESOURCES_PATH points to Contents/Resources/ (set by Swift).
+// Falls back to process.execPath-relative paths for local dev where Node runs from the bundle.
+const resourcesDir = process.env.FAZM_RESOURCES_PATH || join(dirname(process.execPath), "..", "..", "Resources");
+const contentsDir = join(resourcesDir, "..");
 
-// whatsapp-mcp binary lives in Contents/MacOS/ alongside mcp-server-macos-use.
-const whatsappMcpBinary = join(
-  dirname(process.execPath),
-  "..",
-  "..",
-  "MacOS",
-  "whatsapp-mcp"
-);
+const macosUseBinary = join(contentsDir, "MacOS", "mcp-server-macos-use");
+const whatsappMcpBinary = join(contentsDir, "MacOS", "whatsapp-mcp");
 
 // Google Workspace MCP — Python server bundled under Contents/Resources/google-workspace-mcp/
-// Both source code and .venv are bundled in the app (created during CI build).
-const googleWorkspaceMcpDir = join(
-  dirname(process.execPath),
-  "..",
-  "..",
-  "Resources",
-  "google-workspace-mcp"
-);
+const googleWorkspaceMcpDir = join(resourcesDir, "google-workspace-mcp");
 const googleWorkspaceMcpPython = join(googleWorkspaceMcpDir, ".venv", "bin", "python3");
 const googleWorkspaceMcpMain = join(googleWorkspaceMcpDir, "main.py");
 
