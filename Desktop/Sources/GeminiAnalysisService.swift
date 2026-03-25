@@ -128,6 +128,18 @@ actor GeminiAnalysisService {
             self.chunkBuffer = entries
             log("GeminiAnalysis: restored \(entries.count) chunks from disk")
         }
+
+        // Clean up orphaned files not tracked by the buffer index
+        let indexedFiles = Set(chunkBuffer.map { $0.localURL.lastPathComponent })
+        if let allFiles = try? FileManager.default.contentsOfDirectory(atPath: chunksDir.path) {
+            let orphans = allFiles.filter { $0.hasSuffix(".mp4") && !indexedFiles.contains($0) }
+            for orphan in orphans {
+                try? FileManager.default.removeItem(at: chunksDir.appendingPathComponent(orphan))
+            }
+            if !orphans.isEmpty {
+                log("GeminiAnalysis: cleaned up \(orphans.count) orphaned chunk files")
+            }
+        }
     }
 
     /// Called by SessionRecordingManager when a chunk is finalized.
