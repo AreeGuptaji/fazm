@@ -463,11 +463,14 @@ class ChatToolExecutor {
             let extractor = AutofillExtractor()
             let profile = extractor.extractAll()
 
+            log("Browser profile raw counts: addresses=\(profile.addresses.count), formFields=\(profile.formFields.count), cards=\(profile.cards.count), tools=\(profile.tools.count), accounts=\(profile.accounts.count), bookmarks=\(profile.bookmarks.count)")
+
             do {
                 let db = try ProfileDatabase()
                 db.ingestProfile(profile)
                 return db.profileText()
             } catch {
+                log("Browser profile DB error: \(error.localizedDescription)")
                 // DB failed but we still have raw data — format inline
                 var lines: [String] = []
                 let grouped = profile.grouped
