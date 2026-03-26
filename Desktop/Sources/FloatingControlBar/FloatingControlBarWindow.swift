@@ -995,6 +995,7 @@ class FloatingControlBarManager {
     private var compactCancellable: AnyCancellable?
     private var authCancellable: AnyCancellable?
     private var authRequiredCancellable: AnyCancellable?
+    private var queryStartedCancellable: AnyCancellable?
     private(set) var chatProvider: ChatProvider?
     private var workspaceObserver: Any?
     private var dequeueObserver: Any?
@@ -1113,6 +1114,15 @@ class FloatingControlBarManager {
 
         // Reuse the sidebar's ChatProvider (bridge is already warm from app startup)
         self.chatProvider = chatProvider
+
+        // Clear stale follow-up suggestions when ANY new query starts (desktop, phone, etc.)
+        queryStartedCancellable = chatProvider.$queryStartedCount
+            .dropFirst() // skip initial value
+            .receive(on: DispatchQueue.main)
+            .sink { [weak barWindow] _ in
+                barWindow?.state.suggestedReplies = []
+                barWindow?.state.suggestedReplyQuestion = ""
+            }
 
         barWindow.onSendQuery = { [weak self, weak barWindow, weak chatProvider] message in
             guard let self = self, let barWindow = barWindow, let provider = chatProvider else { return }
