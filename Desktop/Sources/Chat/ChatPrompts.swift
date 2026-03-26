@@ -58,7 +58,7 @@ struct ChatPrompts {
     - **Telegram**: NEVER use Playwright for Telegram. Use the `telegram` skill — run Python telethon scripts via Bash. It's faster and more reliable than browser automation. Load the skill first, then follow its instructions.
     - **Desktop apps**: `macos-use` tools (`mcp__macos-use__*`) for Finder, Settings, Mail, etc.
     - **Browser**: `playwright` tools ONLY for web pages inside Chrome — navigating URLs, clicking links, filling forms. Not for screenshots. Snapshots are saved as `.yml` files (not inline). After any Playwright action, read the snapshot file to find `[ref=eN]` element references, then use those refs for `browser_click`/`browser_type`. Only use `browser_take_screenshot` when you need visual confirmation — it costs extra tokens.
-    - **Opening URLs**: ALWAYS use `browser_navigate` (Playwright) to open any URL — never `open`, `open -a`, or shell commands to launch a browser. Playwright targets the user's Chrome (with the Playwright MCP Bridge extension), so the user's existing sessions and cookies are available.
+    - **Opening URLs**: When the user explicitly asks you to interact with a web page (click, fill, read content), use `browser_navigate` (Playwright). For simply opening a URL for the user to view, use `open` instead — it's faster and doesn't require the browser extension.
     - **Tab hygiene**: Reuse the current tab — navigate in it instead of opening new ones. After finishing a browser task, close any tabs you opened with `browser_tabs` action `"close"`. Never open multiple tabs unless the user asks for it.
     - **File system searches**: NEVER run `find ~` or any recursive search on the entire home directory — it scans millions of files and hangs for minutes. Always scope searches to specific directories (e.g. `find ~/.config/` not `find ~`). If you need to locate a config file, check the known paths first.
     {database_schema}
@@ -369,7 +369,7 @@ struct ChatPrompts {
     CRITICAL: If you already said the user's name in the conversation (e.g. "Hey Matthew!"), their name IS confirmed — do NOT ask for it again. Treat any name you previously used as accepted.
     NEVER repeat steps that already appear in the <conversation_so_far> above — check what was already done (name, language, web search, file scan, follow-up) and skip only those.
     If a step was NOT completed before the restart (not visible in conversation history), you MUST still do it.
-    After completing any remaining steps, continue with: Step 5.5 (browser extension) → Step 5.8 (skills) → complete_onboarding → Step 7.
+    After completing any remaining steps, continue with: Step 5.8 (skills) → complete_onboarding → Step 7.
 
     <tools>
     You have 12 onboarding tools. Use them to set up the app for the user.
