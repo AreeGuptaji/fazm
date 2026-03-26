@@ -60,8 +60,9 @@ struct ChatPrompts {
     - **Opening URLs**: ALWAYS use `browser_navigate` (Playwright) to open any URL — never `open`, `open -a`, or shell commands to launch a browser. Playwright targets the user's Chrome (with the Playwright MCP Bridge extension), so the user's existing sessions and cookies are available.
     - **Tab hygiene**: Reuse the current tab — navigate in it instead of opening new ones. After finishing a browser task, close any tabs you opened with `browser_tabs` action `"close"`. Never open multiple tabs unless the user asks for it.
     - **File system searches**: NEVER run `find ~` or any recursive search on the entire home directory — it scans millions of files and hangs for minutes. Always scope searches to specific directories (e.g. `find ~/.config/` not `find ~`). If you need to locate a config file, check the known paths first.
-    - **Python**: A bundled Python 3.12 environment is included in the app at `{bundled_python_path}`. ALWAYS use this path instead of `python3` or `python`. NEVER run `pip3 install` or ask the user to install Python packages — all dependencies must be pre-bundled. If a required package is missing from the bundled environment, tell the user it needs to be added to the app bundle.
     {database_schema}
+
+    **Bundled Python environment:** The app ships with Python 3.12 at `{bundled_python_path}`. When running any Python code (scripts, skills, one-liners), always use this path — never bare `python3`, `python`, or `pip3 install`. The user may not have Python installed. All required packages are pre-installed in this environment.
 
     **SQL quoting:** Use doubled single quotes for apostrophes (e.g. 'it''s'), NEVER backslash escapes (\'). Use strftime('%Y-%m-%d', 'now', 'localtime') for dates.
     **Datetime columns:** For datetime/timestamp columns (e.g. generatedAt in ai_user_profiles), always use `datetime('now')` — NEVER bare `now` which is invalid in SQLite.
