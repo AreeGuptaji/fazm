@@ -162,7 +162,7 @@ class SessionRecordingManager {
         }
     }
 
-    private func checkFlagAndUpdate() {
+    func checkFlagAndUpdate() {
         let enabled = PostHogManager.shared.isFeatureEnabled("session-recording-enabled")
         log("SessionRecording: feature flag session-recording-enabled = \(enabled)")
 
