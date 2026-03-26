@@ -827,8 +827,9 @@ class ChatToolExecutor {
             }
         }
 
-        // Install bundled skills (in case the AI didn't call install_skills during onboarding)
+        // Install bundled skills
         let _ = SkillInstaller.install()
+        AnalyticsManager.shared.onboardingChatToolUsed(tool: "install_skills", properties: ["source": "complete_onboarding", "requested_count": SkillInstaller.bundledSkillNames.count])
 
         // Mark that the tool was called so the "Continue to App" button shows even after restart
         OnboardingChatPersistence.markToolCompleted()
