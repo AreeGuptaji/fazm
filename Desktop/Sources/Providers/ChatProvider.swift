@@ -341,6 +341,9 @@ class ChatProvider: ObservableObject {
     private var floatingChatRestored = false
     /// Saved ACP session ID for resuming the floating chat after restart
     private var pendingFloatingResume: String?
+    /// Conversation session ID for grouping messages within the chat_messages table.
+    /// A new UUID is generated each time the user starts a new chat.
+    private var floatingChatSessionId: String = UUID().uuidString
     @Published var sessionsLoadError: String?
     @Published var selectedAppId: String?
     @Published var hasMoreMessages = false
@@ -961,6 +964,7 @@ class ChatProvider: ObservableObject {
             pendingFloatingResume = nil
             messages = []
             pendingMessages.removeAll()
+            floatingChatSessionId = UUID().uuidString
         }
     }
 
@@ -2012,7 +2016,8 @@ class ChatProvider: ObservableObject {
                 Task { await OnboardingChatPersistence.saveMessage(msg) }
             } else if sessionKey == "floating" {
                 let msg = userMessage
-                Task { await ChatMessageStore.saveMessage(msg, context: "__floating__") }
+                let sid = floatingChatSessionId
+                Task { await ChatMessageStore.saveMessage(msg, context: "__floating__", sessionId: sid) }
                 // User sent a message in the new chat — clear the "new chat" flag
                 // so this conversation restores if the app is killed mid-conversation
                 UserDefaults.standard.removeObject(forKey: Self.floatingChatClearedKey)
