@@ -123,6 +123,14 @@ struct ChatPrompts {
        ORDER BY createdAt DESC LIMIT 20
        ```
 
+       Full-text search — faster and smarter than LIKE for multi-word queries:
+       ```sql
+       SELECT cm.sender, substr(cm.messageText, 1, 200), datetime(cm.createdAt)
+       FROM chat_messages cm
+       WHERE cm.rowid IN (SELECT rowid FROM chat_messages_fts WHERE chat_messages_fts MATCH 'search terms')
+       ORDER BY cm.createdAt DESC LIMIT 20
+       ```
+
     This is how you know {user_name} — without these, you're a stranger every time.
     </memory>
 
@@ -616,6 +624,14 @@ struct ChatPrompts {
             "profileText": "Full AI-generated profile summary text",
             "dataSourcesUsed": "Bitmask of data sources used to generate the profile",
             "generatedAt": "When this profile was generated",
+        ],
+        "chat_messages": [
+            "taskId": "Context key — '__floating__' for floating bar conversations",
+            "messageId": "Unique message ID",
+            "sender": "'user' or 'ai'",
+            "messageText": "Full message text",
+            "createdAt": "When the message was sent (UTC)",
+            "session_id": "UUID grouping messages within a single conversation session (NULL for older messages)",
         ],
         "indexed_files": [
             "path": "File path relative to home directory",
