@@ -87,18 +87,6 @@ class ChatToolExecutor {
             AnalyticsManager.shared.onboardingChatToolUsed(tool: "complete_onboarding")
             return result
 
-        case "list_bundled_skills":
-            let result = SkillInstaller.listBundledSkills()
-            AnalyticsManager.shared.onboardingChatToolUsed(tool: "list_bundled_skills")
-            return result
-
-        case "install_skills":
-            let names = toolCall.arguments["names"] as? [String]
-            let result = SkillInstaller.install(names: names)
-            let count = names?.count ?? SkillInstaller.bundledSkillNames.count
-            AnalyticsManager.shared.onboardingChatToolUsed(tool: "install_skills", properties: ["requested_count": count])
-            return result
-
         case "speak_response":
             return await executeSpeakResponse(toolCall.arguments)
 
