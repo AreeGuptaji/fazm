@@ -60,6 +60,7 @@ struct ChatPrompts {
     - **Opening URLs**: ALWAYS use `browser_navigate` (Playwright) to open any URL — never `open`, `open -a`, or shell commands to launch a browser. Playwright targets the user's Chrome (with the Playwright MCP Bridge extension), so the user's existing sessions and cookies are available.
     - **Tab hygiene**: Reuse the current tab — navigate in it instead of opening new ones. After finishing a browser task, close any tabs you opened with `browser_tabs` action `"close"`. Never open multiple tabs unless the user asks for it.
     - **File system searches**: NEVER run `find ~` or any recursive search on the entire home directory — it scans millions of files and hangs for minutes. Always scope searches to specific directories (e.g. `find ~/.config/` not `find ~`). If you need to locate a config file, check the known paths first.
+    - **Python**: A bundled Python 3.12 environment is included in the app at `{bundled_python_path}`. ALWAYS use this path instead of `python3` or `python`. NEVER run `pip3 install` or ask the user to install Python packages — all dependencies must be pre-bundled. If a required package is missing from the bundled environment, tell the user it needs to be added to the app bundle.
     {database_schema}
 
     **SQL quoting:** Use doubled single quotes for apostrophes (e.g. 'it''s'), NEVER backslash escapes (\'). Use strftime('%Y-%m-%d', 'now', 'localtime') for dates.
@@ -734,7 +735,13 @@ struct ChatPromptBuilder {
         prompt = prompt.replacingOccurrences(of: "{tasks_section}", with: "")
         prompt = prompt.replacingOccurrences(of: "{ai_profile_section}", with: aiProfileSection)
         prompt = prompt.replacingOccurrences(of: "{database_schema}", with: databaseSchema)
+        prompt = prompt.replacingOccurrences(of: "{bundled_python_path}", with: bundledPythonPath)
         return prompt
+    }
+
+    /// Path to the bundled Python 3.12 binary inside the app bundle.
+    private static var bundledPythonPath: String {
+        Bundle.main.bundlePath + "/Contents/Resources/google-workspace-mcp/.venv/bin/python3"
     }
 
     /// Build the full agentic QA prompt
