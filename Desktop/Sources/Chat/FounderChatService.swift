@@ -223,7 +223,7 @@ class FounderChatService: ObservableObject {
             } else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let body = String(data: data, encoding: .utf8) ?? ""
-                log("FounderChatService: Send failed (status \(statusCode)): \(body.prefix(300))")
+                log("FounderChatService: Send failed (status \(statusCode)): \(body.prefix(500))")
             }
         } catch {
             log("FounderChatService: Send failed: \(error.localizedDescription)")
@@ -291,7 +291,7 @@ class FounderChatService: ObservableObject {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let body = String(data: data, encoding: .utf8) ?? ""
-                log("FounderChatService: fetchMessages failed (status \(code)): \(body.prefix(300))")
+                log("FounderChatService: fetchMessages failed (status \(code)): \(body.prefix(500))")
                 return
             }
 
