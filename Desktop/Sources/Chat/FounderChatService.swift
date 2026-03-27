@@ -203,7 +203,7 @@ class FounderChatService: ObservableObject {
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["fields": msgFields])
 
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
                 log("FounderChatService: Message sent successfully")
 
@@ -222,7 +222,8 @@ class FounderChatService: ObservableObject {
                 await updateMetadata(uid: uid, idToken: idToken, lastMessageText: text, userEmail: userEmail, userName: userName)
             } else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                log("FounderChatService: Send failed (status \(statusCode))")
+                let body = String(data: data, encoding: .utf8) ?? ""
+                log("FounderChatService: Send failed (status \(statusCode)): \(body.prefix(300))")
             }
         } catch {
             log("FounderChatService: Send failed: \(error.localizedDescription)")
@@ -287,9 +288,17 @@ class FounderChatService: ObservableObject {
             request.httpBody = jsonData
 
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                let body = String(data: data, encoding: .utf8) ?? ""
+                log("FounderChatService: fetchMessages failed (status \(code)): \(body.prefix(300))")
+                return
+            }
 
-            guard let results = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
+            guard let results = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                log("FounderChatService: fetchMessages — could not parse response")
+                return
+            }
 
             var fetched: [FounderChatMessage] = []
             for entry in results {
