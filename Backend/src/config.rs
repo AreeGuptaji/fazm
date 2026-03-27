@@ -23,6 +23,8 @@ pub struct Config {
     // Comma-separated list of Firebase UIDs or device IDs that should NOT receive the builtin API key.
     // Set to "*" to block ALL users (global kill switch).
     pub builtin_key_blocklist: Vec<String>,
+    // Shared secret for release management (register/promote endpoints)
+    pub release_secret: String,
 }
 
 impl Config {
@@ -79,6 +81,8 @@ impl Config {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect(),
+            release_secret: std::env::var("RELEASE_SECRET")
+                .unwrap_or_default(),
         }
     }
 }
