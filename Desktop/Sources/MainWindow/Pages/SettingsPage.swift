@@ -13,7 +13,7 @@ struct SettingsPage: View {
 
     var body: some View {
         Group {
-            if selectedSection == .chatWithUs {
+            if selectedSection == .chatWithFounder {
                 // Chat page fills the entire content area (no header/scroll wrapper)
                 FounderChatPage()
             } else {
@@ -137,7 +137,7 @@ struct SettingsContentView: View {
 
     enum SettingsSection: String, CaseIterable {
         case home = "Home"
-        case chatWithUs = "Chat with Us"
+        case chatWithFounder = "Chat with Founder"
         case discoveredTasks = "Discovered Tasks"
         case remoteControl = "Remote Control"
         case dictionary = "Dictionary"
@@ -187,7 +187,7 @@ struct SettingsContentView: View {
                 switch selectedSection {
                 case .home:
                     HomeSection(appState: appState)
-                case .chatWithUs:
+                case .chatWithFounder:
                     FounderChatPage()
                 case .discoveredTasks:
                     DiscoveredTasksSection()
