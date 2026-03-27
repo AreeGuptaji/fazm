@@ -166,12 +166,7 @@ async fn validate_firebase_token(
     Ok(uid)
 }
 
-/// Returns true if the token looks like a JWT (has exactly 2 dots separating 3 parts)
-fn looks_like_jwt(token: &str) -> bool {
-    token.chars().filter(|&c| c == '.').count() == 2
-}
-
-/// Middleware that validates either a Firebase ID token or the legacy shared secret
+/// Middleware that validates a Firebase ID token
 pub async fn auth_middleware(
     request: Request,
     next: Next,
@@ -209,35 +204,17 @@ pub async fn auth_middleware(
         .unwrap_or("unknown")
         .to_string();
 
-    let auth_device = if looks_like_jwt(token) {
-        // Try Firebase ID token validation
-        match validate_firebase_token(token, &config.firebase_project_id, &jwks_cache).await {
-            Ok(uid) => {
-                tracing::debug!("Firebase auth success: uid={}, device={}", uid, device_id);
-                AuthDevice {
-                    device_id,
-                    firebase_uid: Some(uid),
-                }
-            }
-            Err(e) => {
-                tracing::warn!("Firebase token validation failed: {}", e);
-                return Err(StatusCode::UNAUTHORIZED);
+    let auth_device = match validate_firebase_token(token, &config.firebase_project_id, &jwks_cache).await {
+        Ok(uid) => {
+            tracing::debug!("Firebase auth success: uid={}, device={}", uid, device_id);
+            AuthDevice {
+                device_id,
+                firebase_uid: Some(uid),
             }
         }
-    } else {
-        // Legacy shared secret auth
-        match &config.backend_secret {
-            Some(secret) if token == secret => {
-                tracing::debug!("Legacy secret auth success: device={}", device_id);
-                AuthDevice {
-                    device_id,
-                    firebase_uid: None,
-                }
-            }
-            _ => {
-                tracing::warn!("Legacy auth failed: invalid or unconfigured secret");
-                return Err(StatusCode::UNAUTHORIZED);
-            }
+        Err(e) => {
+            tracing::warn!("Firebase token validation failed: {}", e);
+            return Err(StatusCode::UNAUTHORIZED);
         }
     };
 
