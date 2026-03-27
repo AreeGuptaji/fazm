@@ -36,7 +36,7 @@ struct ToolCallGroupItem: Equatable, Identifiable {
         var result: [ContentBlockGroup] = []
         var pendingText = ""
         var pendingTextId = ""
-        var pendingToolCalls: [(name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)] = []
+        var pendingToolCalls: [ToolCallGroupItem] = []
         var pendingToolCallsId = ""
 
         func flushText() {
@@ -69,7 +69,7 @@ struct ToolCallGroupItem: Equatable, Identifiable {
                 if pendingToolCalls.isEmpty {
                     pendingToolCallsId = id
                 }
-                pendingToolCalls.append((name: name, status: status, toolUseId: toolUseId, input: input, output: output))
+                pendingToolCalls.append(ToolCallGroupItem(name: name, status: status, toolUseId: toolUseId, input: input, output: output))
 
             case .thinking(let id, let text):
                 flushText()
@@ -97,11 +97,11 @@ struct ToolCallGroupItem: Equatable, Identifiable {
 // MARK: - Tool Calls Group View
 
 struct ToolCallsGroup: View {
-    let calls: [(name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)]
+    let calls: [ContentBlockGroup.ToolCallGroupItem]
     @State private var isExpanded = false
 
     /// The currently running call, or the last call if all completed
-    private var latestCall: (name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)? {
+    private var latestCall: ContentBlockGroup.ToolCallGroupItem? {
         calls.last(where: { $0.status == .running }) ?? calls.last
     }
 
