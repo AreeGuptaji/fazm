@@ -545,12 +545,14 @@ actor ACPBridge {
     }
     sendLine(jsonString)
 
-    // Read messages until we get a result or error.
-    // No per-message timeout — rely on process termination (handleTermination) to
-    // detect a dead bridge. A per-message timeout (like Zed's old low_speed_timeout)
-    // fires prematurely during long-running tools (sentry-logs, slow API calls, etc.).
+    // Inactivity timeout: if no message arrives from the bridge for 3 minutes,
+    // consider the query stuck (e.g., a hung Bash command that bypassed the SDK's
+    // own 120s timeout). ChatProvider catches BridgeError.timeout and sends
+    // interrupt() to cancel the stuck session. 3 minutes is well beyond the SDK's
+    // default Bash timeout (2 min) so this only fires as a last-resort safety net.
+    let inactivityTimeout: TimeInterval = 180
     while true {
-      let message = try await waitForMessage()
+      let message = try await waitForMessage(timeout: inactivityTimeout)
 
       switch message {
       case .`init`:
