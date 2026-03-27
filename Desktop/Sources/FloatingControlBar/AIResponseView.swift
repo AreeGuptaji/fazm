@@ -25,6 +25,14 @@ struct AIResponseView: View {
     @Binding var suggestedReplies: [String]
     @Binding var suggestedReplyQuestion: String
 
+    /// Pre-filtered exchanges to avoid re-filtering in body on every render.
+    private var regularExchanges: [FloatingChatExchange] {
+        chatHistory.filter { !$0.question.isEmpty }
+    }
+    private var observerOnlyExchanges: [FloatingChatExchange] {
+        chatHistory.filter { $0.question.isEmpty }
+    }
+
     var onClose: (() -> Void)?
     var onNewChat: (() -> Void)?
     var onSendFollowUp: ((String) -> Void)?
@@ -50,7 +58,7 @@ struct AIResponseView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         // Previous chat exchanges — regular ones rendered individually
-                        ForEach(chatHistory.filter { !$0.question.isEmpty }) { exchange in
+                        ForEach(regularExchanges) { exchange in
                             chatExchangeView(exchange)
                         }
                         // Observer-only exchanges consolidated into one stack
@@ -494,7 +502,7 @@ struct AIResponseView: View {
     /// Collects all observer cards from observer-only history exchanges into one stack.
     @ViewBuilder
     private var consolidatedHistoryObserverCards: some View {
-        let cards = extractObserverCards(from: chatHistory.filter { $0.question.isEmpty })
+        let cards = extractObserverCards(from: observerOnlyExchanges)
         if !cards.isEmpty {
             ObserverCardStackView(
                 cards: cards,
@@ -614,15 +622,15 @@ struct AIResponseView: View {
         .cornerRadius(8)
     }
 
+    /// Whether the user input text needs an expand button — cached to avoid
+    /// recalculating NSAttributedString.boundingRect on every render.
     private var needsExpansion: Bool {
         let font = NSFont.systemFont(ofSize: 13)
-        let attributes = [NSAttributedString.Key.font: font]
-        let size = (userInput as NSString).boundingRect(
-            with: NSSize(width: 350, height: CGFloat.greatestFiniteMagnitude),
+        return (userInput as NSString).boundingRect(
+            with: NSSize(width: 350, height: .greatestFiniteMagnitude),
             options: .usesLineFragmentOrigin,
-            attributes: attributes
-        ).size
-        return size.height > font.pointSize * 1.5
+            attributes: [.font: font]
+        ).size.height > font.pointSize * 1.5
     }
 
     private var currentContentView: some View {
