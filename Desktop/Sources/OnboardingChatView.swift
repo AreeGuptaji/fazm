@@ -155,6 +155,7 @@ struct OnboardingChatView: View {
     @State private var pendingPermissionType: String? = nil  // e.g. "microphone" — waiting for user to grant
     @State private var inputPulseActive: Bool = false
     @State private var inputPulsePhase: Bool = false
+    @State private var showSkipConfirmation: Bool = false
     @FocusState private var isInputFocused: Bool
 
     // Parallel exploration state
@@ -179,7 +180,7 @@ struct OnboardingChatView: View {
 
                 Spacer()
 
-                Button(action: onSkip) {
+                Button(action: { showSkipConfirmation = true }) {
                     Text("Skip")
                         .font(.system(size: 13))
                         .foregroundColor(FazmColors.textTertiary)
@@ -396,6 +397,14 @@ struct OnboardingChatView: View {
         }
         .onChange(of: appState.hasAccessibilityPermission) { _, granted in
             if granted { handlePermissionGranted("accessibility", label: "Accessibility") }
+        }
+        .alert("Skip setup?", isPresented: $showSkipConfirmation) {
+            Button("Continue Setup", role: .cancel) { }
+            Button("Skip") {
+                onSkip()
+            }
+        } message: {
+            Text("You can restart setup anytime from the Home page.")
         }
     }
 
