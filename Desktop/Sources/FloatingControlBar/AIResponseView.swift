@@ -627,7 +627,7 @@ struct AIResponseView: View {
     private var needsExpansion: Bool {
         let font = NSFont.systemFont(ofSize: 13)
         return (userInput as NSString).boundingRect(
-            with: NSSize(width: 350, height: .greatestFiniteMagnitude),
+            with: NSSize(width: 350, height: CGFloat.greatestFiniteMagnitude),
             options: .usesLineFragmentOrigin,
             attributes: [.font: font]
         ).size.height > font.pointSize * 1.5
