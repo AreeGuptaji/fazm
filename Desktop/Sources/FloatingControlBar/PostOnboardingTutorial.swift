@@ -160,8 +160,9 @@ class PostOnboardingTutorialManager {
                                     self.viewModel.step = .selectMic
                                 }
                             } else {
-                                // Speech detected — dismiss overlay and transition to guided chat
-                                self.dismiss()
+                                // Speech detected — hide overlay and transition to guided chat
+                                // Don't mark as completed yet — that happens when the chat guide finishes
+                                self.hideOverlay()
                                 // Show pulsating send button hint (focus is handled by PushToTalkManager)
                                 barState.showSendButtonHint = true
                                 // Start the tutorial chat guide — it will observe the first
@@ -177,8 +178,9 @@ class PostOnboardingTutorialManager {
             .store(in: &cancellables)
     }
 
-    func dismiss() {
-        UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    /// Hide the overlay window without marking the tutorial as completed.
+    /// Used when transitioning to the tutorial chat guide after first voice interaction.
+    private func hideOverlay() {
         cancellables.removeAll()
         viewModel.stopPulse()
 
@@ -192,6 +194,18 @@ class PostOnboardingTutorialManager {
                 self?.window = nil
             }
         })
+    }
+
+    /// Dismiss the tutorial and mark it as completed (user explicitly skipped or finished).
+    func dismiss() {
+        UserDefaults.standard.set(true, forKey: userDefaultsKey)
+        hideOverlay()
+    }
+
+    /// Mark the tutorial as completed without touching the overlay window.
+    /// Called by TutorialChatGuide when all steps are done.
+    func markCompleted() {
+        UserDefaults.standard.set(true, forKey: userDefaultsKey)
     }
 
     /// Force-replay the tutorial (for debugging / demos).
@@ -478,6 +492,9 @@ class TutorialChatGuide {
         barState.tutorialSystemPromptSuffix = nil
         barState.tutorialPrompts = []
         cancellables.removeAll()
+
+        // Mark tutorial as completed so it won't re-show on next launch
+        PostOnboardingTutorialManager.shared.markCompleted()
 
         // Reset the floating ACP session so tutorial conversation history
         // doesn't consume context in future queries
