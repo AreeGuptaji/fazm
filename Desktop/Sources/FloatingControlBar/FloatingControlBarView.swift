@@ -311,6 +311,10 @@ struct FloatingControlBarView: View {
                         state.currentAIMessage = nil
                     }
                     onSendQuery(message)
+                    // Focus the follow-up input after the view transition settles
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        (window as? FloatingControlBarWindow)?.focusInputField()
+                    }
                 },
                 onCancel: onCloseAI,
                 onHeightChange: { [weak state] height in
