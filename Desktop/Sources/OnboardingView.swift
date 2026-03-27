@@ -162,6 +162,9 @@ struct OnboardingView: View {
         // Stop the AI if it's still running
         chatProvider.stopAgent()
 
+        // Mark that onboarding was skipped (so Home page can prompt to restart)
+        UserDefaults.standard.set(true, forKey: "onboardingWasSkipped")
+
         // Navigate to Chat page after transition (not Dashboard)
         UserDefaults.standard.set(true, forKey: "onboardingJustCompleted")
 
