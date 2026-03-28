@@ -1121,6 +1121,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
     };
 
     // Send the prompt — retry with fresh session if stale
+    let promptStartTime = Date.now();
     const sendPrompt = async (): Promise<void> => {
       const promptBlocks: Array<Record<string, unknown>> = [];
       // Cap image sends per session to avoid Claude's "many-image" stricter 2000px limit.
@@ -1135,7 +1136,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
         prompt: promptBlocks,
       };
 
-      const promptStartTime = Date.now();
+      promptStartTime = Date.now();
       logErr(`[TIMING] session/prompt request sending (sessionId=${sessionId}, promptLength=${fullPrompt.length})`);
 
       const promptResult = (await acpRequest("session/prompt", sessionPromptPayload)) as {
@@ -1179,7 +1180,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
     try {
       await sendPrompt();
     } catch (err) {
-      const elapsedMs = Date.now() - (promptStartTime ?? Date.now());
+      const elapsedMs = Date.now() - promptStartTime;
       logErr(`[TIMING] Query failed after ${elapsedMs}ms, notifications received: ${notificationCount}, fullText: ${fullText.length} chars, error: ${err instanceof Error ? err.message : String(err)}`);
       if (abortController.signal.aborted) {
         if (interruptRequested) {
