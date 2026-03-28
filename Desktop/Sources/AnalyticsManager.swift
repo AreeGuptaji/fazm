@@ -17,6 +17,11 @@ class AnalyticsManager {
     private var sessionHeartbeatTimer: Timer?
     private var sessionStartTime: Date?
 
+    // Chat session tracking (floating bar AI conversation lifecycle)
+    private var chatSessionStartTime: Date?
+    private var chatSessionQueryCount: Int = 0
+    private var chatSessionCostUsd: Double = 0.0
+
     private init() {}
 
     // MARK: - Initialization
@@ -744,10 +749,38 @@ class AnalyticsManager {
     func floatingBarAskFazmOpened(source: String) {
         let props: [String: Any] = ["source": source]
         PostHogManager.shared.track("floating_bar_ask_fazm_opened", properties: props)
+
+        // Start chat session timer
+        chatSessionStartTime = Date()
+        chatSessionQueryCount = 0
+        chatSessionCostUsd = 0.0
     }
 
     func floatingBarAskFazmClosed() {
         PostHogManager.shared.track("floating_bar_ask_fazm_closed")
+        endChatSession(source: "closed")
+    }
+
+    /// Accumulate per-query stats into the current chat session.
+    func chatSessionTrackQuery(costUsd: Double) {
+        chatSessionQueryCount += 1
+        chatSessionCostUsd += costUsd
+    }
+
+    /// Emit `chat_session_ended` with duration, query count, and total cost.
+    private func endChatSession(source: String) {
+        guard let start = chatSessionStartTime else { return }
+        let durationSeconds = Int(Date().timeIntervalSince(start))
+        let props: [String: Any] = [
+            "duration_seconds": durationSeconds,
+            "query_count": chatSessionQueryCount,
+            "total_cost_usd": chatSessionCostUsd,
+            "source": source
+        ]
+        PostHogManager.shared.track("chat_session_ended", properties: props)
+        chatSessionStartTime = nil
+        chatSessionQueryCount = 0
+        chatSessionCostUsd = 0.0
     }
 
     func floatingBarQuerySent(messageLength: Int, hasScreenshot: Bool, queryText: String) {
