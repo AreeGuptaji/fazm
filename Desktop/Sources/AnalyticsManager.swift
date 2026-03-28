@@ -90,6 +90,11 @@ class AnalyticsManager {
             ])
         }
         sessionStartTime = nil
+
+        // End any active chat session on app quit
+        if chatSessionStartTime != nil {
+            endChatSession(source: "app_terminated")
+        }
     }
 
     // MARK: - Onboarding Events
@@ -492,6 +497,9 @@ class AnalyticsManager {
             props["ttft_ms"] = ttftMs
         }
         PostHogManager.shared.track("chat_agent_query_completed", properties: props)
+
+        // Accumulate into chat session
+        chatSessionTrackQuery(costUsd: costUsd)
     }
 
     func chatToolCallCompleted(toolName: String, durationMs: Int, success: Bool = true, error: String? = nil) {
@@ -744,6 +752,11 @@ class AnalyticsManager {
             "source": source
         ]
         PostHogManager.shared.track("floating_bar_toggled", properties: props)
+
+        // End chat session if bar is hidden while a conversation was active
+        if !visible && chatSessionStartTime != nil {
+            endChatSession(source: "bar_hidden")
+        }
     }
 
     func floatingBarAskFazmOpened(source: String) {
