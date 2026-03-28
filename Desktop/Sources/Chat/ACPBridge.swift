@@ -551,8 +551,16 @@ actor ACPBridge {
     // interrupt() to cancel the stuck session. 3 minutes is well beyond the SDK's
     // default Bash timeout (2 min) so this only fires as a last-resort safety net.
     let inactivityTimeout: TimeInterval = 180
+    var messageCount = 0
+    var lastMessageTime = Date()
     while true {
       let message = try await waitForMessage(timeout: inactivityTimeout)
+      messageCount += 1
+      let gapMs = Int(Date().timeIntervalSince(lastMessageTime) * 1000)
+      lastMessageTime = Date()
+      if messageCount <= 3 || gapMs > 10000 || messageCount % 50 == 0 {
+        log("ACPBridge: msg #\(messageCount) type=\(String(describing: message).prefix(40)) gap=\(gapMs)ms")
+      }
 
       switch message {
       case .`init`:
@@ -981,6 +989,7 @@ actor ACPBridge {
             try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             if self.messageGeneration == expectedGeneration, self.messageContinuation != nil {
               self.messageContinuation = nil
+              log("ACPBridge: waitForMessage timeout fired after \(timeout)s — no message received, bridge may be stuck")
               continuation.resume(throwing: BridgeError.timeout)
             }
           }
