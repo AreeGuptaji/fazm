@@ -1097,11 +1097,23 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
     fullPrompt = msg.prompt;
 
     // Set up notification handler for this query
+    let notificationCount = 0;
+    let lastNotificationTime = Date.now();
     acpNotificationHandler = (method: string, params: unknown) => {
       if (abortController.signal.aborted) return;
 
       if (method === "session/update") {
+        notificationCount++;
+        const now = Date.now();
+        const gapMs = now - lastNotificationTime;
+        lastNotificationTime = now;
         const p = params as Record<string, unknown>;
+        const update = p.update as Record<string, unknown> | undefined;
+        const sessionUpdate = update?.sessionUpdate as string | undefined;
+        // Log every notification with gap time to detect stalls
+        if (notificationCount <= 5 || gapMs > 10000 || notificationCount % 50 === 0) {
+          logErr(`[NOTIFY] #${notificationCount} type=${sessionUpdate ?? "?"} gap=${gapMs}ms`);
+        }
         handleSessionUpdate(p, pendingTools, (text) => {
           fullText += text;
         });
@@ -1123,6 +1135,9 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
         prompt: promptBlocks,
       };
 
+      const promptStartTime = Date.now();
+      logErr(`[TIMING] session/prompt request sending (sessionId=${sessionId}, promptLength=${fullPrompt.length})`);
+
       const promptResult = (await acpRequest("session/prompt", sessionPromptPayload)) as {
         stopReason: string;
         // Populated by patched-acp-entry.mjs intercepting SDKResultSuccess
@@ -1130,7 +1145,8 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
         _meta?: { costUsd?: number };
       };
 
-      logErr(`Prompt completed: stopReason=${promptResult.stopReason}`);
+      const promptDurationMs = Date.now() - promptStartTime;
+      logErr(`Prompt completed: stopReason=${promptResult.stopReason} duration=${promptDurationMs}ms`);
 
       // Increment image turn counter so we know when to stop including screenshots.
       // Image turn counting removed — screenshots are now read by the model via Read tool
@@ -1163,6 +1179,8 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
     try {
       await sendPrompt();
     } catch (err) {
+      const elapsedMs = Date.now() - (promptStartTime ?? Date.now());
+      logErr(`[TIMING] Query failed after ${elapsedMs}ms, notifications received: ${notificationCount}, fullText: ${fullText.length} chars, error: ${err instanceof Error ? err.message : String(err)}`);
       if (abortController.signal.aborted) {
         if (interruptRequested) {
           for (const name of pendingTools) {

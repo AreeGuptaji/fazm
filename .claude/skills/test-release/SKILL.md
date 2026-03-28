@@ -14,16 +14,12 @@ Smoke test a Fazm release on **both** the local production app and the MacStadiu
 
 ### Step 1: Trigger Update on Local Machine
 
-1. Open the production Fazm app (not Fazm Dev):
-   ```bash
-   open -a "Fazm"
-   ```
-2. Wait 5 seconds for it to launch, then use `macos-use` MCP to navigate to Settings > About and click "Check for Updates"
-3. Wait for Sparkle to find and install the update. Watch logs:
-   ```bash
-   tail -f /private/tmp/fazm.log | grep -i "sparkle\|update"
-   ```
-4. If the app restarts after update, wait for it to be ready
+1. Open the production Fazm app: `open -a "Fazm"`
+2. Use `macos-use` MCP to click the "Update Available" button in the sidebar (or Settings > About > "Check for Updates")
+3. Sparkle shows the update dialog — verify it shows the correct version and release notes
+4. **Do NOT check "Automatically download and install updates"** — we want to manually verify each step
+5. Click "Install Update" and wait for the app to restart
+6. After restart, verify the new version in the title bar or About screen
 
 ### Step 2: Send Test Queries on Local Machine
 
@@ -47,40 +43,16 @@ After each query:
 - Check logs for errors: `grep -i "error\|fail\|crash\|unauthorized\|401" /private/tmp/fazm.log | tail -5`
 - Check the AI actually responded: `grep -i "AGENT_BRIDGE\|response\|completed" /private/tmp/fazm.log | tail -10`
 
-### Step 3: Trigger Update on MacStadium Remote Machine
+### Step 3: Update and Test on MacStadium Remote Machine
 
-1. Check if Fazm is running on the remote machine:
+1. Check Fazm is running: `./scripts/macstadium/ssh.sh "pgrep -la Fazm"` (launch if needed)
+2. Use `macos-use-remote` MCP to click "Update Available" or navigate to Settings > About > "Check for Updates"
+3. Verify update dialog shows correct version, click "Install Update" (do NOT auto-update)
+4. After restart, verify version, then send the same 4 test queries via SSH:
    ```bash
-   ./scripts/macstadium/ssh.sh "pgrep -la Fazm"
+   ./scripts/macstadium/ssh.sh "xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init(\"com.fazm.testQuery\"), object: nil, userInfo: [\"text\": \"YOUR_QUERY\"], deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'"
    ```
-2. If not running, launch it:
-   ```bash
-   ./scripts/macstadium/ssh.sh "open -a Fazm"
-   ```
-3. Use `macos-use-remote` MCP to navigate to Settings > About and trigger "Check for Updates"
-4. Wait for the update to install. Watch remote logs:
-   ```bash
-   ./scripts/macstadium/ssh.sh "tail -50 /tmp/fazm.log" | grep -i "sparkle\|update"
-   ```
-
-### Step 4: Send Test Queries on MacStadium Remote Machine
-
-Use `macos-use-remote` MCP to interact with the floating bar on the remote machine. For each query:
-
-1. Use `macos-use-remote` to activate the floating bar (click or keyboard shortcut)
-2. Type the query into the floating bar input
-3. Wait for the AI to respond
-4. Screenshot the result to verify
-5. Check remote logs for errors:
-   ```bash
-   ./scripts/macstadium/ssh.sh "grep -i 'error\|fail\|crash' /tmp/fazm.log | tail -10"
-   ```
-
-**Remote test queries** (same set):
-- "What is 2+2?"
-- "What do you remember about me?"
-- "What events do I have on my calendar today?"
-- "List the files on my Desktop"
+5. Check remote logs: `./scripts/macstadium/ssh.sh "grep -iE 'error|fail|crash|completed' /tmp/fazm.log | tail -10"`
 
 ### Step 5: Check Sentry
 
