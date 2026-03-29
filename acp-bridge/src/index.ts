@@ -1191,32 +1191,95 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
         const promptDurationMs = Date.now() - promptStartTime;
         logErr(`Prompt completed: stopReason=${promptResult.stopReason} duration=${promptDurationMs}ms`);
 
-      // Increment image turn counter so we know when to stop including screenshots.
-      // Image turn counting removed — screenshots are now read by the model via Read tool
+        // Increment image turn counter so we know when to stop including screenshots.
+        // Image turn counting removed — screenshots are now read by the model via Read tool
 
-      // Mark any remaining pending tools as completed
-      for (const name of pendingTools) {
-        send({ type: "tool_activity", name, status: "completed" });
-      }
-      pendingTools.length = 0;
-
-      // Buffer conversation turns for the observer session (skip if this IS the observer)
-      if (sessionKey !== "observer" && sessions.has("observer")) {
-        bufferObserverTurn("user", fullPrompt);
-        if (fullText.trim()) {
-          bufferObserverTurn("assistant", fullText);
+        // Mark any remaining pending tools as completed
+        for (const name of pendingTools) {
+          send({ type: "tool_activity", name, status: "completed" });
         }
-      }
+        pendingTools.length = 0;
 
-      const inputTokens = promptResult.usage?.inputTokens ?? 0;
-      const outputTokens = promptResult.usage?.outputTokens ?? 0;
-      const cacheReadTokens = promptResult.usage?.cachedReadTokens ?? 0;
-      const cacheWriteTokens = promptResult.usage?.cachedWriteTokens ?? 0;
-      const costUsd = promptResult._meta?.costUsd ?? 0;
-      if (!promptResult.usage) {
-        logErr(`[WARN] No usage data from ACP — cost/token tracking will be zero for this query`);
+        // Buffer conversation turns for the observer session (skip if this IS the observer)
+        if (sessionKey !== "observer" && sessions.has("observer")) {
+          bufferObserverTurn("user", fullPrompt);
+          if (fullText.trim()) {
+            bufferObserverTurn("assistant", fullText);
+          }
+        }
+
+        const inputTokens = promptResult.usage?.inputTokens ?? 0;
+        const outputTokens = promptResult.usage?.outputTokens ?? 0;
+        const cacheReadTokens = promptResult.usage?.cachedReadTokens ?? 0;
+        const cacheWriteTokens = promptResult.usage?.cachedWriteTokens ?? 0;
+        const costUsd = promptResult._meta?.costUsd ?? 0;
+        if (!promptResult.usage) {
+          logErr(`[WARN] No usage data from ACP — cost/token tracking will be zero for this query`);
+        }
+        send({ type: "result", text: fullText, sessionId, costUsd, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens });
+      } catch (watchdogErr) {
+        if (watchdogErr instanceof Error && watchdogErr.message.startsWith("TTFT_WATCHDOG")) {
+          // Session is dead after interrupt — destroy it and retry with a fresh session
+          logErr(`TTFT watchdog fired: session ${sessionId} is unresponsive after interrupt, creating fresh session`);
+          sessions.delete(sessionKey);
+          imageTurnCounts.delete(sessionKey);
+          interruptedSessions.delete(sessionId);
+          // Abort the dangling acpRequest (it will never resolve from ACP)
+          if (activeAbort) activeAbort.abort();
+          // Create a fresh session and retry
+          const freshParams: Record<string, unknown> = {
+            cwd: requestedCwd,
+            mcpServers: buildMcpServers(currentMode, requestedCwd, sessionKey),
+            ...buildMeta(msg.systemPrompt, sessionKey),
+          };
+          const freshResult = (await acpRequest("session/new", freshParams)) as { sessionId: string };
+          sessionId = freshResult.sessionId;
+          sessions.set(sessionKey, { sessionId, cwd: requestedCwd, model: requestedModel });
+          activeSessionId = sessionId;
+          if (requestedModel) {
+            await acpRequest("session/set_model", { sessionId, modelId: requestedModel });
+          }
+          logErr(`Fresh session created: ${sessionId} (key=${sessionKey}) — retrying prompt`);
+          // Reset notification state for the retry
+          notificationCount = 0;
+          // Retry the prompt on the fresh session (no watchdog needed — it's brand new)
+          const retryPayload = { sessionId, prompt: [{ type: "text", text: fullPrompt }] };
+          promptStartTime = Date.now();
+          const retryResult = (await acpRequest("session/prompt", retryPayload)) as {
+            stopReason: string;
+            usage?: { inputTokens: number; outputTokens: number; cachedReadTokens?: number | null; cachedWriteTokens?: number | null; totalTokens: number };
+            _meta?: { costUsd?: number };
+          };
+          const retryDurationMs = Date.now() - promptStartTime;
+          logErr(`Prompt completed (after watchdog recovery): stopReason=${retryResult.stopReason} duration=${retryDurationMs}ms`);
+
+          for (const name of pendingTools) {
+            send({ type: "tool_activity", name, status: "completed" });
+          }
+          pendingTools.length = 0;
+
+          if (sessionKey !== "observer" && sessions.has("observer")) {
+            bufferObserverTurn("user", fullPrompt);
+            if (fullText.trim()) {
+              bufferObserverTurn("assistant", fullText);
+            }
+          }
+
+          const inputTokens = retryResult.usage?.inputTokens ?? 0;
+          const outputTokens = retryResult.usage?.outputTokens ?? 0;
+          const cacheReadTokens = retryResult.usage?.cachedReadTokens ?? 0;
+          const cacheWriteTokens = retryResult.usage?.cachedWriteTokens ?? 0;
+          const costUsd = retryResult._meta?.costUsd ?? 0;
+          if (!retryResult.usage) {
+            logErr(`[WARN] No usage data from ACP — cost/token tracking will be zero for this query`);
+          }
+          send({ type: "result", text: fullText, sessionId, costUsd, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens });
+        } else {
+          throw watchdogErr;
+        }
+      } finally {
+        if (watchdogTimer) clearTimeout(watchdogTimer);
       }
-      send({ type: "result", text: fullText, sessionId, costUsd, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens });
     };
 
     try {
@@ -1880,6 +1943,8 @@ async function main(): Promise<void> {
       case "resetSession": {
         const key = (msg as any).sessionKey;
         if (key && sessions.has(key)) {
+          const oldSessionId = sessions.get(key)?.sessionId;
+          if (oldSessionId) interruptedSessions.delete(oldSessionId);
           sessions.delete(key);
           imageTurnCounts.delete(key);
           logErr(`Session reset: ${key}`);
