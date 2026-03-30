@@ -128,7 +128,7 @@ final class SubscriptionService {
 
         let checkout = try JSONDecoder().decode(CheckoutResponse.self, from: data)
         log("SubscriptionService: opening checkout \(checkout.session_id)")
-        AnalyticsManager.shared.subscriptionCheckoutOpened(sessionId: checkout.session_id)
+        Task { @MainActor in AnalyticsManager.shared.subscriptionCheckoutOpened(sessionId: checkout.session_id) }
 
         if let checkoutURL = URL(string: checkout.checkout_url) {
             await MainActor.run {
@@ -177,7 +177,7 @@ final class SubscriptionService {
 
             log("SubscriptionService: status=\(result.status) active=\(result.active)")
             if result.active && !wasActive {
-                AnalyticsManager.shared.subscriptionActivated(status: result.status)
+                Task { @MainActor in AnalyticsManager.shared.subscriptionActivated(status: result.status) }
             }
             return result.active
         } catch {
