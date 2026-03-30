@@ -12,7 +12,8 @@
     "Fixed a crash during app startup caused by SwiftUI re-entrancy in WebRelay",
     "Fixed infinite retry loop when AI sessions encounter persistent errors",
     "Fixed main thread blocking in orphaned cloudflared cleanup",
-    "Show updating spinner in sidebar and floating bar while Sparkle downloads the update"
+    "Show updating spinner in sidebar and floating bar while Sparkle downloads the update",
+    "Voice response is now on by default with a mute button in the floating dialog header"
   ],
   "releases": [
     {
