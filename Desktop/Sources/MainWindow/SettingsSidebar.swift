@@ -200,13 +200,20 @@ struct SettingsSidebar: View {
             updaterViewModel.checkForUpdates()
         }) {
             HStack(spacing: 12) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .scaledFont(size: 17)
-                    .foregroundColor(.white)
-                    .frame(width: iconWidth)
+                if updaterViewModel.updateSessionInProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                        .colorScheme(.dark)
+                        .frame(width: iconWidth)
+                } else {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .scaledFont(size: 17)
+                        .foregroundColor(.white)
+                        .frame(width: iconWidth)
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Update Available")
+                    Text(updaterViewModel.updateSessionInProgress ? "Updating..." : "Update Available")
                         .scaledFont(size: 13, weight: .semibold)
                         .foregroundColor(.white)
 
@@ -219,9 +226,11 @@ struct SettingsSidebar: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
-                    .scaledFont(size: 12)
-                    .foregroundColor(.white.opacity(0.7))
+                if !updaterViewModel.updateSessionInProgress {
+                    Image(systemName: "chevron.right")
+                        .scaledFont(size: 12)
+                        .foregroundColor(.white.opacity(0.7))
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
@@ -232,6 +241,7 @@ struct SettingsSidebar: View {
             .shadow(color: FazmColors.purplePrimary.opacity(updateGlowAnimating ? 0.7 : 0.3), radius: 8)
         }
         .buttonStyle(.plain)
+        .disabled(updaterViewModel.updateSessionInProgress)
         .onAppear {
             withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                 updateGlowAnimating = true
