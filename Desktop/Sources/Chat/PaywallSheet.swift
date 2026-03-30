@@ -85,7 +85,10 @@ struct PaywallSheet: View {
 
             // Actions
             VStack(spacing: 12) {
-                Button(action: onSubscribe) {
+                Button(action: {
+                    AnalyticsManager.shared.subscriptionUpgradeTapped(source: "paywall")
+                    onSubscribe()
+                }) {
                     Text("Subscribe Now")
                         .scaledFont(size: 14, weight: .semibold)
                         .frame(maxWidth: .infinity)
@@ -96,7 +99,10 @@ struct PaywallSheet: View {
                 }
                 .buttonStyle(.plain)
 
-                Button(action: onDismiss) {
+                Button(action: {
+                    AnalyticsManager.shared.paywallDismissed()
+                    onDismiss()
+                }) {
                     Text("Maybe Later")
                         .scaledFont(size: 13)
                         .foregroundColor(FazmColors.textTertiary)
@@ -161,6 +167,7 @@ final class PaywallWindowController {
             return
         }
 
+        AnalyticsManager.shared.paywallShown()
         let controller = self
         let content = PaywallWindowContent(
             chatProvider: chatProvider,
