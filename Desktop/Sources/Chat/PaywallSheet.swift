@@ -167,7 +167,7 @@ final class PaywallWindowController {
             return
         }
 
-        AnalyticsManager.shared.paywallShown()
+        Task { @MainActor in AnalyticsManager.shared.paywallShown() }
         let controller = self
         let content = PaywallWindowContent(
             chatProvider: chatProvider,
