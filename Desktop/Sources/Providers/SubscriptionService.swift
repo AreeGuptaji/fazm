@@ -45,7 +45,10 @@ final class SubscriptionService {
 
     /// Call after sign-in to update trial start to the actual account creation date.
     func syncTrialStartWithFirebase() {
-        guard let creationDate = Auth.auth().currentUser?.metadata.creationDate else { return }
+        guard let creationDate = Auth.auth().currentUser?.metadata.creationDate else {
+            log("SubscriptionService: syncTrialStart skipped — no Firebase currentUser or creationDate")
+            return
+        }
         let key = "fazm_trial_start_date"
         let current = UserDefaults.standard.object(forKey: key) as? Date
         // Only update if Firebase date is earlier (user signed up before this code existed)
