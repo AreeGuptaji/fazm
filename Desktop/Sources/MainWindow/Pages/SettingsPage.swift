@@ -1863,7 +1863,7 @@ struct SettingsContentView: View {
                                         .foregroundColor(FazmColors.textTertiary)
                                 }
                             } else if !SubscriptionService.shared.isTrialExpired {
-                                let daysLeft = max(0, 30 - (Calendar.current.dateComponents([.day], from: SubscriptionService.shared.trialStartDate, to: Date()).day ?? 0))
+                                let daysLeft = max(0, SubscriptionService.shared.trialDays - (Calendar.current.dateComponents([.day], from: SubscriptionService.shared.trialStartDate, to: Date()).day ?? 0))
                                 Text("\(daysLeft) days remaining in free trial")
                                     .scaledFont(size: 13)
                                     .foregroundColor(FazmColors.textTertiary)
