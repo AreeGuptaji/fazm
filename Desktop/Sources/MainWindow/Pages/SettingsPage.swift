@@ -120,8 +120,9 @@ struct SettingsContentView: View {
     // Dev Mode setting
     @AppStorage("devModeEnabled") private var devModeEnabled = false
 
-    // Voice Response (TTS) setting
+    // Voice Response (TTS) settings
     @AppStorage("voiceResponseEnabled") private var voiceResponseEnabled = false
+    @AppStorage("voiceResponseSpeed") private var voiceResponseSpeed: Double = 1.0
 
     // Browser Extension settings
     @AppStorage("playwrightUseExtension") private var playwrightUseExtension = true
@@ -589,6 +590,39 @@ struct SettingsContentView: View {
                     Text("When enabled, the AI will speak its response aloud using text-to-speech. Takes effect on next message.")
                         .scaledFont(size: 12)
                         .foregroundColor(FazmColors.textTertiary)
+
+                    if voiceResponseEnabled {
+                        Divider()
+                            .background(FazmColors.borderSecondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Speed")
+                                    .scaledFont(size: 13, weight: .medium)
+                                    .foregroundColor(FazmColors.textSecondary)
+
+                                Spacer()
+
+                                Text(String(format: "%.1f×", voiceResponseSpeed))
+                                    .scaledFont(size: 12, weight: .medium)
+                                    .foregroundColor(FazmColors.purplePrimary)
+                                    .monospacedDigit()
+                            }
+
+                            HStack(spacing: 8) {
+                                Text("0.5×")
+                                    .scaledFont(size: 10)
+                                    .foregroundColor(FazmColors.textTertiary)
+
+                                Slider(value: $voiceResponseSpeed, in: 0.5...2.0, step: 0.1)
+                                    .controlSize(.small)
+
+                                Text("2.0×")
+                                    .scaledFont(size: 10)
+                                    .foregroundColor(FazmColors.textTertiary)
+                            }
+                        }
+                    }
                 }
             }
         }
