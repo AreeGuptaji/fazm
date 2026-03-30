@@ -296,6 +296,10 @@ class AuthService: NSObject {
             do {
                 let result = try await Auth.auth().signIn(with: credential)
                 log("AuthService: Firebase SDK sign-in successful (uid: \(result.user.uid))")
+                if let creationDate = result.user.metadata.creationDate {
+                    UserDefaults.standard.set(creationDate, forKey: "fazm_firebase_creation_date")
+                    log("AuthService: Stored Firebase creation date: \(creationDate)")
+                }
             } catch {
                 // Non-fatal — the REST API token is sufficient
                 log("AuthService: Firebase SDK sign-in failed (non-fatal): \(error.localizedDescription)")
@@ -400,6 +404,10 @@ class AuthService: NSObject {
         do {
             let result = try await Auth.auth().signIn(with: credential)
             log("AuthService: Firebase SDK Apple sign-in successful (uid: \(result.user.uid))")
+            if let creationDate = result.user.metadata.creationDate {
+                UserDefaults.standard.set(creationDate, forKey: "fazm_firebase_creation_date")
+                log("AuthService: Stored Firebase creation date: \(creationDate)")
+            }
 
             // If REST API failed, use the SDK result
             if self.idToken == nil {
