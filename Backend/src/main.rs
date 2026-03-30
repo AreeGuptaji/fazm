@@ -114,7 +114,7 @@ async fn main() {
         .layer(TraceLayer::new_for_http());
 
     let addr = format!("0.0.0.0:{}", port);
-    tracing::info!("Starting Fazm Backend on {}", addr);
+    tracing::info!("Starting Fazm Backend on {} (with Stripe routes)", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
