@@ -593,7 +593,7 @@ struct SettingsContentView: View {
 
                     if voiceResponseEnabled {
                         Divider()
-                            .background(FazmColors.borderSecondary)
+                            .background(FazmColors.border)
 
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
