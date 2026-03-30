@@ -58,6 +58,14 @@ async fn main() {
             "/api/relay/discover",
             axum::routing::get(routes::relay::discover),
         )
+        .route(
+            "/api/stripe/create-checkout-session",
+            axum::routing::post(routes::stripe::create_checkout_session),
+        )
+        .route(
+            "/api/stripe/subscription-status",
+            axum::routing::get(routes::stripe::subscription_status),
+        )
         .layer(middleware::from_fn(auth::auth_middleware));
 
     // Public routes (release management uses its own shared-secret auth)
@@ -83,6 +91,10 @@ async fn main() {
         .route(
             "/.well-known/openid-configuration",
             axum::routing::get(routes::vertex::openid_configuration),
+        )
+        .route(
+            "/api/stripe/webhook",
+            axum::routing::post(routes::stripe::webhook),
         );
 
     let cors = CorsLayer::new()
