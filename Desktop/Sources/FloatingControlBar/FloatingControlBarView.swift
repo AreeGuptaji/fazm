@@ -194,15 +194,22 @@ struct FloatingControlBarView: View {
         Button {
             updaterViewModel.checkForUpdates()
         } label: {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 16))
-                .foregroundColor(FazmColors.purplePrimary)
-                .opacity(updateButtonPulse ? 1.0 : 0.4)
-                .scaleEffect(updateButtonPulse ? 1.15 : 0.9)
-                .shadow(color: FazmColors.purplePrimary.opacity(updateButtonPulse ? 0.9 : 0.0), radius: updateButtonPulse ? 8 : 0)
+            if updaterViewModel.updateSessionInProgress {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 16, height: 16)
+            } else {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(FazmColors.purplePrimary)
+                    .opacity(updateButtonPulse ? 1.0 : 0.4)
+                    .scaleEffect(updateButtonPulse ? 1.15 : 0.9)
+                    .shadow(color: FazmColors.purplePrimary.opacity(updateButtonPulse ? 0.9 : 0.0), radius: updateButtonPulse ? 8 : 0)
+            }
         }
         .buttonStyle(.plain)
-        .help("Update available — v\(updaterViewModel.availableVersion)")
+        .disabled(updaterViewModel.updateSessionInProgress)
+        .help(updaterViewModel.updateSessionInProgress ? "Updating..." : "Update available — v\(updaterViewModel.availableVersion)")
         .onAppear {
             updateButtonPulse = false
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
