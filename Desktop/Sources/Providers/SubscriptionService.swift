@@ -1,7 +1,6 @@
 import Foundation
 import IOKit
 import AppKit
-import FirebaseAuth
 
 /// Manages Stripe subscription state — checkout, status polling, and local caching.
 final class SubscriptionService {
@@ -32,8 +31,8 @@ final class SubscriptionService {
         if let stored = UserDefaults.standard.object(forKey: key) as? Date {
             return stored
         }
-        // Use Firebase account creation date if the user is signed in
-        if let creationDate = Auth.auth().currentUser?.metadata.creationDate {
+        // Use persisted Firebase creation date (saved during sign-in)
+        if let creationDate = UserDefaults.standard.object(forKey: "fazm_firebase_creation_date") as? Date {
             UserDefaults.standard.set(creationDate, forKey: key)
             return creationDate
         }
@@ -45,8 +44,8 @@ final class SubscriptionService {
 
     /// Call after sign-in to update trial start to the actual account creation date.
     func syncTrialStartWithFirebase() {
-        guard let creationDate = Auth.auth().currentUser?.metadata.creationDate else {
-            log("SubscriptionService: syncTrialStart skipped — no Firebase currentUser or creationDate")
+        guard let creationDate = UserDefaults.standard.object(forKey: "fazm_firebase_creation_date") as? Date else {
+            log("SubscriptionService: syncTrialStart skipped — no Firebase creation date stored")
             return
         }
         let key = "fazm_trial_start_date"
