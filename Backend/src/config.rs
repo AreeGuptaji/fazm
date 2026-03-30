@@ -25,6 +25,11 @@ pub struct Config {
     pub builtin_key_blocklist: Vec<String>,
     // Shared secret for release management (register/promote endpoints)
     pub release_secret: String,
+    // Stripe
+    pub stripe_secret_key: String,
+    pub stripe_price_id: String,
+    pub stripe_intro_coupon_id: String,
+    pub stripe_webhook_secret: String,
 }
 
 impl Config {
@@ -82,6 +87,14 @@ impl Config {
                 .filter(|s| !s.is_empty())
                 .collect(),
             release_secret: std::env::var("RELEASE_SECRET")
+                .unwrap_or_default(),
+            stripe_secret_key: std::env::var("STRIPE_SECRET_KEY")
+                .unwrap_or_default(),
+            stripe_price_id: std::env::var("STRIPE_PRICE_ID")
+                .unwrap_or_default(),
+            stripe_intro_coupon_id: std::env::var("STRIPE_INTRO_COUPON_ID")
+                .unwrap_or_default(),
+            stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET")
                 .unwrap_or_default(),
         }
     }
