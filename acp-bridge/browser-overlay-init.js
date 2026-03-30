@@ -1,9 +1,17 @@
 /**
- * Fazm Browser Overlay — Init Script
+ * Fazm Browser Overlay — injected into every page when Playwright MCP controls the browser.
  *
- * Auto-injected by Playwright MCP via --init-script flag.
- * Shows an animated glowing overlay indicating the browser is controlled by Fazm.
- * Persists across all page navigations automatically.
+ * Shows animated glowing wings + status pill ("Browser controlled by Fazm").
+ * Semi-transparent, pointer-events:none — doesn't block user interaction.
+ *
+ * HOW IT GETS INJECTED:
+ * - scripts/patch-playwright-overlay.cjs patches Playwright's extensionContextFactory.js
+ *   (runs as npm postinstall) to call page.evaluate() with this script on every page load.
+ * - addInitScript() doesn't work on CDP-connected contexts (extension mode), so we use
+ *   page 'load'/'domcontentloaded' event listeners instead.
+ * - The patch reads this file from disk at Playwright MCP startup (path relative to __dirname).
+ *
+ * TO MODIFY THE OVERLAY: edit this file, rebuild with run.sh. No other changes needed.
  */
 (function injectFazmOverlay() {
   console.log('[fazm-overlay] injectFazmOverlay called, existing:', !!document.getElementById('fazm-overlay'));

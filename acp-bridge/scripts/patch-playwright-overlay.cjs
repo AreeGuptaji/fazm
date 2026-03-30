@@ -3,10 +3,33 @@
  * Patches Playwright MCP's extensionContextFactory.js to inject the Fazm
  * browser overlay on every page load when running in extension mode.
  *
- * addInitScript() does NOT work on CDP-connected contexts, so we use
- * page 'load' / 'domcontentloaded' event listeners instead.
+ * WHY THIS PATCH EXISTS:
+ * Playwright's addInitScript() does NOT work on CDP-connected contexts
+ * (which is what extension mode uses via connectOverCDP). So we can't use
+ * the built-in --init-script flag. Instead, this patch hooks into
+ * createContext() to register page 'load'/'domcontentloaded' event listeners
+ * that call page.evaluate() with the overlay script.
  *
- * Run automatically via npm postinstall.
+ * HOW IT WORKS:
+ * 1. Adds require("path") and require("fs") imports
+ * 2. Loads browser-overlay-init.js from the acp-bridge root at module init time
+ * 3. Patches createContext() to set up page event listeners that inject the overlay
+ *
+ * WHEN PLAYWRIGHT UPDATES:
+ * If the Playwright MCP package updates and the code structure of
+ * extensionContextFactory.js changes, the string replacements below may fail
+ * silently (the overlay just won't appear — nothing breaks). To fix:
+ * 1. Look at the new extensionContextFactory.js in node_modules
+ * 2. Update the string patterns below to match the new code
+ * 3. Run: node scripts/patch-playwright-overlay.cjs
+ * 4. Verify with: grep _fazmOverlayScript node_modules/playwright/lib/mcp/extension/extensionContextFactory.js
+ *
+ * RELATED FILES:
+ * - acp-bridge/browser-overlay-init.js — the overlay UI (CSS animations, DOM elements)
+ * - acp-bridge/package.json — "postinstall" hook that runs this script
+ * - build.sh / run.sh — copy browser-overlay-init.js into the app bundle
+ *
+ * Run automatically via npm postinstall. Safe to run manually at any time.
  */
 const fs = require("fs");
 const path = require("path");
@@ -35,7 +58,7 @@ if (code.includes("_fazmOverlayScript")) {
   process.exit(0);
 }
 
-// Insert requires for path and fs after cdpRelay require
+// --- Step 1: Add path/fs requires (needed to load the overlay script from disk) ---
 if (!code.includes('require("path")')) {
   code = code.replace(
     'var import_cdpRelay = require("./cdpRelay");',
@@ -43,7 +66,9 @@ if (!code.includes('require("path")')) {
   );
 }
 
-// Insert overlay loader after debugLogger line
+// --- Step 2: Load the overlay script at module init time ---
+// The path goes 5 levels up from extensionContextFactory.js to reach acp-bridge root:
+//   extension/ -> mcp/ -> lib/ -> playwright/ -> node_modules/ -> acp-bridge/
 const overlayLoader = `
 // Fazm: load overlay init script for browser injection
 let _fazmOverlayScript = null;
@@ -53,7 +78,7 @@ try {
     _fazmOverlayScript = import_fs.readFileSync(overlayPath, "utf-8");
   }
 } catch (e) {
-  // Overlay is optional
+  // Overlay is optional — don't break Playwright MCP if loading fails
 }
 `;
 
@@ -62,8 +87,9 @@ code = code.replace(
   'const debugLogger = (0, import_utilsBundle.debug)("pw:mcp:relay");\n' + overlayLoader
 );
 
-// Patch createContext: the original returns browser.contexts()[0] inline.
-// We need to extract it to a variable so we can set up event listeners.
+// --- Step 3: Patch createContext() to inject overlay via page event listeners ---
+// The original code returns browser.contexts()[0] inline. We extract it to a variable
+// so we can set up event listeners before returning.
 code = code.replace(
   `async createContext(clientInfo, abortSignal, options) {
     const browser = await this._obtainBrowser(clientInfo, abortSignal, options?.toolName);
@@ -83,6 +109,13 @@ code = code.replace(
     return {
       browserContext,`
 );
+
+// Verify the patch was applied
+if (!code.includes("_fazmOverlayScript")) {
+  console.error("[patch-overlay] WARNING: Patch failed to apply — Playwright MCP may have changed.");
+  console.error("[patch-overlay] The overlay won't appear. See comments in this file for how to fix.");
+  process.exit(0); // Exit 0 so npm install doesn't fail
+}
 
 fs.writeFileSync(targetFile, code);
 console.log("[patch-overlay] Successfully patched extensionContextFactory.js");
