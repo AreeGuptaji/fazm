@@ -3,4 +3,5 @@ pub mod keys;
 pub mod relay;
 pub mod releases;
 pub mod session_recording;
+pub mod stripe;
 pub mod vertex;
