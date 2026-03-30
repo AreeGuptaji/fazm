@@ -50,28 +50,32 @@ final class WebRelay: ObservableObject {
 
     /// Kill any cloudflared processes left over from previous app runs.
     /// These accumulate when the app is force-quit or crashes without calling stop().
+    /// Runs on a background thread to avoid blocking the main thread
+    /// (waitUntilExit pumps the run loop, which can cause SwiftUI re-entrancy crashes).
     private func killOrphanedCloudflared() {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-f", "cloudflared tunnel --url"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
+        Task.detached {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+            task.arguments = ["-f", "cloudflared tunnel --url"]
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = FileHandle.nullDevice
 
-        do {
-            try task.run()
-            task.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return }
+            do {
+                try task.run()
+                task.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                guard let output = String(data: data, encoding: .utf8) else { return }
 
-            let myPid = ProcessInfo.processInfo.processIdentifier
-            for line in output.components(separatedBy: "\n") {
-                guard let pid = Int32(line.trimmingCharacters(in: .whitespaces)), pid != myPid else { continue }
-                log("WebRelay: killing orphaned cloudflared (pid \(pid))")
-                kill(pid, SIGTERM)
+                let myPid = ProcessInfo.processInfo.processIdentifier
+                for line in output.components(separatedBy: "\n") {
+                    guard let pid = Int32(line.trimmingCharacters(in: .whitespaces)), pid != myPid else { continue }
+                    await MainActor.run { log("WebRelay: killing orphaned cloudflared (pid \(pid))") }
+                    kill(pid, SIGTERM)
+                }
+            } catch {
+                // pgrep not found or no matches — fine
             }
-        } catch {
-            // pgrep not found or no matches — fine
         }
     }
 
