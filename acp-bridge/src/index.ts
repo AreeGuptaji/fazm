@@ -739,6 +739,11 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
   }
   // Save snapshots to files and strip inline base64 screenshots to reduce context size
   playwrightArgs.push("--output-mode", "file", "--image-responses", "omit", "--output-dir", "/tmp/playwright-mcp");
+  // Inject visual overlay on every page to indicate browser is controlled by Fazm
+  const overlayInitScript = join(__dirname, "..", "browser-overlay-init.js");
+  if (existsSync(overlayInitScript)) {
+    playwrightArgs.push("--init-script", overlayInitScript);
+  }
   const playwrightEnv: Array<{ name: string; value: string }> = [];
   if (process.env.PLAYWRIGHT_MCP_EXTENSION_TOKEN) {
     playwrightEnv.push({
