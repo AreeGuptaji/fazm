@@ -675,7 +675,7 @@ class ChatProvider: ObservableObject {
     @AppStorage("projectClaudeMdEnabled") var projectClaudeMdEnabled = true
 
     // MARK: - Voice Response (TTS)
-    @AppStorage("voiceResponseEnabled") var voiceResponseEnabled = false
+    @AppStorage("voiceResponseEnabled") var voiceResponseEnabled = true
 
     // MARK: - Dev Mode
     @AppStorage("devModeEnabled") var devModeEnabled = false
