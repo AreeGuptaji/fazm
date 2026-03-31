@@ -58,13 +58,14 @@ async fn generate_appcast(
     config: &Arc<Config>,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     // Fetch Firestore channel map (tag → channel) in parallel with GitHub releases
-    let (firestore_result, github_result) = tokio::join!(
-        fetch_firestore_channels(config),
-        fetch_github_releases()
-    );
+    let (firestore_result, github_result) =
+        tokio::join!(fetch_firestore_channels(config), fetch_github_releases());
 
     let channel_map = firestore_result.unwrap_or_else(|e| {
-        tracing::warn!("Firestore unavailable, falling back to GitHub isPrerelease: {}", e);
+        tracing::warn!(
+            "Firestore unavailable, falling back to GitHub isPrerelease: {}",
+            e
+        );
         std::collections::HashMap::new()
     });
 
@@ -102,7 +103,10 @@ async fn generate_appcast(
             b.as_str().to_string()
         } else {
             let parts: Vec<u64> = version.split('.').filter_map(|p| p.parse().ok()).collect();
-            parts.iter().fold(0u64, |acc, &p| acc * 1000 + p).to_string()
+            parts
+                .iter()
+                .fold(0u64, |acc, &p| acc * 1000 + p)
+                .to_string()
         };
 
         // Determine channel:
@@ -222,10 +226,7 @@ async fn fetch_firestore_channels(
 ) -> Result<std::collections::HashMap<String, String>, Box<dyn std::error::Error + Send + Sync>> {
     let token = firestore::get_access_token(config).await?;
     let releases = firestore::list_live_releases(config, &token).await?;
-    Ok(releases
-        .into_iter()
-        .map(|r| (r.tag, r.channel))
-        .collect())
+    Ok(releases.into_iter().map(|r| (r.tag, r.channel)).collect())
 }
 
 async fn fetch_github_releases(
