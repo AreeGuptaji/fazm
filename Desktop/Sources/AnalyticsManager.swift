@@ -500,6 +500,10 @@ class AnalyticsManager {
         PostHogManager.shared.track("subscription_activated", properties: ["status": status])
     }
 
+    func paywallReferralTapped() {
+        PostHogManager.shared.track("paywall_referral_tapped")
+    }
+
     func paywallFounderCallTapped() {
         PostHogManager.shared.track("paywall_founder_call_tapped")
     }
