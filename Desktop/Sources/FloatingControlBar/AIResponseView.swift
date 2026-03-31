@@ -388,7 +388,7 @@ struct AIResponseView: View {
         HStack(spacing: 6) {
             Image(systemName: "graduationcap.fill")
                 .font(.system(size: 11))
-            Text("Getting Started — Test \(min(state.tutorialChatStep + 1, state.tutorialPrompts.count))/\(state.tutorialPrompts.count)")
+            Text("Getting Started — Step \(min(state.tutorialChatStep + 1, state.tutorialPrompts.count)) of \(state.tutorialPrompts.count)")
                 .scaledFont(size: 11, weight: .medium)
             Spacer()
             Button("Skip") {
