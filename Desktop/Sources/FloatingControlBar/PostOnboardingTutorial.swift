@@ -443,6 +443,8 @@ class TutorialChatGuide {
         let step = barState.tutorialChatStep
         let prompts = barState.tutorialPrompts
 
+        AnalyticsManager.shared.tutorialChatGuidanceInjected(step: step)
+
         if step >= prompts.count {
             // All prompts done — send completion message and end tutorial
             let completionMessage = ChatMessage(
@@ -562,6 +564,7 @@ class TutorialChatGuide {
 
     /// End the tutorial chat guide and reset the floating session to free context.
     func finish(barState: FloatingControlBarState) {
+        AnalyticsManager.shared.tutorialCompleted()
         barState.isTutorialChatActive = false
         barState.tutorialWaitingForResponse = false
         barState.tutorialSystemPromptSuffix = nil
