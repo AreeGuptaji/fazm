@@ -51,12 +51,7 @@ for i in $(seq 0 $((NUM_CHATS - 1))); do
 
     # Immediately claim this chat by resetting unread_by_founder to 0
     # Prevents duplicate spawns if the Claude session finishes before next poll
-    "$NODE_BIN" -e "
-      const { getDb } = require('$SCRIPTS_DIR/firestore-helpers');
-      getDb().collection('founder_chats').doc('$UID_VAL').update({ unread_by_founder: 0 })
-        .then(() => console.log('Claimed chat for $UID_VAL'))
-        .catch(e => console.error('Claim error:', e.message));
-    " 2>>"$LOG_DIR/founder-chat.log"
+    "$NODE_BIN" "$SCRIPTS_DIR/claim-chat.js" "$UID_VAL" 2>>"$LOG_DIR/founder-chat.log" || log "WARNING: Failed to claim chat for $UID_VAL"
 
     # Extract this user's data as JSON for the prompt
     USER_DATA=$(echo "$CHATS" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)[$i], indent=2))")
