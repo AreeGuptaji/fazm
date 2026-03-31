@@ -329,7 +329,7 @@ export default function MacOSAIAgentGuide() {
           reliable desktop automation. Clean codebase, no unnecessary
           scaffolding. Free to use.
         </p>
-        <CTAButton href="https://github.com/m13v/fazm" page="/t/macos-ai-agent-development-guide">
+        <CTAButton href="https://github.com/mediar-ai/fazm" page="/t/macos-ai-agent-development-guide">
           Explore the Source Code
         </CTAButton>
       </section>

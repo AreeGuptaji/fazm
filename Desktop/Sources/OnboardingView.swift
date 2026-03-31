@@ -453,7 +453,7 @@ struct OnboardingPrivacySheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
 
                             Button(action: {
-                                if let url = URL(string: "https://github.com/m13v/fazm") {
+                                if let url = URL(string: "https://github.com/mediar-ai/fazm") {
                                     NSWorkspace.shared.open(url)
                                 }
                             }) {

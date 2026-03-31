@@ -3,7 +3,7 @@ workflows:
   # FAZM DESKTOP SWIFT RELEASE
   # Builds, signs, notarizes, and publishes the Swift macOS app.
   #
-  # Trigger: push a tag like v0.0.1+1-macos to m13v/fazm
+  # Trigger: push a tag like v0.0.1+1-macos to mediar-ai/fazm
   #   git tag v0.0.1+1-macos && git push origin v0.0.1+1-macos
   #
   # Required Codemagic environment variable groups:
@@ -35,7 +35,7 @@ workflows:
         APP_NAME: "Fazm"
         BUNDLE_ID: "com.fazm.app"
         BUILD_DIR: "build"
-        GITHUB_REPO: "m13v/fazm"
+        GITHUB_REPO: "mediar-ai/fazm"
       xcode: 16.4
     triggering:
       events:

@@ -51,7 +51,7 @@ SPARKLE_PRIVATE_KEY="${SPARKLE_PRIVATE_KEY:-}"  # Set via environment or Keychai
 SPARKLE_ZIP_PATH="$BUILD_DIR/Fazm.zip"
 
 # GitHub Release
-GITHUB_REPO="m13v/fazm"
+GITHUB_REPO="mediar-ai/fazm"
 
 # Read changelog from CHANGELOG.json
 CHANGELOG_FILE="CHANGELOG.json"

@@ -296,7 +296,7 @@ export default function AIDesktopToolsCompared() {
           Apps, and native applications using accessibility APIs. Free to start,
           fully local.
         </p>
-        <CTAButton href="https://github.com/m13v/fazm" page="/t/ai-desktop-automation-tools-compared">
+        <CTAButton href="https://github.com/mediar-ai/fazm" page="/t/ai-desktop-automation-tools-compared">
           Get Started Free
         </CTAButton>
       </section>

@@ -381,7 +381,7 @@ export default function ParallelAIAgentsGuide() {
           documents, and apps — so you can run it alongside your coding agents
           for full-stack productivity.
         </p>
-        <CTAButton href="https://github.com/m13v/fazm" page="/t/parallel-ai-agents-productivity">
+        <CTAButton href="https://github.com/mediar-ai/fazm" page="/t/parallel-ai-agents-productivity">
           View on GitHub
         </CTAButton>
       </section>
