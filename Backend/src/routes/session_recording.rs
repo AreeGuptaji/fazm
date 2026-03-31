@@ -173,7 +173,10 @@ async fn iam_sign_blob(sa_email: &str, data: &[u8]) -> Result<Vec<u8>, String> {
         .await
         .map_err(|e| format!("IAM signBlob response read: {}", e))?;
 
-    tracing::debug!("IAM signBlob response: {}", &resp_text[..resp_text.len().min(500)]);
+    tracing::debug!(
+        "IAM signBlob response: {}",
+        &resp_text[..resp_text.len().min(500)]
+    );
 
     #[derive(serde::Deserialize)]
     struct SignBlobResponse {
@@ -182,12 +185,23 @@ async fn iam_sign_blob(sa_email: &str, data: &[u8]) -> Result<Vec<u8>, String> {
         signature: Option<String>,
     }
 
-    let sign_resp: SignBlobResponse = serde_json::from_str(&resp_text)
-        .map_err(|e| format!("IAM signBlob response parse: {} body: {}", e, &resp_text[..resp_text.len().min(200)]))?;
+    let sign_resp: SignBlobResponse = serde_json::from_str(&resp_text).map_err(|e| {
+        format!(
+            "IAM signBlob response parse: {} body: {}",
+            e,
+            &resp_text[..resp_text.len().min(200)]
+        )
+    })?;
 
-    let sig_b64 = sign_resp.signature
+    let sig_b64 = sign_resp
+        .signature
         .or(sign_resp.signed_bytes)
-        .ok_or_else(|| format!("IAM signBlob: no signature field in response: {}", &resp_text[..resp_text.len().min(200)]))?;
+        .ok_or_else(|| {
+            format!(
+                "IAM signBlob: no signature field in response: {}",
+                &resp_text[..resp_text.len().min(200)]
+            )
+        })?;
 
     base64::engine::general_purpose::STANDARD
         .decode(&sig_b64)
@@ -271,7 +285,8 @@ pub async fn auto_enroll(
     if body.update_channel != "beta" {
         tracing::info!(
             "Session recording auto-enroll: skipping {} (channel={})",
-            device_id, body.update_channel
+            device_id,
+            body.update_channel
         );
         return Json(AutoEnrollResponse {
             enrolled: false,
@@ -322,7 +337,8 @@ pub async fn auto_enroll(
 
     tracing::info!(
         "Session recording auto-enroll: enrolled {} (total: {})",
-        device_id, new_ids.len()
+        device_id,
+        new_ids.len()
     );
 
     Json(AutoEnrollResponse {
