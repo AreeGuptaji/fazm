@@ -100,6 +100,33 @@ struct PaywallSheet: View {
                 .buttonStyle(.plain)
 
                 Button(action: {
+                    AnalyticsManager.shared.paywallReferralTapped()
+                    Task {
+                        do {
+                            try await ReferralService.shared.copyReferralLink()
+                            await MainActor.run {
+                                ToastManager.shared.show("Referral link copied!", icon: "doc.on.doc.fill")
+                            }
+                        } catch {
+                            log("PaywallSheet: referral error: \(error.localizedDescription)")
+                        }
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.2.fill")
+                            .scaledFont(size: 12)
+                        Text("Get 1 month free — refer a friend")
+                            .scaledFont(size: 12, weight: .medium)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(FazmColors.backgroundTertiary.opacity(0.6))
+                    .foregroundColor(FazmColors.textSecondary)
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
                     AnalyticsManager.shared.paywallFounderCallTapped()
                     if let url = URL(string: "https://cal.com/team/mediar/onboarding") {
                         NSWorkspace.shared.open(url)
@@ -132,7 +159,7 @@ struct PaywallSheet: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }
-        .frame(width: 400, height: 520)
+        .frame(width: 400, height: 560)
         .background(FazmColors.backgroundPrimary)
     }
 
@@ -201,10 +228,10 @@ final class PaywallWindowController {
         )
 
         let hostingView = NSHostingView(rootView: AnyView(content))
-        hostingView.setFrameSize(NSSize(width: 400, height: 520))
+        hostingView.setFrameSize(NSSize(width: 400, height: 560))
 
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: NSSize(width: 400, height: 520)),
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 400, height: 560)),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -227,7 +254,7 @@ final class PaywallWindowController {
             let sf = screen.visibleFrame
             let x = sf.origin.x + (sf.width - 400) / 2
             let y = sf.origin.y + (sf.height - 520) / 2
-            window.setFrame(NSRect(x: x, y: y, width: 400, height: 520), display: true)
+            window.setFrame(NSRect(x: x, y: y, width: 400, height: 560), display: true)
         } else {
             window.center()
         }
