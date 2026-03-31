@@ -47,6 +47,10 @@ async fn main() {
             axum::routing::post(routes::keys::get_keys),
         )
         .route(
+            "/v1/llm-usage/mediar-forward",
+            axum::routing::post(routes::llm_usage::forward_to_mediar),
+        )
+        .route(
             "/api/relay/register",
             axum::routing::post(routes::relay::register),
         )
@@ -123,4 +127,3 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
-
