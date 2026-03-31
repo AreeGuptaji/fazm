@@ -1846,6 +1846,11 @@ class FloatingControlBarManager {
 
         AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotPath != nil, queryText: message)
 
+        // Track referral progress for referred users
+        if ReferralService.shared.wasReferred && !ReferralService.shared.isReferralCompleted {
+            Task { await ReferralService.shared.validateFloatingBarMessage() }
+        }
+
         // Provider is already initialized by ViewModelContainer at app launch
 
         // Record message count before sending so we can detect the new AI response
