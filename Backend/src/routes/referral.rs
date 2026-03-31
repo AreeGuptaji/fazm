@@ -429,9 +429,9 @@ pub async fn landing_page(
         <p class="subtitle">AI assistant for your Mac — right on your desktop</p>
         <div class="code">{code}</div>
         <br><br>
-        <a href="https://fazm.ai" class="btn">Download Fazm for Mac</a>
-        <p class="open-link">Already have Fazm? <a href="fazm://referral/{code}">Open in app</a></p>
-        <p class="hint">After installing, your referral code <strong>{code}</strong> will be applied automatically via the link above</p>
+        <a href="https://fazm.ai/download" class="btn" id="download-btn">Download Fazm for Mac</a>
+        <p class="open-link"><a href="fazm://referral/{code}">Open in Fazm</a> (if already installed)</p>
+        <p class="hint">After installing, come back to this page and click "Open in Fazm" to apply your referral</p>
     </div>
 </body>
 </html>"#,
