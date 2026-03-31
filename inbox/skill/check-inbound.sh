@@ -9,7 +9,7 @@ source "$(dirname "$0")/lock.sh"
 acquire_lock "check-inbound" 3600
 
 # Load secrets from omi-analytics (where the DB creds live)
-[ -f "$HOME/omi-analytics/.env.production.local" ] && source "$HOME/omi-analytics/.env.production.local"
+[ -f "$HOME/analytics/.env.production.local" ] && source "$HOME/analytics/.env.production.local"
 
 INBOX_DIR="$HOME/fazm/inbox"
 SCRIPTS_DIR="$INBOX_DIR/scripts"
