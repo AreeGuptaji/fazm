@@ -6,11 +6,26 @@ struct PaywallSheet: View {
     let onSubscribe: () -> Void
     let onDismiss: () -> Void
 
+    @State private var showReferral = false
+    @State private var referralCode: String = ""
+    @State private var referralUrl: String = ""
+    @State private var isLoadingReferral = false
+    @State private var linkCopied = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Upgrade to Fazm Pro")
+                if showReferral {
+                    Button(action: { showReferral = false }) {
+                        Image(systemName: "chevron.left")
+                            .scaledFont(size: 14, weight: .medium)
+                            .foregroundColor(FazmColors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Text(showReferral ? "Refer a Friend" : "Upgrade to Fazm Pro")
                     .scaledFont(size: 18, weight: .semibold)
                     .foregroundColor(FazmColors.textPrimary)
 
@@ -33,6 +48,20 @@ struct PaywallSheet: View {
             Divider()
                 .foregroundColor(FazmColors.border)
 
+            if showReferral {
+                referralView
+            } else {
+                paywallView
+            }
+        }
+        .frame(width: 400, height: 560)
+        .background(FazmColors.backgroundPrimary)
+    }
+
+    // MARK: - Paywall View
+
+    private var paywallView: some View {
+        VStack(spacing: 0) {
             // Content
             VStack(spacing: 20) {
                 Image(systemName: "lock.fill")
@@ -101,16 +130,8 @@ struct PaywallSheet: View {
 
                 Button(action: {
                     AnalyticsManager.shared.paywallReferralTapped()
-                    Task {
-                        do {
-                            try await ReferralService.shared.copyReferralLink()
-                            await MainActor.run {
-                                ToastManager.shared.show("Referral link copied!", icon: "doc.on.doc.fill")
-                            }
-                        } catch {
-                            log("PaywallSheet: referral error: \(error.localizedDescription)")
-                        }
-                    }
+                    showReferral = true
+                    loadReferralCode()
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "person.2.fill")
@@ -159,9 +180,95 @@ struct PaywallSheet: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }
-        .frame(width: 400, height: 560)
-        .background(FazmColors.backgroundPrimary)
     }
+
+    // MARK: - Referral View
+
+    private var referralView: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 20) {
+                Image(systemName: "gift.fill")
+                    .scaledFont(size: 40)
+                    .foregroundStyle(FazmColors.purpleGradient)
+                    .padding(.top, 16)
+
+                VStack(spacing: 8) {
+                    Text("Get 1 month free")
+                        .scaledFont(size: 17, weight: .semibold)
+                        .foregroundColor(FazmColors.textPrimary)
+
+                    Text("Share your link with a friend. When they install Fazm and send 5 messages, you both get 1 month of Pro free.")
+                        .scaledFont(size: 13)
+                        .foregroundColor(FazmColors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 20)
+
+                if isLoadingReferral {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .padding(.vertical, 20)
+                } else if !referralCode.isEmpty {
+                    // Referral code display
+                    VStack(spacing: 12) {
+                        Text("Your referral code")
+                            .scaledFont(size: 12)
+                            .foregroundColor(FazmColors.textTertiary)
+
+                        Text(referralCode)
+                            .scaledFont(size: 24, weight: .bold)
+                            .foregroundColor(FazmColors.textPrimary)
+                            .tracking(4)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(FazmColors.backgroundTertiary.opacity(0.5))
+                            .cornerRadius(8)
+                    }
+
+                    // Copy link button
+                    Button(action: copyLink) {
+                        HStack(spacing: 6) {
+                            Image(systemName: linkCopied ? "checkmark" : "doc.on.doc")
+                                .scaledFont(size: 13)
+                            Text(linkCopied ? "Link copied!" : "Copy referral link")
+                                .scaledFont(size: 14, weight: .medium)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(linkCopied ? FazmColors.success.opacity(0.2) : FazmColors.purpleGradient)
+                        .foregroundColor(linkCopied ? FazmColors.success : .white)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                }
+
+                // Steps
+                VStack(alignment: .leading, spacing: 10) {
+                    stepRow(number: "1", text: "Share your link with a friend")
+                    stepRow(number: "2", text: "They download and install Fazm")
+                    stepRow(number: "3", text: "They send 5 messages from the floating bar")
+                    stepRow(number: "4", text: "You both get 1 month of Pro free")
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
+
+            Spacer()
+
+            Button(action: { showReferral = false }) {
+                Text("Back to upgrade options")
+                    .scaledFont(size: 13)
+                    .foregroundColor(FazmColors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 20)
+        }
+    }
+
+    // MARK: - Helpers
 
     private func featureRow(_ text: String) -> some View {
         HStack(spacing: 8) {
@@ -171,6 +278,50 @@ struct PaywallSheet: View {
             Text(text)
                 .scaledFont(size: 13)
                 .foregroundColor(FazmColors.textSecondary)
+        }
+    }
+
+    private func stepRow(number: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Text(number)
+                .scaledFont(size: 11, weight: .bold)
+                .foregroundColor(.white)
+                .frame(width: 20, height: 20)
+                .background(FazmColors.purpleGradient)
+                .clipShape(Circle())
+            Text(text)
+                .scaledFont(size: 13)
+                .foregroundColor(FazmColors.textSecondary)
+        }
+    }
+
+    private func loadReferralCode() {
+        guard referralCode.isEmpty else { return }
+        isLoadingReferral = true
+        Task {
+            do {
+                let (code, url) = try await ReferralService.shared.generateReferralCode()
+                await MainActor.run {
+                    referralCode = code
+                    referralUrl = url
+                    isLoadingReferral = false
+                }
+            } catch {
+                log("PaywallSheet: referral load error: \(error.localizedDescription)")
+                await MainActor.run {
+                    isLoadingReferral = false
+                }
+            }
+        }
+    }
+
+    private func copyLink() {
+        guard !referralUrl.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(referralUrl, forType: .string)
+        linkCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            linkCopied = false
         }
     }
 }
