@@ -42,10 +42,7 @@ async fn main() {
             "/api/session-recording/auto-enroll",
             axum::routing::post(routes::session_recording::auto_enroll),
         )
-        .route(
-            "/v1/keys",
-            axum::routing::post(routes::keys::get_keys),
-        )
+        .route("/v1/keys", axum::routing::post(routes::keys::get_keys))
         .route(
             "/v1/llm-usage/mediar-forward",
             axum::routing::post(routes::llm_usage::forward_to_mediar),
@@ -76,10 +73,7 @@ async fn main() {
     let public_routes = Router::new()
         .route("/health", axum::routing::get(routes::vertex::health))
         .route("/appcast.xml", axum::routing::get(routes::appcast::appcast))
-        .route(
-            "/api/releases",
-            axum::routing::get(routes::releases::list),
-        )
+        .route("/api/releases", axum::routing::get(routes::releases::list))
         .route(
             "/api/releases/register",
             axum::routing::post(routes::releases::register),
@@ -88,10 +82,7 @@ async fn main() {
             "/api/releases/promote",
             axum::routing::patch(routes::releases::promote),
         )
-        .route(
-            "/v1/vertex/jwks",
-            axum::routing::get(routes::vertex::jwks),
-        )
+        .route("/v1/vertex/jwks", axum::routing::get(routes::vertex::jwks))
         .route(
             "/.well-known/openid-configuration",
             axum::routing::get(routes::vertex::openid_configuration),
