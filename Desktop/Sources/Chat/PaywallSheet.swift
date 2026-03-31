@@ -236,7 +236,13 @@ struct PaywallSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(linkCopied ? FazmColors.success.opacity(0.2) : FazmColors.purpleGradient)
+                        .background {
+                            if linkCopied {
+                                FazmColors.success.opacity(0.2)
+                            } else {
+                                FazmColors.purpleGradient
+                            }
+                        }
                         .foregroundColor(linkCopied ? FazmColors.success : .white)
                         .cornerRadius(8)
                     }
