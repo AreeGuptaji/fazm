@@ -108,6 +108,11 @@ actor ACPBridge {
     case bundledKey(apiKey: String)
     /// Vertex AI via Workload Identity Federation
     case vertex(adcFilePath: String, projectId: String, region: String)
+
+    var isPersonalOAuth: Bool {
+      if case .personalOAuth = self { return true }
+      return false
+    }
   }
 
   let mode: BridgeMode
