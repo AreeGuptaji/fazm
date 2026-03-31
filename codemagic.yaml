@@ -467,74 +467,6 @@ workflows:
           echo "All required env vars verified in bundled .env"
           echo "App bundle created: $APP_BUNDLE"
 
-      - name: Create arch-specific ZIPs for stub installer
-        script: |
-          # Create arch-specific app bundles by replacing the universal binary
-          # with the single-arch binary, then ZIP each one
-          ARM64_BINARY="/tmp/Fazm-arm64"
-          X86_64_BINARY="Desktop/.build/x86_64-apple-macosx/release/$BINARY_NAME"
-
-          for ARCH in arm64 x86_64; do
-            echo "Creating $ARCH ZIP..."
-            ARCH_APP="/tmp/Fazm-$ARCH-app"
-            rm -rf "$ARCH_APP"
-            ditto "$APP_BUNDLE" "$ARCH_APP/$APP_NAME.app"
-
-            # Replace universal binary with single-arch
-            if [ "$ARCH" = "arm64" ]; then
-              lipo "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME" \
-                -thin arm64 -output "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME.thin"
-            else
-              lipo "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME" \
-                -thin x86_64 -output "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME.thin"
-            fi
-            mv "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME.thin" \
-               "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME"
-
-            # Also thin mcp-server-macos-use if present
-            MCP_BIN="$ARCH_APP/$APP_NAME.app/Contents/MacOS/mcp-server-macos-use"
-            if [ -f "$MCP_BIN" ] && lipo -info "$MCP_BIN" 2>/dev/null | grep -q "Architectures"; then
-              lipo "$MCP_BIN" -thin "$ARCH" -output "$MCP_BIN.thin" 2>/dev/null && \
-                mv "$MCP_BIN.thin" "$MCP_BIN" || true
-            fi
-
-            # Also thin whatsapp-mcp if present
-            WHATSAPP_BIN="$ARCH_APP/$APP_NAME.app/Contents/MacOS/whatsapp-mcp"
-            if [ -f "$WHATSAPP_BIN" ] && lipo -info "$WHATSAPP_BIN" 2>/dev/null | grep -q "Architectures"; then
-              lipo "$WHATSAPP_BIN" -thin "$ARCH" -output "$WHATSAPP_BIN.thin" 2>/dev/null && \
-                mv "$WHATSAPP_BIN.thin" "$WHATSAPP_BIN" || true
-            fi
-
-            # Also thin ffmpeg if present
-            FFMPEG_BIN="$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/ffmpeg"
-            if [ -f "$FFMPEG_BIN" ] && lipo -info "$FFMPEG_BIN" 2>/dev/null | grep -q "Architectures"; then
-              lipo "$FFMPEG_BIN" -thin "$ARCH" -output "$FFMPEG_BIN.thin" 2>/dev/null && \
-                mv "$FFMPEG_BIN.thin" "$FFMPEG_BIN" || true
-            fi
-
-            # Also thin cloudflared if present
-            CLOUDFLARED_BIN="$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/cloudflared"
-            if [ -f "$CLOUDFLARED_BIN" ] && lipo -info "$CLOUDFLARED_BIN" 2>/dev/null | grep -q "Architectures"; then
-              lipo "$CLOUDFLARED_BIN" -thin "$ARCH" -output "$CLOUDFLARED_BIN.thin" 2>/dev/null && \
-                mv "$CLOUDFLARED_BIN.thin" "$CLOUDFLARED_BIN" || true
-            fi
-
-            # Also thin node if present
-            NODE_BIN="$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/node"
-            if [ -f "$NODE_BIN" ] && lipo -info "$NODE_BIN" 2>/dev/null | grep -q "Architectures"; then
-              lipo "$NODE_BIN" -thin "$ARCH" -output "$NODE_BIN.thin" 2>/dev/null && \
-                mv "$NODE_BIN.thin" "$NODE_BIN" || true
-            fi
-
-            # Create ZIP
-            ditto -c -k --keepParent "$ARCH_APP/$APP_NAME.app" "$BUILD_DIR/Fazm-$ARCH.zip"
-            echo "Created $BUILD_DIR/Fazm-$ARCH.zip ($(du -h "$BUILD_DIR/Fazm-$ARCH.zip" | cut -f1))"
-            rm -rf "$ARCH_APP"
-          done
-
-          echo "ARCH_ARM64_ZIP=$BUILD_DIR/Fazm-arm64.zip" >> $CM_ENV
-          echo "ARCH_X86_64_ZIP=$BUILD_DIR/Fazm-x86_64.zip" >> $CM_ENV
-
       - name: Sign app
         script: |
           xattr -cr "$APP_BUNDLE"
@@ -704,6 +636,135 @@ workflows:
         script: |
           xcrun stapler staple "$APP_BUNDLE"
           echo "App stapled"
+
+      - name: Create arch-specific ZIPs for stub installer
+        script: |
+          # Create arch-specific app bundles from the SIGNED+NOTARIZED+STAPLED universal app.
+          # Thin universal binaries to single-arch, then re-sign everything
+          # (lipo -thin invalidates code signatures).
+          CS_PAGESIZE="--pagesize 16384"
+
+          for ARCH in arm64 x86_64; do
+            echo "Creating $ARCH ZIP..."
+            ARCH_APP="/tmp/Fazm-$ARCH-app"
+            rm -rf "$ARCH_APP"
+            ditto "$APP_BUNDLE" "$ARCH_APP/$APP_NAME.app"
+
+            # Helper: thin a universal binary to single-arch (if it is universal)
+            thin_binary() {
+              local bin="$1"
+              if [ -f "$bin" ] && lipo -info "$bin" 2>/dev/null | grep -q "Architectures"; then
+                lipo "$bin" -thin "$ARCH" -output "$bin.thin" 2>/dev/null && \
+                  mv "$bin.thin" "$bin" || true
+              fi
+            }
+
+            # Thin all universal binaries
+            thin_binary "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME"
+            thin_binary "$ARCH_APP/$APP_NAME.app/Contents/MacOS/mcp-server-macos-use"
+            thin_binary "$ARCH_APP/$APP_NAME.app/Contents/MacOS/whatsapp-mcp"
+            thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/ffmpeg"
+            thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/cloudflared"
+            thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/node"
+
+            # Re-sign everything (same order as the main Sign step)
+            A="$ARCH_APP/$APP_NAME.app"
+
+            # Sign ffmpeg
+            [ -f "$A/Contents/Resources/Fazm_Fazm.bundle/ffmpeg" ] && \
+              codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                --sign "$SIGN_IDENTITY" "$A/Contents/Resources/Fazm_Fazm.bundle/ffmpeg"
+
+            # Sign cloudflared
+            [ -f "$A/Contents/Resources/Fazm_Fazm.bundle/cloudflared" ] && \
+              codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                --sign "$SIGN_IDENTITY" "$A/Contents/Resources/Fazm_Fazm.bundle/cloudflared"
+
+            # Sign node with JIT entitlements
+            [ -f "$A/Contents/Resources/Fazm_Fazm.bundle/node" ] && \
+              codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                --sign "$SIGN_IDENTITY" \
+                --entitlements Desktop/Node.entitlements \
+                "$A/Contents/Resources/Fazm_Fazm.bundle/node"
+
+            # Sign acp-bridge native binaries
+            if [ -d "$A/Contents/Resources/acp-bridge/node_modules" ]; then
+              find "$A/Contents/Resources/acp-bridge/node_modules" -type f \
+                \( -name "*.node" -o -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" -o -name "rg" \) \
+                2>/dev/null | while read native_bin; do
+                file "$native_bin" 2>/dev/null | grep -q "Mach-O" && \
+                  codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                    --sign "$SIGN_IDENTITY" "$native_bin"
+              done
+              find "$A/Contents/Resources/acp-bridge/node_modules" -type f \
+                ! -name "*.js"   ! -name "*.json" ! -name "*.ts"   ! -name "*.map" \
+                ! -name "*.md"   ! -name "*.txt"  ! -name "*.yml"  ! -name "*.yaml" \
+                ! -name "*.css"  ! -name "*.html" ! -name "*.jar"  ! -name "*.d.ts" \
+                ! -name "*.node" ! -name "*.dylib" ! -name "*.jnilib" ! -name "*.so" ! -name "rg" \
+                2>/dev/null | while read candidate; do
+                file "$candidate" 2>/dev/null | grep -q "Mach-O" && \
+                  codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                    --sign "$SIGN_IDENTITY" "$candidate"
+              done
+            fi
+
+            # Sign mcp-server-macos-use
+            [ -f "$A/Contents/MacOS/mcp-server-macos-use" ] && \
+              codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                --sign "$SIGN_IDENTITY" "$A/Contents/MacOS/mcp-server-macos-use"
+
+            # Sign whatsapp-mcp
+            [ -f "$A/Contents/MacOS/whatsapp-mcp" ] && \
+              codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                --sign "$SIGN_IDENTITY" "$A/Contents/MacOS/whatsapp-mcp"
+
+            # Sign Google Workspace MCP native binaries
+            if [ -d "$A/Contents/Resources/google-workspace-mcp/.venv" ]; then
+              find "$A/Contents/Resources/google-workspace-mcp/.venv" -type f \
+                \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read native_bin; do
+                file "$native_bin" 2>/dev/null | grep -q "Mach-O" && \
+                  codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                    --sign "$SIGN_IDENTITY" "$native_bin"
+              done
+              if [ -f "$A/Contents/Resources/google-workspace-mcp/.venv/bin/python" ]; then
+                file "$A/Contents/Resources/google-workspace-mcp/.venv/bin/python" 2>/dev/null | grep -q "Mach-O" && \
+                  codesign --force --options runtime --timestamp $CS_PAGESIZE \
+                    --sign "$SIGN_IDENTITY" "$A/Contents/Resources/google-workspace-mcp/.venv/bin/python"
+              fi
+            fi
+
+            # Sign Sparkle components (innermost first)
+            SPARKLE_FW="$A/Contents/Frameworks/Sparkle.framework"
+            if [ -d "$SPARKLE_FW" ]; then
+              codesign --force --options runtime --timestamp $CS_PAGESIZE --sign "$SIGN_IDENTITY" \
+                "$SPARKLE_FW/Versions/B/XPCServices/Downloader.xpc"
+              codesign --force --options runtime --timestamp $CS_PAGESIZE --sign "$SIGN_IDENTITY" \
+                "$SPARKLE_FW/Versions/B/XPCServices/Installer.xpc"
+              codesign --force --options runtime --timestamp $CS_PAGESIZE --sign "$SIGN_IDENTITY" \
+                "$SPARKLE_FW/Versions/B/Autoupdate"
+              codesign --force --options runtime --timestamp $CS_PAGESIZE --sign "$SIGN_IDENTITY" \
+                "$SPARKLE_FW/Versions/B/Updater.app"
+              codesign --force --options runtime --timestamp $CS_PAGESIZE --sign "$SIGN_IDENTITY" \
+                "$SPARKLE_FW"
+            fi
+
+            # Sign the main app bundle with release entitlements
+            codesign --force --options runtime --timestamp $CS_PAGESIZE \
+              --sign "$SIGN_IDENTITY" \
+              --entitlements Desktop/Fazm-Release.entitlements \
+              "$A"
+
+            codesign --verify --verbose=2 "$A" 2>&1 | head -3
+            echo "$ARCH app re-signed successfully"
+
+            # Create ZIP
+            ditto -c -k --keepParent "$A" "$BUILD_DIR/Fazm-$ARCH.zip"
+            echo "Created $BUILD_DIR/Fazm-$ARCH.zip ($(du -h "$BUILD_DIR/Fazm-$ARCH.zip" | cut -f1))"
+            rm -rf "$ARCH_APP"
+          done
+
+          echo "ARCH_ARM64_ZIP=$BUILD_DIR/Fazm-arm64.zip" >> $CM_ENV
+          echo "ARCH_X86_64_ZIP=$BUILD_DIR/Fazm-x86_64.zip" >> $CM_ENV
 
       - name: Upload dSYMs to Sentry
         ignore_failure: true
