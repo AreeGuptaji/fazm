@@ -533,8 +533,12 @@ class BleAudioService {
 class AssistantSettings: ObservableObject {
     static let shared = AssistantSettings()
     @Published var transcriptionEnabled: Bool = false
-    @Published var transcriptionLanguage: String = "en"
-    @Published var transcriptionAutoDetect: Bool = false
+    @Published var transcriptionLanguage: String = UserDefaults.standard.string(forKey: "transcriptionLanguage") ?? "en" {
+        didSet { UserDefaults.standard.set(transcriptionLanguage, forKey: "transcriptionLanguage") }
+    }
+    @Published var transcriptionAutoDetect: Bool = UserDefaults.standard.object(forKey: "transcriptionAutoDetectKey") != nil ? UserDefaults.standard.bool(forKey: "transcriptionAutoDetectKey") : true {
+        didSet { UserDefaults.standard.set(transcriptionAutoDetect, forKey: "transcriptionAutoDetectKey") }
+    }
     @Published var batchTranscriptionEnabled: Bool = false
     @Published var vadGateEnabled: Bool = false
     @Published var screenAnalysisEnabled: Bool = false
@@ -545,15 +549,58 @@ class AssistantSettings: ObservableObject {
     }
     @Published var analysisDelay: Int = 3
     @Published var glowOverlayEnabled: Bool = false
-    var effectiveTranscriptionLanguage: String { transcriptionLanguage }
-    var effectiveVocabulary: [String] { transcriptionVocabulary }
 
-    static var supportedLanguages: [(code: String, name: String)] {
-        [("en", "English"), ("es", "Spanish"), ("fr", "French"), ("de", "German"),
-         ("it", "Italian"), ("pt", "Portuguese"), ("ja", "Japanese"), ("ko", "Korean"),
-         ("zh", "Chinese"), ("ru", "Russian"), ("ar", "Arabic"), ("hi", "Hindi")]
+    /// Returns the effective language to send to Deepgram.
+    /// If auto-detect is enabled and the language supports multi-language mode, returns "multi".
+    var effectiveTranscriptionLanguage: String {
+        if transcriptionAutoDetect {
+            if Self.multiLanguageSupported.contains(transcriptionLanguage) {
+                return "multi"
+            }
+        }
+        return transcriptionLanguage
     }
-    static func supportsAutoDetect(_ language: String) -> Bool { true }
+
+    var effectiveVocabulary: [String] {
+        var vocab = Set(transcriptionVocabulary)
+        vocab.insert("Fazm")
+        return Array(vocab)
+    }
+
+    /// Languages that support multi-language (auto-detect) mode in Deepgram Nova-3
+    static let multiLanguageSupported: Set<String> = [
+        "en", "en-US", "en-AU", "en-GB", "en-IN", "en-NZ",
+        "es", "es-419",
+        "fr", "fr-CA",
+        "de",
+        "hi",
+        "ru",
+        "pt", "pt-BR", "pt-PT",
+        "ja",
+        "it",
+        "nl"
+    ]
+
+    /// All languages supported by Deepgram Nova-3 for single-language transcription
+    static var supportedLanguages: [(code: String, name: String)] {
+        [("en", "English"), ("en-US", "English (US)"), ("en-GB", "English (UK)"),
+         ("en-AU", "English (Australia)"), ("en-IN", "English (India)"), ("en-NZ", "English (New Zealand)"),
+         ("bg", "Bulgarian"), ("ca", "Catalan"), ("cs", "Czech"), ("da", "Danish"),
+         ("nl", "Dutch"), ("nl-BE", "Dutch (Belgium)"), ("et", "Estonian"), ("fi", "Finnish"),
+         ("fr", "French"), ("fr-CA", "French (Canada)"),
+         ("de", "German"), ("de-CH", "German (Switzerland)"), ("el", "Greek"),
+         ("hi", "Hindi"), ("hu", "Hungarian"), ("id", "Indonesian"),
+         ("it", "Italian"), ("ja", "Japanese"), ("ko", "Korean"),
+         ("lv", "Latvian"), ("lt", "Lithuanian"), ("ms", "Malay"), ("no", "Norwegian"),
+         ("pl", "Polish"), ("pt", "Portuguese"), ("pt-BR", "Portuguese (Brazil)"), ("pt-PT", "Portuguese (Portugal)"),
+         ("ro", "Romanian"), ("ru", "Russian"), ("sk", "Slovak"),
+         ("es", "Spanish"), ("es-419", "Spanish (Latin America)"),
+         ("sv", "Swedish"), ("tr", "Turkish"), ("uk", "Ukrainian"), ("vi", "Vietnamese")]
+    }
+
+    static func supportsAutoDetect(_ language: String) -> Bool {
+        multiLanguageSupported.contains(language)
+    }
 }
 
 struct AssistantSettingsResponse: Codable {
