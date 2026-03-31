@@ -38,7 +38,7 @@ Categorize:
 2. Assess complexity
 
 **Question about Fazm vs OMI or product identity:**
-- Fazm is built by the same team as OMI. Fazm is the desktop AI agent, OMI is the wearable. Different products, same company (Based Hardware / Mediar.ai).
+- Fazm is a spin-off from the OMI team, but it is a DIFFERENT company. Fazm is not OMI and not part of OMI. It's an independent product by a team member who spun off to build a desktop AI agent. Do NOT say they are the same company or the same team.
 
 ### Step 3: Reply
 
