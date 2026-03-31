@@ -55,54 +55,42 @@ impl Config {
                     String::from_utf8(
                         base64::engine::general_purpose::STANDARD
                             .decode(&raw)
-                            .expect("VERTEX_SA_PRIVATE_KEY_PEM is not valid base64")
-                    ).expect("VERTEX_SA_PRIVATE_KEY_PEM base64 is not valid UTF-8")
+                            .expect("VERTEX_SA_PRIVATE_KEY_PEM is not valid base64"),
+                    )
+                    .expect("VERTEX_SA_PRIVATE_KEY_PEM base64 is not valid UTF-8")
                 }
             },
-            vertex_issuer: std::env::var("VERTEX_ISSUER")
-                .expect("VERTEX_ISSUER must be set"),
+            vertex_issuer: std::env::var("VERTEX_ISSUER").expect("VERTEX_ISSUER must be set"),
             vertex_project_id: std::env::var("VERTEX_PROJECT_ID")
                 .unwrap_or_else(|_| "fazm-prod".to_string()),
             vertex_region: std::env::var("VERTEX_REGION")
                 .unwrap_or_else(|_| "us-east5".to_string()),
-            gcp_project_number: std::env::var("GCP_PROJECT_NUMBER")
-                .unwrap_or_default(),
+            gcp_project_number: std::env::var("GCP_PROJECT_NUMBER").unwrap_or_default(),
             gcp_workload_pool: std::env::var("GCP_WORKLOAD_POOL")
                 .unwrap_or_else(|_| "fazm-desktop-pool".to_string()),
             gcp_oidc_provider: std::env::var("GCP_OIDC_PROVIDER")
                 .unwrap_or_else(|_| "fazm-backend-provider".to_string()),
-            gcp_service_account: std::env::var("GCP_SERVICE_ACCOUNT")
-                .unwrap_or_default(),
+            gcp_service_account: std::env::var("GCP_SERVICE_ACCOUNT").unwrap_or_default(),
             gcs_session_replay_bucket: std::env::var("GCS_SESSION_REPLAY_BUCKET")
                 .unwrap_or_else(|_| "fazm-session-recordings".to_string()),
-            posthog_personal_api_key: std::env::var("POSTHOG_PERSONAL_API_KEY")
-                .unwrap_or_default(),
-            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY")
-                .unwrap_or_default(),
-            deepgram_api_key: std::env::var("DEEPGRAM_API_KEY")
-                .unwrap_or_default(),
-            gemini_api_key: std::env::var("GEMINI_API_KEY")
-                .unwrap_or_default(),
+            posthog_personal_api_key: std::env::var("POSTHOG_PERSONAL_API_KEY").unwrap_or_default(),
+            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY").unwrap_or_default(),
+            deepgram_api_key: std::env::var("DEEPGRAM_API_KEY").unwrap_or_default(),
+            gemini_api_key: std::env::var("GEMINI_API_KEY").unwrap_or_default(),
             builtin_key_blocklist: std::env::var("BUILTIN_KEY_BLOCKLIST")
                 .unwrap_or_default()
                 .split(',')
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect(),
-            mediar_usage_ingest_url: std::env::var("MEDIAR_USAGE_INGEST_URL")
-                .unwrap_or_default(),
+            mediar_usage_ingest_url: std::env::var("MEDIAR_USAGE_INGEST_URL").unwrap_or_default(),
             mediar_usage_ingest_secret: std::env::var("MEDIAR_USAGE_INGEST_SECRET")
                 .unwrap_or_default(),
-            release_secret: std::env::var("RELEASE_SECRET")
-                .unwrap_or_default(),
-            stripe_secret_key: std::env::var("STRIPE_SECRET_KEY")
-                .unwrap_or_default(),
-            stripe_price_id: std::env::var("STRIPE_PRICE_ID")
-                .unwrap_or_default(),
-            stripe_intro_coupon_id: std::env::var("STRIPE_INTRO_COUPON_ID")
-                .unwrap_or_default(),
-            stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET")
-                .unwrap_or_default(),
+            release_secret: std::env::var("RELEASE_SECRET").unwrap_or_default(),
+            stripe_secret_key: std::env::var("STRIPE_SECRET_KEY").unwrap_or_default(),
+            stripe_price_id: std::env::var("STRIPE_PRICE_ID").unwrap_or_default(),
+            stripe_intro_coupon_id: std::env::var("STRIPE_INTRO_COUPON_ID").unwrap_or_default(),
+            stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET").unwrap_or_default(),
         }
     }
 }
