@@ -67,6 +67,22 @@ async fn main() {
             "/api/stripe/subscription-status",
             axum::routing::get(routes::stripe::subscription_status),
         )
+        .route(
+            "/api/referral/generate",
+            axum::routing::post(routes::referral::generate),
+        )
+        .route(
+            "/api/referral/status",
+            axum::routing::get(routes::referral::status),
+        )
+        .route(
+            "/api/referral/track-signup",
+            axum::routing::post(routes::referral::track_signup),
+        )
+        .route(
+            "/api/referral/validate",
+            axum::routing::post(routes::referral::validate),
+        )
         .layer(middleware::from_fn(auth::auth_middleware));
 
     // Public routes (release management uses its own shared-secret auth)
@@ -94,7 +110,8 @@ async fn main() {
         .route(
             "/api/stripe/redirect",
             axum::routing::get(routes::stripe::checkout_redirect),
-        );
+        )
+        .route("/r/:code", axum::routing::get(routes::referral::landing_page));
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
