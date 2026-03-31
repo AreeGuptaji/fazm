@@ -47,8 +47,8 @@ pub async fn subject_token(
     header.kid = Some(kid);
     header.typ = Some("JWT".to_string());
 
-    let key = EncodingKey::from_rsa_pem(config.vertex_sa_private_key_pem.as_bytes())
-        .map_err(|e| {
+    let key =
+        EncodingKey::from_rsa_pem(config.vertex_sa_private_key_pem.as_bytes()).map_err(|e| {
             tracing::error!("Failed to parse RSA key: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
@@ -88,11 +88,9 @@ struct JwkKey {
 
 /// GET /v1/vertex/jwks
 /// Returns the public key as JWKS for Google STS to verify our JWTs
-pub async fn jwks(
-    Extension(config): Extension<Arc<Config>>,
-) -> Result<Response, StatusCode> {
-    let private_key = RsaPrivateKey::from_pkcs8_pem(&config.vertex_sa_private_key_pem)
-        .map_err(|e| {
+pub async fn jwks(Extension(config): Extension<Arc<Config>>) -> Result<Response, StatusCode> {
+    let private_key =
+        RsaPrivateKey::from_pkcs8_pem(&config.vertex_sa_private_key_pem).map_err(|e| {
             tracing::error!("Failed to parse RSA private key: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
@@ -139,9 +137,7 @@ struct OidcConfig {
 
 /// GET /.well-known/openid-configuration
 /// OIDC discovery for Google STS
-pub async fn openid_configuration(
-    Extension(config): Extension<Arc<Config>>,
-) -> Response {
+pub async fn openid_configuration(Extension(config): Extension<Arc<Config>>) -> Response {
     let issuer = config.vertex_issuer.clone();
     let oidc = OidcConfig {
         jwks_uri: format!("{}/v1/vertex/jwks", issuer),
