@@ -67,10 +67,10 @@ PROMPT_EOF
 
 # Run Claude Code with full permissions in the FAZM repo
 log "Spawning Claude Code session..."
+cd "$HOME/fazm"
 gtimeout 1800 claude \
     -p "$(cat "$PROMPT_FILE")" \
     --dangerously-skip-permissions \
-    --no-session-persistence \
     2>&1 | tee -a "$LOG_FILE" || log "WARNING: Claude exited with code $?"
 
 rm -f "$PROMPT_FILE"
