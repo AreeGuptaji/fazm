@@ -416,6 +416,55 @@ class APIClient {
     /// Legacy stub name — redirects to fetchTotalBuiltinCost
     func fetchTotalOmiAICost() async -> Double? { await fetchTotalBuiltinCost() }
 
+    /// Forward LLM usage to the Fazm backend so it can be ingested into Mediar's dashboard.
+    func recordExternalLlmTrace(model: String, inputTokens: Int, outputTokens: Int, totalTokens: Int, source: String) async {
+        guard totalTokens > 0 else { return }
+
+        guard let backendUrl = ProcessInfo.processInfo.environment["FAZM_BACKEND_URL"]?
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/")),
+            !backendUrl.isEmpty else {
+            log("APIClient: recordExternalLlmTrace skipped — missing FAZM_BACKEND_URL")
+            return
+        }
+
+        guard let idToken = try? await AuthService.shared.getIdToken() else {
+            log("APIClient: recordExternalLlmTrace skipped — no ID token")
+            return
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "input_tokens": inputTokens,
+            "output_tokens": outputTokens,
+            "total_tokens": totalTokens,
+            "source": source,
+        ]
+
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: body)
+            var request = URLRequest(url: URL(string: "\(backendUrl)/v1/llm-usage/mediar-forward")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = jsonData
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                log("APIClient: recordExternalLlmTrace failed — invalid response")
+                return
+            }
+
+            if (200...299).contains(httpResponse.statusCode) {
+                log("APIClient: recordExternalLlmTrace success (source=\(source), tokens=\(totalTokens))")
+            } else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                log("APIClient: recordExternalLlmTrace failed (status \(httpResponse.statusCode)): \(body.prefix(200))")
+            }
+        } catch {
+            log("APIClient: recordExternalLlmTrace failed: \(error.localizedDescription)")
+        }
+    }
+
     // Knowledge Graph
     func getKnowledgeGraph() async throws -> KnowledgeGraphResponse { KnowledgeGraphResponse(nodes: [], edges: []) }
     func rebuildKnowledgeGraph() async throws -> Bool { false }
