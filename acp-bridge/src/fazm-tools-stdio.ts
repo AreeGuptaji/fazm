@@ -57,6 +57,7 @@ function connectToPipe(): Promise<void> {
 
     pipeConnection = createConnection(bridgePipePath, () => {
       logErr(`Connected to bridge pipe: ${bridgePipePath}`);
+      pipeConnected = true;
       resolve();
     });
 
@@ -90,9 +91,38 @@ function connectToPipe(): Promise<void> {
 
     pipeConnection.on("error", (err) => {
       logErr(`Pipe error: ${err.message}`);
-      reject(err);
+      // Reject only during initial connection; after that, mark pipe dead
+      if (pipeConnected) {
+        pipeConnection = null;
+        rejectPendingToolCalls("bridge pipe error");
+      } else {
+        reject(err);
+      }
+    });
+
+    pipeConnection.on("close", () => {
+      logErr("Bridge pipe closed");
+      pipeConnection = null;
+      rejectPendingToolCalls("bridge pipe closed");
+    });
+
+    pipeConnection.on("end", () => {
+      logErr("Bridge pipe ended");
+      pipeConnection = null;
+      rejectPendingToolCalls("bridge pipe ended");
     });
   });
+}
+
+let pipeConnected = false;
+
+/** Reject all pending tool calls (pipe died) */
+function rejectPendingToolCalls(reason: string): void {
+  for (const [callId, pending] of pendingToolCalls) {
+    logErr(`Rejecting pending tool call ${callId}: ${reason}`);
+    pending.resolve(`Error: ${reason}`);
+  }
+  pendingToolCalls.clear();
 }
 
 /** Notify the bridge that an observer card is ready for immediate display */
