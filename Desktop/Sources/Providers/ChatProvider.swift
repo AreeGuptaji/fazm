@@ -2426,6 +2426,9 @@ class ChatProvider: ObservableObject {
             let responseLength = max(messageText.count, queryResult.text.count)
             if responseLength == 0 {
                 log("ChatProvider: WARNING — response_length=0 on successful query (outputTokens=\(queryResult.outputTokens), messageText.count=\(messageText.count), queryResult.text.count=\(queryResult.text.count))")
+                let breadcrumb = Breadcrumb(level: .warning, category: "chat")
+                breadcrumb.message = "response_length=0 on success (outputTokens=\(queryResult.outputTokens), mode=\(bridgeMode))"
+                SentrySDK.addBreadcrumb(breadcrumb)
             }
             AnalyticsManager.shared.chatAgentQueryCompleted(
                 durationMs: durationMs,
