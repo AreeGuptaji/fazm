@@ -20,7 +20,8 @@
     "Added \"Friends\" as a discovery source option in onboarding",
     "Added analytics tracking throughout the post-onboarding tutorial flow",
     "Fixed remote control connection reliability: token refresh on auth errors, heartbeat re-registration, exponential backoff, and persistent tunnel registry",
-    "Added \"Chat with our founder\" button on paywall for a free month offer"
+    "Added \"Chat with our founder\" button on paywall for a free month offer",
+    "Added \"Refer a Friend\" option to the paywall \u2014 share a link, get 1 month free when your friend sends 5 messages"
   ],
   "releases": [
     {
