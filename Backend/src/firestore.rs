@@ -141,9 +141,7 @@ fn from_firestore_doc(doc: &serde_json::Value) -> Option<ReleaseDoc> {
         version: str_field(fields, "version"),
         build: str_field(fields, "build"),
         channel: str_field(fields, "channel"),
-        is_live: fields["is_live"]["booleanValue"]
-            .as_bool()
-            .unwrap_or(false),
+        is_live: fields["is_live"]["booleanValue"].as_bool().unwrap_or(false),
     })
 }
 
