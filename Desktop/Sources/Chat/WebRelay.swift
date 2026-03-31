@@ -20,6 +20,7 @@ final class WebRelay: ObservableObject {
     private var cloudflaredProcess: Process?
     private var stdinPipe: Pipe?
     private var localPort: UInt16 = 0
+    private var heartbeatTask: Task<Void, Never>?
 
     /// Callback: a query arrived from the phone. Parameters: text, sessionKey
     var onQuery: ((String, String) async -> Void)?
@@ -35,6 +36,8 @@ final class WebRelay: ObservableObject {
     }
 
     func stop() {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         unregisterTunnel()
         cloudflaredProcess?.terminationHandler = nil
         cloudflaredProcess?.terminate()
@@ -307,6 +310,7 @@ final class WebRelay: ObservableObject {
                     self?.tunnelUrl = url
                     log("WebRelay: tunnel URL = \(url)")
                     self?.registerTunnel(url: url)
+                    self?.startHeartbeat()
                 }
             }
         }
