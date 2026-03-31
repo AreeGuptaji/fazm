@@ -2461,7 +2461,8 @@ class ChatProvider: ObservableObject {
                 cacheReadTokens: queryResult.cacheReadTokens,
                 cacheWriteTokens: queryResult.cacheWriteTokens,
                 queryText: trimmedText,
-                ttftMs: firstTokenTime.map { Int($0.timeIntervalSince(queryStartTime) * 1000) }
+                ttftMs: firstTokenTime.map { Int($0.timeIntervalSince(queryStartTime) * 1000) },
+                responseText: messageText.isEmpty ? queryResult.text : messageText
             )
 
             // Track conversation depth (total messages in this session)
