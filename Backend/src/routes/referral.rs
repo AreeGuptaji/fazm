@@ -394,8 +394,7 @@ pub async fn validate(
 // ---------- Landing Page ----------
 
 /// GET /r/:code
-/// Public landing page for referral links. Shows download info and passes
-/// the code through to the app via fazm:// URL scheme.
+/// Public landing page for referral links. Shows email form to send download link.
 pub async fn landing_page(
     Extension(config): Extension<Arc<Config>>,
     Path(code): Path<String>,
@@ -411,34 +410,192 @@ pub async fn landing_page(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Get Fazm — AI Desktop Assistant</title>
     <style>
-        body {{ background: #0F0F0F; color: #E5E5E5; font-family: -apple-system, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
-        .container {{ text-align: center; max-width: 400px; padding: 40px 20px; }}
+        body {{ background: #0a0a0f; color: #E5E5E5; font-family: -apple-system, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }}
+        .container {{ text-align: center; max-width: 420px; padding: 40px 24px; }}
         h1 {{ color: #8B5CF6; font-size: 28px; margin-bottom: 8px; }}
-        .subtitle {{ color: #B0B0B0; font-size: 16px; margin-bottom: 32px; }}
-        .code {{ background: #1A1A2E; border: 1px solid #333; border-radius: 8px; padding: 12px 20px; font-family: monospace; font-size: 18px; color: #8B5CF6; letter-spacing: 2px; margin-bottom: 24px; display: inline-block; }}
-        .btn {{ display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: white; text-decoration: none; border-radius: 10px; font-size: 16px; font-weight: 600; margin-bottom: 16px; }}
+        .subtitle {{ color: #94a3b8; font-size: 16px; margin-bottom: 32px; line-height: 1.5; }}
+        .code {{ background: #1e1e3a; border: 1px solid #333; border-radius: 8px; padding: 12px 20px; font-family: monospace; font-size: 18px; color: #8B5CF6; letter-spacing: 2px; margin-bottom: 24px; display: inline-block; }}
+        .form-group {{ margin-bottom: 16px; }}
+        .email-input {{ width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: white; font-size: 16px; outline: none; box-sizing: border-box; }}
+        .email-input:focus {{ border-color: rgba(139,92,246,0.5); box-shadow: 0 0 0 2px rgba(139,92,246,0.15); }}
+        .email-input::placeholder {{ color: rgba(255,255,255,0.3); }}
+        .btn {{ display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }}
         .btn:hover {{ opacity: 0.9; }}
-        .hint {{ color: #666; font-size: 13px; margin-top: 16px; }}
-        .open-link {{ color: #8B5CF6; font-size: 14px; margin-top: 12px; }}
-        .open-link a {{ color: #8B5CF6; }}
+        .btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+        .success {{ display: none; text-align: center; padding: 16px 0; }}
+        .success .check {{ width: 48px; height: 48px; margin: 0 auto 16px; border-radius: 50%; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); display: flex; align-items: center; justify-content: center; }}
+        .success .check svg {{ width: 24px; height: 24px; color: #4ade80; }}
+        .success h3 {{ color: white; font-size: 20px; margin-bottom: 8px; }}
+        .success p {{ color: #94a3b8; font-size: 14px; }}
+        .error {{ color: #f87171; font-size: 14px; margin-top: 8px; display: none; }}
+        .open-link {{ color: #64748b; font-size: 14px; margin-top: 20px; }}
+        .open-link a {{ color: #8B5CF6; text-decoration: none; }}
+        .open-link a:hover {{ text-decoration: underline; }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>You've been invited to Fazm</h1>
-        <p class="subtitle">AI assistant for your Mac — right on your desktop</p>
+        <p class="subtitle">AI agent for your Mac — controls your browser, writes code, handles documents, all from your voice.</p>
         <div class="code">{code}</div>
-        <br><br>
-        <a href="https://fazm.ai/download" class="btn" id="download-btn">Download Fazm for Mac</a>
-        <p class="open-link"><a href="fazm://referral/{code}">Open in Fazm</a> (if already installed)</p>
-        <p class="hint">After installing, come back to this page and click "Open in Fazm" to apply your referral</p>
+
+        <div id="form-section">
+            <p style="color: #94a3b8; font-size: 14px; margin-bottom: 16px;">Enter your email and we'll send you the download link.</p>
+            <form id="download-form" onsubmit="handleSubmit(event)">
+                <div class="form-group">
+                    <input type="email" id="email" class="email-input" placeholder="you@email.com" required autofocus />
+                </div>
+                <button type="submit" class="btn" id="submit-btn">Get download link</button>
+                <p class="error" id="error-msg">Something went wrong. Try again.</p>
+            </form>
+        </div>
+
+        <div class="success" id="success-section">
+            <div class="check">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h3>Check your email!</h3>
+            <p>Download link sent. Check your inbox.</p>
+        </div>
+
+        <p class="open-link">Already have Fazm? <a href="fazm://referral/{code}">Open in app</a></p>
     </div>
+    <script>
+        async function handleSubmit(e) {{
+            e.preventDefault();
+            var email = document.getElementById('email').value;
+            var btn = document.getElementById('submit-btn');
+            var errEl = document.getElementById('error-msg');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            errEl.style.display = 'none';
+            try {{
+                var res = await fetch('{backend_base}/api/referral/send-download', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ email: email, referral_code: '{code}' }})
+                }});
+                if (res.ok) {{
+                    document.getElementById('form-section').style.display = 'none';
+                    document.getElementById('success-section').style.display = 'block';
+                }} else {{
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Get download link';
+                }}
+            }} catch(err) {{
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Get download link';
+            }}
+        }}
+    </script>
 </body>
 </html>"#,
-        code = code
+        code = code,
+        backend_base = backend_base
     );
 
     Html(html)
+}
+
+// ---------- Send Download Email ----------
+
+#[derive(Deserialize)]
+pub struct SendDownloadRequest {
+    pub email: String,
+    pub referral_code: String,
+}
+
+/// POST /api/referral/send-download
+/// Sends a download email with the referral code to the given email address.
+/// Public endpoint (no auth required — used from the referral landing page).
+pub async fn send_download(
+    Extension(config): Extension<Arc<Config>>,
+    Json(body): Json<SendDownloadRequest>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let resend_key = &config.resend_api_key;
+    if resend_key.is_empty() {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Email service not configured".to_string(),
+        ));
+    }
+
+    let email = body.email.trim().to_lowercase();
+    if email.is_empty() || !email.contains('@') {
+        return Err((StatusCode::BAD_REQUEST, "Invalid email".to_string()));
+    }
+
+    let code = body.referral_code.trim().to_uppercase();
+    let download_url = format!(
+        "https://fazm.ai/download?email={}&utm_source=referral&utm_campaign={}",
+        urlencoding::encode(&email),
+        urlencoding::encode(&code)
+    );
+    let backend_base = &config.vertex_issuer;
+    let open_in_app_url = format!("fazm://referral/{code}");
+
+    let email_html = format!(
+        r#"<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0f;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+        <tr><td style="padding-bottom:32px;">
+          <span style="font-size:24px;font-weight:bold;color:#ffffff;">fazm</span><span style="font-size:24px;font-weight:bold;color:#8B5CF6;">.</span>
+        </td></tr>
+        <tr><td style="padding-bottom:16px;">
+          <h1 style="margin:0;font-size:28px;font-weight:bold;color:#ffffff;line-height:1.3;">Your download is ready</h1>
+        </td></tr>
+        <tr><td style="padding-bottom:32px;color:#94a3b8;font-size:16px;line-height:1.6;">
+          A friend invited you to try Fazm — the AI agent that controls your Mac with voice commands. Click below to download and get started.
+        </td></tr>
+        <tr><td style="padding-bottom:24px;">
+          <a href="{download_url}" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;border-radius:12px;">
+            Download Fazm for macOS
+          </a>
+        </td></tr>
+        <tr><td style="padding-bottom:16px;color:#64748b;font-size:14px;line-height:1.5;">
+          Your referral code: <strong style="color:#8B5CF6;">{code}</strong>
+        </td></tr>
+        <tr><td style="padding-bottom:40px;color:#64748b;font-size:14px;line-height:1.5;">
+          After installing, <a href="{open_in_app_url}" style="color:#8B5CF6;text-decoration:none;">click here to apply your referral</a> and both you and your friend get 1 month of Pro free.
+        </td></tr>
+        <tr><td style="border-top:1px solid #1e293b;padding-top:24px;color:#475569;font-size:13px;line-height:1.5;">
+          <a href="https://fazm.ai" style="color:#8B5CF6;text-decoration:none;">fazm.ai</a> — AI computer agent for macOS.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"#
+    );
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.resend.com/emails")
+        .header("Authorization", format!("Bearer {resend_key}"))
+        .json(&serde_json::json!({
+            "from": "Matt from Fazm <matt@fazm.ai>",
+            "to": email,
+            "subject": "Your Fazm download link",
+            "html": email_html
+        }))
+        .send()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Email send error: {e}")))?;
+
+    if !resp.status().is_success() {
+        let err = resp.text().await.unwrap_or_default();
+        tracing::error!(error = %err, "Resend email failed");
+        return Err((StatusCode::BAD_GATEWAY, "Failed to send email".to_string()));
+    }
+
+    tracing::info!(email = %body.email, code = %code, "Referral download email sent");
+    Ok(StatusCode::OK)
 }
 
 // ---------- Helpers ----------

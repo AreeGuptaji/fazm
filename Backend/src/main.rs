@@ -111,7 +111,11 @@ async fn main() {
             "/api/stripe/redirect",
             axum::routing::get(routes::stripe::checkout_redirect),
         )
-        .route("/r/:code", axum::routing::get(routes::referral::landing_page));
+        .route("/r/:code", axum::routing::get(routes::referral::landing_page))
+        .route(
+            "/api/referral/send-download",
+            axum::routing::post(routes::referral::send_download),
+        );
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

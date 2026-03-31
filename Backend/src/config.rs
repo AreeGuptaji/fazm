@@ -33,6 +33,8 @@ pub struct Config {
     pub stripe_price_id: String,
     pub stripe_intro_coupon_id: String,
     pub stripe_webhook_secret: String,
+    // Resend (email service)
+    pub resend_api_key: String,
 }
 
 impl Config {
@@ -91,6 +93,7 @@ impl Config {
             stripe_price_id: std::env::var("STRIPE_PRICE_ID").unwrap_or_default(),
             stripe_intro_coupon_id: std::env::var("STRIPE_INTRO_COUPON_ID").unwrap_or_default(),
             stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET").unwrap_or_default(),
+            resend_api_key: std::env::var("RESEND_API_KEY").unwrap_or_default(),
         }
     }
 }
