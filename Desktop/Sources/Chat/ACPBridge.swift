@@ -1006,10 +1006,13 @@ actor ACPBridge {
             // Before timing out, check if ACP tools are still running via stderr.
             // ACP's own tools (Terminal, text_editor) don't send bridge messages,
             // so waitForMessage would time out even though work is progressing.
-            // Keep extending the deadline while tools are actively running.
+            // Defer up to 3 times (total ~12 min) while tools are actively running.
+            var deferrals = 0
+            let maxDeferrals = 3
             while self.messageGeneration == expectedGeneration, self.messageContinuation != nil,
-                  self.acpToolsRunning > 0 {
-              log("ACPBridge: waitForMessage timeout deferred — \(self.acpToolsRunning) ACP tool(s) still running")
+                  self.acpToolsRunning > 0, deferrals < maxDeferrals {
+              deferrals += 1
+              log("ACPBridge: waitForMessage timeout deferred (\(deferrals)/\(maxDeferrals)) — \(self.acpToolsRunning) ACP tool(s) still running")
               try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             }
             if self.messageGeneration == expectedGeneration, self.messageContinuation != nil {
