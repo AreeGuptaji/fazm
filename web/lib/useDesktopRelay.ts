@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getFirebaseAuth } from "./firebase";
 import { trackEvent } from "./posthog";
 
 export interface ChatMessage {
@@ -20,6 +21,9 @@ interface RelayHook {
   isSending: boolean;
 }
 
+const BACKOFF_INITIAL_MS = 3000;
+const BACKOFF_MAX_MS = 60000;
+
 export function useDesktopRelay(token: string | null): RelayHook {
   const [isConnected, setIsConnected] = useState(false);
   const [isDesktopOnline, setIsDesktopOnline] = useState(false);
@@ -30,6 +34,8 @@ export function useDesktopRelay(token: string | null): RelayHook {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const offlineTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hasConnected = useRef(false);
+  const backoffMs = useRef(BACKOFF_INITIAL_MS);
+  const connectRef = useRef<() => void>(() => {});
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
   // Debounced offline setter — don't flicker on brief WS reconnects
@@ -47,66 +53,6 @@ export function useDesktopRelay(token: string | null): RelayHook {
     setIsDesktopOnline(true);
     trackEvent("web_desktop_online");
   }, []);
-
-  // Discover tunnel URL and connect
-  const connect = useCallback(async () => {
-    if (!token || !backendUrl) return;
-
-    try {
-      const res = await fetch(`${backendUrl}/api/relay/discover`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        trackEvent("web_relay_discover_failed", { status: res.status });
-        setOffline();
-        reconnectTimer.current = setTimeout(connect, 5000);
-        return;
-      }
-
-      const { tunnel_url } = await res.json();
-      if (!tunnel_url) {
-        trackEvent("web_relay_discover_failed", { reason: "no_tunnel_url" });
-        setOffline();
-        reconnectTimer.current = setTimeout(connect, 5000);
-        return;
-      }
-
-      // Connect WebSocket to tunnel
-      const wsUrl = tunnel_url.replace(/^http/, "ws");
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setIsConnected(true);
-        setOnline();
-        trackEvent("web_relay_connected");
-        ws.send(JSON.stringify({ type: "request_history" }));
-      };
-
-      ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        handleMessage(msg);
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        setOffline();
-        setIsSending(false);
-        wsRef.current = null;
-        trackEvent("web_relay_disconnected");
-        reconnectTimer.current = setTimeout(connect, 3000);
-      };
-
-      ws.onerror = () => {
-        trackEvent("web_connection_error");
-        ws.close();
-      };
-    } catch (err) {
-      trackEvent("web_connection_error", { error: (err as Error).message });
-      reconnectTimer.current = setTimeout(connect, 5000);
-    }
-  }, [token, backendUrl, setOffline, setOnline]);
 
   const handleMessage = useCallback((msg: Record<string, unknown>) => {
     switch (msg.type) {
@@ -186,6 +132,132 @@ export function useDesktopRelay(token: string | null): RelayHook {
       }
     }
   }, []);
+
+  // Force-refresh the Firebase ID token (e.g. after a 401)
+  const refreshToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const auth = getFirebaseAuth();
+      const user = auth.currentUser;
+      if (!user) return null;
+      const freshToken = await user.getIdToken(true);
+      trackEvent("web_relay_token_refreshed");
+      return freshToken;
+    } catch (err) {
+      trackEvent("web_relay_token_refresh_failed", { error: (err as Error).message });
+      return null;
+    }
+  }, []);
+
+  // Schedule a reconnect with current backoff
+  const scheduleReconnect = useCallback(() => {
+    reconnectTimer.current = setTimeout(() => connectRef.current(), backoffMs.current);
+  }, []);
+
+  // Open a WebSocket to the discovered tunnel URL
+  const openWebSocket = useCallback((tunnelUrl: string) => {
+    const wsUrl = tunnelUrl.replace(/^http/, "ws");
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setIsConnected(true);
+      setOnline();
+      backoffMs.current = BACKOFF_INITIAL_MS;
+      trackEvent("web_relay_connected");
+      ws.send(JSON.stringify({ type: "request_history" }));
+    };
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      handleMessage(msg);
+    };
+
+    ws.onclose = () => {
+      setIsConnected(false);
+      setOffline();
+      setIsSending(false);
+      wsRef.current = null;
+      trackEvent("web_relay_disconnected");
+      scheduleReconnect();
+    };
+
+    ws.onerror = () => {
+      trackEvent("web_connection_error");
+      ws.close();
+    };
+  }, [setOnline, setOffline, handleMessage, scheduleReconnect]);
+
+  // Discover tunnel URL and connect
+  const connect = useCallback(async () => {
+    if (!token || !backendUrl) return;
+
+    try {
+      const res = await fetch(`${backendUrl}/api/relay/discover`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // On 401, force-refresh the Firebase token and retry immediately
+      if (res.status === 401) {
+        trackEvent("web_relay_discover_failed", { status: 401, action: "refreshing_token" });
+        const freshToken = await refreshToken();
+        if (freshToken) {
+          const retryRes = await fetch(`${backendUrl}/api/relay/discover`, {
+            headers: { Authorization: `Bearer ${freshToken}` },
+          });
+          if (!retryRes.ok) {
+            trackEvent("web_relay_discover_failed", { status: retryRes.status, after_refresh: true });
+            setOffline();
+            backoffMs.current = Math.min(backoffMs.current * 2, BACKOFF_MAX_MS);
+            scheduleReconnect();
+            return;
+          }
+          const { tunnel_url } = await retryRes.json();
+          if (!tunnel_url) {
+            trackEvent("web_relay_discover_failed", { reason: "no_tunnel_url" });
+            setOffline();
+            backoffMs.current = Math.min(backoffMs.current * 2, BACKOFF_MAX_MS);
+            scheduleReconnect();
+            return;
+          }
+          openWebSocket(tunnel_url);
+          return;
+        }
+        // Token refresh failed — retry with backoff
+        setOffline();
+        backoffMs.current = Math.min(backoffMs.current * 2, BACKOFF_MAX_MS);
+        scheduleReconnect();
+        return;
+      }
+
+      if (!res.ok) {
+        trackEvent("web_relay_discover_failed", { status: res.status });
+        setOffline();
+        backoffMs.current = Math.min(backoffMs.current * 2, BACKOFF_MAX_MS);
+        scheduleReconnect();
+        return;
+      }
+
+      const { tunnel_url } = await res.json();
+      if (!tunnel_url) {
+        trackEvent("web_relay_discover_failed", { reason: "no_tunnel_url" });
+        setOffline();
+        backoffMs.current = Math.min(backoffMs.current * 2, BACKOFF_MAX_MS);
+        scheduleReconnect();
+        return;
+      }
+
+      openWebSocket(tunnel_url);
+    } catch (err) {
+      trackEvent("web_connection_error", { error: (err as Error).message });
+      backoffMs.current = Math.min(backoffMs.current * 2, BACKOFF_MAX_MS);
+      scheduleReconnect();
+    }
+  }, [token, backendUrl, setOffline, refreshToken, openWebSocket, scheduleReconnect]);
+
+  // Keep connectRef in sync so scheduleReconnect always calls the latest connect
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     connect();
