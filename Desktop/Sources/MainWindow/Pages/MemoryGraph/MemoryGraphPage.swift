@@ -139,6 +139,20 @@ class MemoryGraphViewModel: ObservableObject {
     private var edgeSceneNodes: [String: SCNNode] = [:]
     private var isAnimating = true
 
+    /// Maximum number of nodes to render in SceneKit (top by connection count)
+    private let maxVisibleNodes = 100
+    /// Minimum connection count to show a glow halo
+    private let glowConnectionThreshold = 3
+    /// Minimum connection count to show a text label
+    private let labelConnectionThreshold = 2
+
+    /// Debounce timer for incremental graph updates
+    private var graphUpdateDebounceTask: Task<Void, Never>?
+    private var hasPendingGraphUpdate = false
+
+    /// Cache for pre-rendered label textures
+    private var labelTextureCache: [String: NSImage] = [:]
+
     init() {
         setupCamera()
         setupLighting()
@@ -175,6 +189,38 @@ class MemoryGraphViewModel: ObservableObject {
         scene.rootNode.addChildNode(directionalNode)
     }
 
+    // MARK: - Node Capping
+
+    /// Filter a graph response to only include the top nodes by connection count.
+    /// Always includes the user node. Edges are filtered to only reference included nodes.
+    private func capGraphResponse(_ response: KnowledgeGraphResponse, maxNodes: Int, userNodeLabel: String?) -> KnowledgeGraphResponse {
+        guard response.nodes.count > maxNodes else { return response }
+
+        // Count connections per node
+        var connectionCounts: [String: Int] = [:]
+        for edge in response.edges {
+            connectionCounts[edge.sourceId, default: 0] += 1
+            connectionCounts[edge.targetId, default: 0] += 1
+        }
+
+        // Sort by connection count descending, keep top N
+        let sorted = response.nodes.sorted { (connectionCounts[$0.id] ?? 0) > (connectionCounts[$1.id] ?? 0) }
+        var kept = Array(sorted.prefix(maxNodes))
+
+        // Ensure user node is included
+        if let userName = userNodeLabel,
+           !kept.contains(where: { $0.label.lowercased() == userName.lowercased() }),
+           let userNode = response.nodes.first(where: { $0.label.lowercased() == userName.lowercased() }) {
+            kept.append(userNode)
+        }
+
+        let keptIds = Set(kept.map { $0.id })
+        let filteredEdges = response.edges.filter { keptIds.contains($0.sourceId) && keptIds.contains($0.targetId) }
+
+        log("Knowledge graph capped: \(response.nodes.count) → \(kept.count) nodes, \(response.edges.count) → \(filteredEdges.count) edges")
+        return KnowledgeGraphResponse(nodes: kept, edges: filteredEdges)
+    }
+
     // MARK: - Load Graph
 
     func loadGraph() async {
@@ -194,8 +240,11 @@ class MemoryGraphViewModel: ObservableObject {
 
             guard !isEmpty else { return }
 
-            // Populate simulation with user node at center
+            // Cap to top nodes by connection count for rendering performance
             let userName = AuthService.shared.displayName.isEmpty ? nil : AuthService.shared.givenName
+            response = capGraphResponse(response, maxNodes: maxVisibleNodes, userNodeLabel: userName)
+
+            // Populate simulation with user node at center
             log("User name for center node: \(userName ?? "nil")")
             simulation.populate(graphResponse: response, userNodeLabel: userName)
             log("Simulation populated: \(simulation.nodes.count) nodes (including user), \(simulation.edges.count) edges")
@@ -240,29 +289,53 @@ class MemoryGraphViewModel: ObservableObject {
 
     // MARK: - Incremental Graph Update
 
-    /// Add new graph data from storage incrementally (used during onboarding)
+    /// Debounced entry point — buffers rapid save_knowledge_graph calls into a single update.
     func addGraphFromStorage() async {
-        let response = await KnowledgeGraphStorage.shared.loadGraph()
+        // Cancel any pending debounce and schedule a new one
+        graphUpdateDebounceTask?.cancel()
+        hasPendingGraphUpdate = true
+        graphUpdateDebounceTask = Task { [weak self] in
+            // Wait 5 seconds to coalesce rapid calls
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            await self.performIncrementalGraphUpdate()
+        }
+    }
+
+    /// Actually performs the incremental graph update after debounce settles.
+    private func performIncrementalGraphUpdate() async {
+        guard hasPendingGraphUpdate else { return }
+        hasPendingGraphUpdate = false
+
+        var response = await KnowledgeGraphStorage.shared.loadGraph()
         guard !response.nodes.isEmpty else { return }
         isEmpty = false
 
+        // Cap the response before feeding to simulation
         let userName = AuthService.shared.displayName.isEmpty ? nil : AuthService.shared.givenName
-        simulation.addNodesAndEdges(graphResponse: response, userNodeLabel: userName)
+        response = capGraphResponse(response, maxNodes: maxVisibleNodes, userNodeLabel: userName)
 
-        // Run a burst of physics to integrate new nodes
-        await Task.detached(priority: .userInitiated) { [simulation] in
-            simulation.runSync(ticks: 200)
-        }.value
+        let previousNodeCount = simulation.nodes.count
+        simulation.addNodesAndEdges(graphResponse: response, userNodeLabel: userName)
+        let addedNodes = simulation.nodes.count - previousNodeCount
+
+        // Scale physics burst to number of new nodes (skip if only 1-2 added)
+        if addedNodes > 2 {
+            let ticks = min(200, addedNodes * 20)
+            await Task.detached(priority: .userInitiated) { [simulation] in
+                simulation.runSync(ticks: ticks)
+            }.value
+        }
 
         // Create scene nodes for new entries, animate them in
         await addNewSceneNodes()
         autoFitCamera(animated: true)
 
-        // Re-enable animation for settling
+        // Re-enable animation for settling (shorter window)
         isAnimating = true
         Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await MainActor.run { isAnimating = false }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run { self.isAnimating = false }
         }
     }
 
