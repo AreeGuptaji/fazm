@@ -1717,6 +1717,24 @@ struct SettingsContentView: View {
                 }
             }
 
+            // Screen Observer (Discovered Tasks)
+            settingsCard(settingId: "advanced.preferences.screenObserver") {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Screen Observer")
+                            .scaledFont(size: 16, weight: .semibold)
+                            .foregroundColor(FazmColors.textPrimary)
+                        Text("Watches your screen and suggests tasks AI can help with")
+                            .scaledFont(size: 13)
+                            .foregroundColor(FazmColors.textSecondary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $shortcutSettings.screenObserverEnabled)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+            }
+
             // Draggable Floating Bar
             settingsCard(settingId: "advanced.preferences.draggable") {
                 HStack(spacing: 16) {
