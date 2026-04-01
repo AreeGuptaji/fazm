@@ -1787,7 +1787,7 @@ class FloatingControlBarManager {
             state.showingAIResponse = false
         }
 
-        let size = FloatingControlBarWindow.minBarSize
+        let size = NSSize(width: 40, height: 10)
         let restoreOrigin = NSPoint(
             x: window.frame.midX - size.width / 2,
             y: window.frame.origin.y
