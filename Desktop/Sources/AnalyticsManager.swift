@@ -884,6 +884,12 @@ class AnalyticsManager {
         endChatSession(source: "closed")
     }
 
+    func floatingBarChatPoppedOut(historyCount: Int) {
+        PostHogManager.shared.track("floating_bar_chat_popped_out", properties: [
+            "history_count": historyCount,
+        ])
+    }
+
     /// Accumulate per-query stats into the current chat session.
     func chatSessionTrackQuery(costUsd: Double) {
         chatSessionQueryCount += 1
