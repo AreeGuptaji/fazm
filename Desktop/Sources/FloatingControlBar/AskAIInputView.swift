@@ -18,24 +18,8 @@ struct AskAIInputView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top bar: close button + escape hint
+            // Top bar: escape hint
             HStack {
-                Button {
-                    onCancel?()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8))
-                            .foregroundColor(.secondary)
-                            .frame(width: 16, height: 16)
-                            .overlay(Circle().strokeBorder(FazmColors.overlayForeground.opacity(0.2), lineWidth: 0.5))
-                        Text("esc")
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
-
                 Spacer()
 
                 HStack(spacing: 4) {
@@ -51,7 +35,7 @@ struct AskAIInputView: View {
                 }
             }
             .padding(.top, 8)
-            .padding(.horizontal, 12)
+            .padding(.trailing, 16)
 
             HStack(spacing: 6) {
                 ZStack(alignment: .topLeading) {
