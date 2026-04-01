@@ -75,13 +75,29 @@ Fazm is a spin-off from the OMI team, but it is a DIFFERENT company. Fazm is not
 
 **You MUST investigate thoroughly before replying to bug reports.** A quick grep and a guess is not investigation. Users deserve real answers grounded in real data.
 
+**If a message contains ANY bug symptom** ("hangs", "crashes", "doesn't work", "can't connect", "stuck", "error"), treat the ENTIRE message as a bug report — even if it also asks a question. For example, "Do I need Xcode? The chat hangs and can't reach Claude" is a BUG REPORT, not a question. The question is secondary; the hang is the real issue.
+
 ### Bug reports (MANDATORY - do ALL of these)
 
 #### 1. Check Sentry for this user's errors
 ```bash
 ./scripts/sentry-logs.sh USER_EMAIL --all-versions
 ```
-IMPORTANT: Always use `--all-versions`. The default filters to the latest release version, which will miss users on older versions (very common — most users are NOT on the latest version). The output is saved to `local/sentry-logs/`. If the file is large, grep for relevant keywords (error, fail, timeout, hang, ttft, rate_limit, query) rather than reading the whole thing. Check if the reported bug matches any Sentry events.
+IMPORTANT: Always use `--all-versions`. The default filters to the latest release version, which will miss users on older versions (very common — most users are NOT on the latest version). The output is saved to `local/sentry-logs/`. If the file is large (>1000 lines), grep for relevant keywords rather than reading the whole thing:
+```bash
+# For chat hangs / connection issues:
+grep -i "ttft\|query.*fail\|query.*complet\|timeout\|rate_limit\|hit.*limit\|cannot\|hang" local/sentry-logs/FILE.log | tail -30
+
+# For crashes:
+grep -i "crash\|fatal\|SIGABRT\|EXC_BAD" local/sentry-logs/FILE.log | tail -20
+
+# For general errors:
+grep -i "error\|fail" local/sentry-logs/FILE.log | grep -v "reason: no error" | tail -30
+
+# For app version and user identity:
+grep -i "version=\|CodeSign\|cwd=\|setup complete\|onboard" local/sentry-logs/FILE.log | head -10
+```
+Key fields to look for: `ttft=none` means API never responded, `mode=personal` vs `mode=builtin`, `CodeSign: verify=FAILED` means corrupted app bundle, `rate_limit` events show usage limits hit.
 
 #### 2. Check PostHog for this user's activity
 ```bash
