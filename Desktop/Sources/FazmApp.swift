@@ -160,6 +160,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         log("AppDelegate: applicationDidFinishLaunching started (mode: \(FazmApp.launchMode.rawValue))")
         log("AppDelegate: AuthState.isSignedIn=\(AuthState.shared.isSignedIn)")
 
+        // Apply user's appearance preference (light/dark/system)
+        AppearanceManager.shared.applyAppearance()
+
         // Force macOS to use the correct app icon (bypasses icon cache).
         // Apply squircle mask with proper margins because NSApp.applicationIconImage
         // renders the raw image without macOS auto-masking.
@@ -405,7 +408,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if window.title.hasPrefix("Fazm") {
                     foundFazmWindow = true
                     window.makeKeyAndOrderFront(nil)
-                    window.appearance = NSAppearance(named: .darkAqua)
                     // Ensure fullscreen always creates a dedicated Space
                     window.collectionBehavior.insert(.fullScreenPrimary)
                     log("AppDelegate: Main window shown on launch")
@@ -736,7 +738,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if window.title.hasPrefix("Fazm") {
                 foundWindow = true
                 window.makeKeyAndOrderFront(nil)
-                window.appearance = NSAppearance(named: .darkAqua)
             }
         }
         NSApp.activate(ignoringOtherApps: true)
