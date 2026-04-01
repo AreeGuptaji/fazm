@@ -46,7 +46,7 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
         self.delegate = self
         self.titlebarAppearsTransparent = false
         self.titleVisibility = .visible
-        self.backgroundColor = NSColor(white: 0.1, alpha: 1.0)
+        self.backgroundColor = NSColor(FazmColors.backgroundPrimary)
 
         // Restore saved position
         if let savedPos = UserDefaults.standard.string(forKey: DetachedChatWindow.positionKey) {
