@@ -1761,46 +1761,35 @@ class FloatingControlBarManager {
         AnalyticsManager.shared.floatingBarChatPoppedOut(
             historyCount: state.chatHistory.count
         )
-        AnalyticsManager.shared.floatingBarAskFazmClosed()
 
         // Remove monitors before hiding the floating bar conversation
         window.removeGlobalClickOutsideMonitor()
         window.suppressClickOutsideDismiss = false
         state.isCollapsed = false
 
-        // Show the detached window with the shared state — conversation carries over
-        DetachedChatWindowController.shared.show(
-            state: state,
-            chatProvider: provider,
-            onSendQuery: { [weak self, weak window, weak provider] message in
-                guard let self, let barWindow = window, let provider else { return }
-                Task { @MainActor in
-                    await self.sendAIQuery(message, barWindow: barWindow, provider: provider)
-                }
-            }
-        )
+        // Snapshot conversation data before resetting
+        let chatHistory = state.chatHistory
+        let displayedQuery = state.displayedQuery
+        let currentAIMessage = state.currentAIMessage
+        let isAILoading = state.isAILoading
+        let messageCountBefore = provider.messages.count
 
-        // Collapse the floating bar back to its pill without clearing conversation state
-        // (the detached window now owns the display of this conversation)
+        // Cancel existing streaming subscription — the detached window will create its own
         chatCancellable?.cancel()
         chatCancellable = nil
 
-        withAnimation(.easeOut(duration: 0.2)) {
-            state.showingAIConversation = false
-            state.showingAIResponse = false
-        }
-
-        let size = NSSize(width: 40, height: 10)
-        let restoreOrigin = NSPoint(
-            x: window.frame.midX - size.width / 2,
-            y: window.frame.origin.y
+        // Show the detached window with its own state copy
+        DetachedChatWindowController.shared.show(
+            chatHistory: chatHistory,
+            displayedQuery: displayedQuery,
+            currentAIMessage: currentAIMessage,
+            isAILoading: isAILoading,
+            chatProvider: provider,
+            messageCountBefore: messageCountBefore
         )
-        window.styleMask.remove(.resizable)
-        NSAnimationContext.beginGrouping()
-        NSAnimationContext.current.duration = 0.35
-        NSAnimationContext.current.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0.0, 0.2, 1.0)
-        window.setFrame(NSRect(origin: restoreOrigin, size: size), display: true, animate: true)
-        NSAnimationContext.endGrouping()
+
+        // Reset the floating bar to a fresh new chat
+        window.startNewChat()
     }
 
     /// Re-send the pending message that was interrupted by browser extension setup.
