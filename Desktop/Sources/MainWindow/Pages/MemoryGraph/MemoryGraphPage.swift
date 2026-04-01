@@ -408,8 +408,8 @@ class MemoryGraphViewModel: ObservableObject {
         for (_, node) in edgeSceneNodes { node.removeFromParentNode() }
         nodeSceneNodes.removeAll()
         edgeSceneNodes.removeAll()
+        labelTextureCache.removeAll()
 
-        // Billboard constraint for labels (always face camera)
         let billboardConstraint = SCNBillboardConstraint()
         billboardConstraint.freeAxes = [.X, .Y]
 
@@ -429,38 +429,52 @@ class MemoryGraphViewModel: ObservableObject {
             scene.rootNode.addChildNode(edgeNode)
             edgeSceneNodes[edge.id] = edgeNode
 
-            // Yield every 20 edges to keep main thread responsive
             if index > 0 && index % 20 == 0 {
                 try? await Task.sleep(nanoseconds: 1_000_000)
             }
         }
 
-        // Create node spheres with labels and glow halos in batches
+        // Create node spheres in batches
         for (index, node) in simulation.nodes.enumerated() {
-            let radius = nodeRadius(for: node)
-            let containerNode = SCNNode()
-            containerNode.position = SCNVector3(node.position)
-            containerNode.name = node.id
+            let containerNode = createNodeSceneNode(node, billboardConstraint: billboardConstraint)
+            scene.rootNode.addChildNode(containerNode)
+            nodeSceneNodes[node.id] = containerNode
 
-            // Core sphere
-            let sphere = SCNSphere(radius: radius)
-            sphere.segmentCount = node.isFixed ? 24 : 12
-            let mat = SCNMaterial()
-            if node.isFixed {
-                mat.diffuse.contents = NSColor.white
-                mat.emission.contents = NSColor.white.withAlphaComponent(0.8)
-            } else {
-                mat.diffuse.contents = node.nodeType.nsColor
-                mat.emission.contents = node.nodeType.nsColor.withAlphaComponent(0.5)
+            if index > 0 && index % 10 == 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000)
             }
-            mat.lightingModel = .constant
-            sphere.materials = [mat]
-            containerNode.addChildNode(SCNNode(geometry: sphere))
+        }
 
-            // Glow halo (larger semi-transparent sphere around node)
+        autoFitCamera()
+    }
+
+    /// Creates a single node's SceneKit representation: sphere + optional glow + optional label
+    private func createNodeSceneNode(_ node: GraphNode3D, billboardConstraint: SCNBillboardConstraint) -> SCNNode {
+        let radius = nodeRadius(for: node)
+        let containerNode = SCNNode()
+        containerNode.position = SCNVector3(node.position)
+        containerNode.name = node.id
+
+        // Core sphere
+        let sphere = SCNSphere(radius: radius)
+        sphere.segmentCount = node.isFixed ? 24 : 8
+        let mat = SCNMaterial()
+        if node.isFixed {
+            mat.diffuse.contents = NSColor.white
+            mat.emission.contents = NSColor.white.withAlphaComponent(0.8)
+        } else {
+            mat.diffuse.contents = node.nodeType.nsColor
+            mat.emission.contents = node.nodeType.nsColor.withAlphaComponent(0.5)
+        }
+        mat.lightingModel = .constant
+        sphere.materials = [mat]
+        containerNode.addChildNode(SCNNode(geometry: sphere))
+
+        // Glow halo — only for user node or well-connected nodes
+        if node.isFixed || node.connectionCount >= glowConnectionThreshold {
             let glowRadius = radius * 2.5
             let glowSphere = SCNSphere(radius: glowRadius)
-            glowSphere.segmentCount = 12
+            glowSphere.segmentCount = 8
             let glowMat = SCNMaterial()
             let glowColor = node.isFixed ? NSColor.white : node.nodeType.nsColor
             glowMat.diffuse.contents = glowColor.withAlphaComponent(0.03)
@@ -470,57 +484,70 @@ class MemoryGraphViewModel: ObservableObject {
             glowMat.blendMode = .add
             glowSphere.materials = [glowMat]
             containerNode.addChildNode(SCNNode(geometry: glowSphere))
+        }
 
-            // Text label (billboard — always faces camera)
+        // Text label — only for user node or nodes with enough connections
+        if node.isFixed || node.connectionCount >= labelConnectionThreshold {
             let labelNode = createLabelNode(text: node.label, nodeRadius: radius, isFixed: node.isFixed)
             labelNode.constraints = [billboardConstraint]
             containerNode.addChildNode(labelNode)
-
-            scene.rootNode.addChildNode(containerNode)
-            nodeSceneNodes[node.id] = containerNode
-
-            // Yield every 10 nodes (node creation is heavier due to SCNText)
-            if index > 0 && index % 10 == 0 {
-                try? await Task.sleep(nanoseconds: 1_000_000)
-            }
         }
 
-        // Auto-fit camera to graph bounds
-        autoFitCamera()
+        return containerNode
     }
 
-    /// Create a text label below a node
+    /// Create a text label as a billboarded texture plane (much cheaper than SCNText)
     private func createLabelNode(text: String, nodeRadius: CGFloat, isFixed: Bool) -> SCNNode {
         let truncated = text.count > 18 ? String(text.prefix(16)) + "..." : text
-        let fontSize: CGFloat = isFixed ? 22 : 16
-        let scnText = SCNText(string: truncated, extrusionDepth: 0.5)
-        scnText.font = NSFont.systemFont(ofSize: fontSize, weight: isFixed ? .bold : .medium)
-        scnText.flatness = 1.0
-        scnText.alignmentMode = CATextLayerAlignmentMode.center.rawValue
+        let cacheKey = "\(truncated)_\(isFixed)"
 
-        let textMat = SCNMaterial()
-        textMat.diffuse.contents = NSColor.white
-        textMat.emission.contents = NSColor.white.withAlphaComponent(0.9)
-        textMat.lightingModel = .constant
-        scnText.materials = [textMat]
+        // Render text to NSImage (cached)
+        let image: NSImage
+        if let cached = labelTextureCache[cacheKey] {
+            image = cached
+        } else {
+            image = renderLabelTexture(text: truncated, isFixed: isFixed)
+            labelTextureCache[cacheKey] = image
+        }
 
-        let textNode = SCNNode(geometry: scnText)
+        // Create a plane with the texture
+        let aspectRatio = image.size.width / image.size.height
+        let planeHeight: CGFloat = isFixed ? 28 : 20
+        let planeWidth = planeHeight * aspectRatio
+        let plane = SCNPlane(width: planeWidth, height: planeHeight)
 
-        // Center the text horizontally
-        let (min, max) = scnText.boundingBox
-        let textWidth = CGFloat(max.x - min.x)
-        let textHeight = CGFloat(max.y - min.y)
-        textNode.position = SCNVector3(
-            -textWidth / 2,
-            -(nodeRadius + textHeight + 12),
-            0
-        )
+        let planeMat = SCNMaterial()
+        planeMat.diffuse.contents = image
+        planeMat.emission.contents = image
+        planeMat.lightingModel = .constant
+        planeMat.isDoubleSided = true
+        planeMat.transparencyMode = .aOne
+        plane.materials = [planeMat]
 
-        // Scale text down to world-appropriate size
-        let scale: Float = isFixed ? 1.2 : 0.9
-        textNode.scale = SCNVector3(scale, scale, scale)
+        let labelNode = SCNNode(geometry: plane)
+        labelNode.position = SCNVector3(0, -(nodeRadius + planeHeight / 2 + 8), 0)
 
-        return textNode
+        return labelNode
+    }
+
+    /// Pre-render label text into an NSImage texture
+    private func renderLabelTexture(text: String, isFixed: Bool) -> NSImage {
+        let fontSize: CGFloat = isFixed ? 44 : 32
+        let font = NSFont.systemFont(ofSize: fontSize, weight: isFixed ? .bold : .medium)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.white,
+        ]
+        let size = (text as NSString).size(withAttributes: attributes)
+        let padding: CGFloat = 8
+        let imageSize = NSSize(width: ceil(size.width + padding * 2), height: ceil(size.height + padding * 2))
+
+        let image = NSImage(size: imageSize)
+        image.lockFocus()
+        (text as NSString).draw(at: NSPoint(x: padding, y: padding), withAttributes: attributes)
+        image.unlockFocus()
+
+        return image
     }
 
     /// Blend two NSColors
