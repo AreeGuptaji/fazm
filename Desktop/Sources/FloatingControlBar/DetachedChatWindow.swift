@@ -65,7 +65,6 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
 
     func setupViews() {
         let chatView = DetachedChatView(
-            state: state,
             onSendFollowUp: { [weak self] msg in self?.onSendFollowUp?(msg) },
             onNewChat: { [weak self] in self?.onNewChat?() },
             onEnqueueMessage: { [weak self] msg in self?.onEnqueueMessage?(msg) },
@@ -81,8 +80,8 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
         let hosting = NSHostingView(rootView: AnyView(
             chatView
                 .withFontScaling()
-                .preferredColorScheme(.dark)
-                .environment(\.colorScheme, .dark)
+                .preferredColorScheme(ColorScheme.dark)
+                .environment(\.colorScheme, ColorScheme.dark)
         ))
         hosting.appearance = NSAppearance(named: .vibrantDark)
         self.contentView = hosting
