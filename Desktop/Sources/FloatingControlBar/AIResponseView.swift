@@ -54,7 +54,7 @@ struct AIResponseView: View {
 
             headerView
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
+                .padding(.top, 20)
 
             ScrollViewReader { proxy in
                 ScrollView {
