@@ -22,6 +22,7 @@ struct SettingsSearchItem: Identifiable {
     static let allSearchableItems: [SettingsSearchItem] = [
         // General
         SettingsSearchItem(name: "Floating Bar Visibility", subtitle: "Show or hide the floating chat bar", keywords: ["floating bar", "chat bar", "ask fazm"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.askomi"),
+        SettingsSearchItem(name: "Appearance", subtitle: "Switch between light, dark, or system theme", keywords: ["appearance", "theme", "dark mode", "light mode", "color scheme"], section: .general, advancedSubsection: nil, icon: "circle.lefthalf.filled", settingId: "general.appearance"),
         SettingsSearchItem(name: "Font Size", subtitle: "Adjust text size across the app", keywords: ["text size", "zoom", "scale", "reset"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.fontsize"),
         SettingsSearchItem(name: "Reset Window Size", subtitle: "Restore the default window dimensions", keywords: ["resize", "window", "default size"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.resetwindow"),
 
@@ -564,5 +565,4 @@ struct SettingHighlightModifier: ViewModifier {
         highlightedSettingId: .constant(nil),
         appState: AppState()
     )
-    .preferredColorScheme(.dark)
 }
