@@ -82,6 +82,7 @@ struct AskAIInputView: View {
                 .padding(.horizontal, 4)
                 .frame(height: textHeight)
 
+                micButton
                 sendButton
             }
             .padding(.horizontal, 16)
@@ -95,6 +96,22 @@ struct AskAIInputView: View {
 
     private var hasInput: Bool {
         !localInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var micButton: some View {
+        Image(systemName: state.isVoiceListening ? "mic.fill" : "mic")
+            .scaledFont(size: 18)
+            .foregroundColor(state.isVoiceListening ? .red : .secondary)
+            .frame(width: 28, height: 28)
+            .scaleEffect(state.isVoiceListening ? 1.15 : 1.0)
+            .animation(.easeInOut(duration: 0.3), value: state.isVoiceListening)
+            .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+                if pressing {
+                    PushToTalkManager.shared.startUIListening()
+                } else {
+                    PushToTalkManager.shared.finalizeUIListening()
+                }
+            }, perform: {})
     }
 
     private var sendButton: some View {
