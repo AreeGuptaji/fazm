@@ -539,8 +539,9 @@ let lastWarmupConfig: { cwd?: string; sessions?: WarmupSessionConfig[] } | null 
 
 // --- Auth flow (OAuth) ---
 
-/** Restart the ACP subprocess so it picks up freshly-stored credentials,
- *  then replay the last warmup so sessions are restored before the caller retries. */
+/** Restart the ACP subprocess so it picks up freshly-stored credentials.
+ *  Warmup is replayed in the background — callers can proceed immediately
+ *  and create their own session without waiting for all sessions to warm up. */
 async function restartAcpProcess(): Promise<void> {
   logErr("Restarting ACP subprocess to pick up new credentials...");
   if (acpProcess) {
@@ -553,11 +554,12 @@ async function restartAcpProcess(): Promise<void> {
   // State is cleaned up by the exit handler (sessions, handlers, etc.)
   startAcpProcess();
 
-  // Replay warmup so sessions are re-created/resumed with the new credentials.
-  // Without this, the caller would get a fresh (no-history) session after OAuth.
+  // Replay warmup in the background so sessions are re-created/resumed.
+  // Don't await — the caller (OAuth retry) should proceed immediately
+  // and create its own session without waiting for unrelated sessions.
   if (lastWarmupConfig) {
-    logErr("Replaying warmup after OAuth restart...");
-    await preWarmSession(lastWarmupConfig.cwd, lastWarmupConfig.sessions);
+    logErr("Replaying warmup after OAuth restart (background)...");
+    preWarmPromise = preWarmSession(lastWarmupConfig.cwd, lastWarmupConfig.sessions);
   }
 }
 
@@ -1047,19 +1049,28 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
     currentMode = mode;
     logErr(`Query mode: ${mode}`);
 
-    // Wait for pre-warm to finish if in progress
+    // Compute session key early so we can decide whether to wait for pre-warm
+    const requestedModel = msg.model || DEFAULT_MODEL;
+    const sessionKey = msg.sessionKey ?? requestedModel;
+
+    // Wait for pre-warm only if the session we need is being warmed.
+    // After OAuth restart, warmup runs in the background for main/floating/observer —
+    // the retry query (e.g. onboarding) should proceed immediately without waiting.
     if (preWarmPromise) {
-      logErr("Waiting for pre-warm to complete...");
-      await preWarmPromise;
-      preWarmPromise = null;
+      const isBeingWarmed = lastWarmupConfig?.sessions?.some(s => s.key === sessionKey);
+      if (sessions.has(sessionKey)) {
+        // Already available, no need to wait
+      } else if (isBeingWarmed) {
+        logErr(`Waiting for pre-warm (need session: ${sessionKey})...`);
+        await preWarmPromise;
+        preWarmPromise = null;
+      } else {
+        logErr(`Pre-warm in progress but session ${sessionKey} not included, proceeding...`);
+      }
     }
 
     // Ensure ACP is initialized
     await initializeAcp();
-
-    // Look up a pre-warmed session by sessionKey (falls back to model name for backward compat)
-    const requestedModel = msg.model || DEFAULT_MODEL;
-    const sessionKey = msg.sessionKey ?? requestedModel;
     const requestedCwd = msg.cwd || DEFAULT_CWD;
     let sessionId = "";
 
