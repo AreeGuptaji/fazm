@@ -8,6 +8,15 @@ set -euo pipefail
 source "$(dirname "$0")/lock.sh"
 acquire_lock "check-founder-chat" 60
 
+# Load secrets from analytics (where the DB creds and API keys live)
+# Can't source the file directly — it has multi-line JSON that breaks bash
+ENV_FILE="$HOME/analytics/.env.production.local"
+if [ -f "$ENV_FILE" ]; then
+    export DATABASE_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | head -1 | sed 's/^DATABASE_URL=//' | tr -d '"')
+    export RESEND_API_KEY=$(grep '^RESEND_API_KEY=' "$ENV_FILE" | sed 's/^RESEND_API_KEY=//' | tr -d '"' | tr -d '\\n')
+    export POSTHOG_PERSONAL_API_KEY=$(grep '^POSTHOG_PERSONAL_API_KEY=' "$ENV_FILE" | sed 's/^POSTHOG_PERSONAL_API_KEY=//' | tr -d '"' | tr -d '\\n')
+fi
+
 export NODE_PATH="$HOME/analytics/node_modules"
 NODE_BIN="$HOME/.nvm/versions/node/v20.19.4/bin/node"
 INBOX_DIR="$HOME/fazm/inbox"
