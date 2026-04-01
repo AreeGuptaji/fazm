@@ -38,6 +38,7 @@ struct FloatingControlBarView: View {
                         aiInputView
                     }
                 }
+                .padding(.top, 12)
                 .overlay(alignment: .topTrailing) {
                     ZStack {
                         ResizeHandleView(targetWindow: window)
