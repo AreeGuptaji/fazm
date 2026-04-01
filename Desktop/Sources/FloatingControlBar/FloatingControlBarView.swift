@@ -38,39 +38,6 @@ struct FloatingControlBarView: View {
                         aiInputView
                     }
                 }
-                .overlay(alignment: .topLeading) {
-                    Button {
-                        onCloseAI()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 8))
-                                .foregroundColor(.secondary)
-                                .frame(width: 16, height: 16)
-                                .overlay(Circle().strokeBorder(FazmColors.overlayForeground.opacity(0.2), lineWidth: 0.5))
-                            Text("esc")
-                                .font(.system(size: 9))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 8)
-                    .padding(.top, 6)
-                    .transition(.opacity)
-                }
-                .overlay(alignment: .topTrailing) {
-                    ZStack {
-                        ResizeHandleView(targetWindow: window)
-                            .frame(width: 20, height: 20)
-                        ResizeGripShape()
-                            .foregroundStyle(FazmColors.overlayForeground.opacity(0.3))
-                            .frame(width: 14, height: 14)
-                            .allowsHitTesting(false)
-                    }
-                    .padding(.top, 6)
-                    .padding(.trailing, 8)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .strokeBorder(FazmColors.overlayBorder.opacity(0.5), lineWidth: 1)
