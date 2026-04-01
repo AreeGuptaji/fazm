@@ -236,18 +236,22 @@ class DetachedChatWindowController {
     private var window: DetachedChatWindow?
     private var chatCancellable: AnyCancellable?
     private var compactCancellable: AnyCancellable?
+    /// Unique session key for the current detached window's ACP session
+    private var sessionKey: String?
 
     var isShowing: Bool { window?.isVisible ?? false }
 
     /// Pop out the current floating bar conversation into a detached window.
     /// Creates its own FloatingControlBarState so the floating bar can reset to new chat.
+    /// The sessionKey identifies this detached window's ACP session for continuity.
     func show(
         chatHistory: [FloatingChatExchange],
         displayedQuery: String,
         currentAIMessage: ChatMessage?,
         isAILoading: Bool,
         chatProvider: ChatProvider,
-        messageCountBefore: Int
+        messageCountBefore: Int,
+        sessionKey: String
     ) {
         // Reuse or create the window
         if let existing = window {
