@@ -221,9 +221,9 @@ struct DetachedChatView: View {
                 onConnectClaude: onConnectClaude,
                 onObserverCardAction: onObserverCardAction
             )
-            .padding(.horizontal, 12)
-            .padding(.top, 24) // space for invisible titlebar
-            .padding(.bottom, 8)
+            .padding(.horizontal, 6)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .floatingBackground(cornerRadius: 0)
