@@ -1567,7 +1567,12 @@ function handleSessionUpdate(
           });
         }
 
-        logErr(`Tool started: ${title} (id=${toolCallId}, kind=${kind})`);
+        // Log tool start with input summary so hung tools are diagnosable
+        const inputSummary = rawInput ? Object.entries(rawInput).map(([k, v]) => {
+          const s = typeof v === "string" ? v : JSON.stringify(v);
+          return `${k}=${s && s.length > 120 ? s.slice(0, 120) + "…" : s}`;
+        }).join(", ") : "";
+        logErr(`Tool started: ${title} (id=${toolCallId}, kind=${kind})${inputSummary ? ` [${inputSummary}]` : ""}`);
       }
       break;
     }
