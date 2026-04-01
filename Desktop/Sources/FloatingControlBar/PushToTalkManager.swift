@@ -731,7 +731,7 @@ class PushToTalkManager: ObservableObject {
           },
           onAudioLevel: { [weak self] level in
             Task { @MainActor in
-              self?.barState?.audioLevel.level = level
+              self?.effectiveBarState?.audioLevel.level = level
             }
           }
         )
@@ -739,7 +739,7 @@ class PushToTalkManager: ObservableObject {
       } catch let error as AudioCaptureService.AudioCaptureError where error.isNoInput {
         log("PushToTalkManager: no microphone available — showing feedback")
         self.stopListening()
-        self.barState?.showSilenceOverlay()
+        self.effectiveBarState?.showSilenceOverlay()
       } catch {
         logError("PushToTalkManager: mic capture failed", error: error)
         self.stopListening()
@@ -772,11 +772,11 @@ class PushToTalkManager: ObservableObject {
       let committed = transcriptSegments.joined(separator: " ")
       liveText = committed.isEmpty ? segment.text : committed + " " + segment.text
     }
-    barState?.audioLevel.transcript = liveText
+    effectiveBarState?.audioLevel.transcript = liveText
 
     // Sync live transcript directly into the input field
     if pttOpenedChat {
-      barState?.aiInputText = preVoiceInputText.isEmpty ? liveText : preVoiceInputText + " " + liveText
+      effectiveBarState?.aiInputText = preVoiceInputText.isEmpty ? liveText : preVoiceInputText + " " + liveText
     }
 
     // In finalizing state, a final segment means Deepgram is done — send immediately
@@ -808,22 +808,22 @@ class PushToTalkManager: ObservableObject {
   // MARK: - Bar State Sync
 
   private func updateBarState(skipResize: Bool = false) {
-    guard let barState = barState else { return }
-    let wasListening = barState.isVoiceListening
-    barState.isVoiceListening =
+    guard let targetState = effectiveBarState else { return }
+    let wasListening = targetState.isVoiceListening
+    targetState.isVoiceListening =
       (state == .listening || state == .lockedListening || state == .finalizing)
-    barState.isVoiceLocked = (state == .lockedListening)
-    barState.isVoiceFinalizing = (state == .finalizing)
+    targetState.isVoiceLocked = (state == .lockedListening)
+    targetState.isVoiceFinalizing = (state == .finalizing)
     if state == .idle {
-      barState.audioLevel.transcript = ""
-      barState.audioLevel.level = 0.0
+      targetState.audioLevel.transcript = ""
+      targetState.audioLevel.level = 0.0
     }
 
-    // Skip resize when PTT opened the chat or expanded AI conversation
-    guard !skipResize && !pttOpenedChat && !barState.showingAIConversation else { return }
-    if barState.isVoiceListening && !wasListening {
+    // Skip resize when PTT is from UI button (detached window) or opened the chat
+    guard uiOverrideState == nil && !skipResize && !pttOpenedChat && !targetState.showingAIConversation else { return }
+    if targetState.isVoiceListening && !wasListening {
       FloatingControlBarManager.shared.resizeForPTT(expanded: true)
-    } else if !barState.isVoiceListening && wasListening {
+    } else if !targetState.isVoiceListening && wasListening {
       FloatingControlBarManager.shared.resizeForPTT(expanded: false)
     }
   }
