@@ -85,7 +85,6 @@ class AnalysisOverlayWindow {
         panel.isMovableByWindowBackground = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.becomesKeyOnlyIfNeeded = false
-        panel.appearance = NSAppearance(named: .vibrantDark)
 
         hostingView.frame = NSRect(origin: .zero, size: overlaySize)
         panel.contentView = hostingView
