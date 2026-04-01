@@ -119,3 +119,4 @@ Desktop/bin/
 # Playwright snapshots
 *-snapshot.yml
 telegram-snapshot.yml
+.gstack/
