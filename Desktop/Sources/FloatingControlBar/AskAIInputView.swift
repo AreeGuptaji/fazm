@@ -36,7 +36,7 @@ struct AskAIInputView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.top, 16)
+            .padding(.top, 24)
             .padding(.trailing, 16)
 
             HStack(spacing: 6) {
