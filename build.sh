@@ -108,6 +108,23 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 # Copy binary
 cp "$BINARY_PATH" "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME"
 
+# Add rpath for Frameworks
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME" 2>/dev/null || true
+
+# Copy Sparkle framework
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+SPARKLE_FRAMEWORK="Desktop/.build/arm64-apple-macosx/release/Sparkle.framework"
+if [ ! -d "$SPARKLE_FRAMEWORK" ]; then
+    SPARKLE_FRAMEWORK="Desktop/.build/x86_64-apple-macosx/release/Sparkle.framework"
+fi
+if [ -d "$SPARKLE_FRAMEWORK" ]; then
+    ditto "$SPARKLE_FRAMEWORK" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+    echo "Copied Sparkle framework"
+else
+    echo "ERROR: Sparkle.framework not found — app will crash at launch"
+    exit 1
+fi
+
 # Build and bundle mcp-server-macos-use
 echo "Building mcp-server-macos-use..."
 MCP_REPO="$HOME/mcp-server-macos-use"
