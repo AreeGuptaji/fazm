@@ -12,11 +12,11 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     private static let collapsedYOffset: CGFloat = 24
     static let expandedBarSize = NSSize(width: 210, height: 50)
     private static let maxBarSize = NSSize(width: 1200, height: 1000)
-    private static let expandedWidth: CGFloat = 430
+    private static let expandedWidth: CGFloat = 559
     /// Minimum window height when AI response first appears.
-    private static let minResponseHeight: CGFloat = 200
+    private static let minResponseHeight: CGFloat = 300
     /// Base height used as the reference for 2× cap.
-    private static let defaultBaseResponseHeight: CGFloat = 215
+    private static let defaultBaseResponseHeight: CGFloat = 323
     /// Overhead (px) added to measured scroll content to account for control bar, header, follow-up input, and padding.
 
     let state = FloatingControlBarState()
