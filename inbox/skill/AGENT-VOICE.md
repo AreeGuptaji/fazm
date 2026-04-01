@@ -79,9 +79,9 @@ Fazm is a spin-off from the OMI team, but it is a DIFFERENT company. Fazm is not
 
 #### 1. Check Sentry for this user's errors
 ```bash
-./scripts/sentry-logs.sh USER_EMAIL
+./scripts/sentry-logs.sh USER_EMAIL --all-versions
 ```
-Returns crashes, errors, breadcrumbs for the user. Saved to `local/sentry-logs/`. Check if the reported bug matches any Sentry events.
+IMPORTANT: Always use `--all-versions`. The default filters to the latest release version, which will miss users on older versions (very common — most users are NOT on the latest version). The output is saved to `local/sentry-logs/`. If the file is large, grep for relevant keywords (error, fail, timeout, hang, ttft, rate_limit, query) rather than reading the whole thing. Check if the reported bug matches any Sentry events.
 
 #### 2. Check PostHog for this user's activity
 ```bash
