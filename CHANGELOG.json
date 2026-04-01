@@ -4,7 +4,8 @@
     "Improved knowledge graph performance: capped visible nodes to 100, debounced updates, and replaced text rendering with lightweight textures",
     "Added pop-out button to detach chat into a separate resizable window that continues the same conversation",
     "Added pop-out button to detach chat into a separate resizable window that continues the same conversation",
-    "Made the default chat window 30% wider and 50% taller"
+    "Made the default chat window 30% wider and 50% taller",
+    "Fixed floating bar overlay buttons (close and resize grip) overflowing outside the inner panel border"
   ],
   "releases": [
     {
