@@ -44,7 +44,6 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
         self.minSize = NSSize(width: 360, height: 300)
         self.isReleasedWhenClosed = false
         self.delegate = self
-        self.appearance = NSAppearance(named: .vibrantDark)
         self.titlebarAppearsTransparent = false
         self.titleVisibility = .visible
         self.backgroundColor = NSColor(white: 0.1, alpha: 1.0)
