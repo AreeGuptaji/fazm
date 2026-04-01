@@ -71,6 +71,7 @@ final class ReferralService {
         referralCode = result.code
         referralUrl = result.referral_url
         log("ReferralService: generated code \(result.code)")
+        Task { @MainActor in AnalyticsManager.shared.referralCodeGenerated(code: result.code) }
         return (result.code, result.referral_url)
     }
 
