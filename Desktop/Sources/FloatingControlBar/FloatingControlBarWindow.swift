@@ -1788,8 +1788,18 @@ class FloatingControlBarManager {
             messageCountBefore: messageCountBefore
         )
 
-        // Reset the floating bar to a fresh new chat
-        window.startNewChat()
+        // Clear floating bar state so closeAIConversation doesn't snapshot stale data
+        state.chatHistory = []
+        state.displayedQuery = ""
+        state.currentAIMessage = nil
+        state.clearLastConversation()
+        state.clearQueue()
+
+        // Close the floating bar conversation and collapse back to pill
+        window.closeAIConversation()
+
+        // Reset ACP session so the next floating bar interaction starts fresh
+        window.onResetSession?()
     }
 
     /// Re-send the pending message that was interrupted by browser extension setup.
