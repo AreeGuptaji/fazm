@@ -2141,11 +2141,17 @@ class ChatProvider: ObservableObject {
                     self?.webRelay.sendToPhone(["type": "text_delta", "text": delta])
                 }
             }
-            let toolCallHandler: ACPBridge.ToolCallHandler = { callId, name, input in
+            let toolCallHandler: ACPBridge.ToolCallHandler = { [weak self] callId, name, input in
                 let toolCall = ToolCall(name: name, arguments: input, thoughtSignature: nil)
                 let result = await ChatToolExecutor.execute(toolCall)
                 log("Fazm tool \(name) executed for callId=\(callId)")
                 await MainActor.run { toolResults[name] = result }
+                // After ask_followup, stop the model so it waits for actual user input
+                // instead of continuing to generate (and potentially hallucinating a response).
+                if name == "ask_followup" {
+                    log("ChatProvider: interrupting after ask_followup to wait for user input")
+                    await self?.acpBridge.interrupt()
+                }
                 return result
             }
             let toolActivityHandler: ACPBridge.ToolActivityHandler = { [weak self] name, status, toolUseId, input in
