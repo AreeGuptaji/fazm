@@ -310,7 +310,7 @@ struct SelectableMarkdown: View {
             let codeFontSize = round(13 * fontScale)
             let bgColor = sender == .user
                 ? Color.white.opacity(0.15)
-                : Color(hex: 0x282C34) // atom-one-dark background
+                : FazmColors.codeBlockBackground
             let codeAttr: NSAttributedString = sender == .user
                 ? NSAttributedString(
                     string: code,
