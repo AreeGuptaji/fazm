@@ -185,18 +185,18 @@ enum UpdateRollbackManager {
         defaults.set(restoredVersion, forKey: kRestoredVersion)
         defaults.set(0, forKey: kLaunchCount)
 
-        // Remove the broken app and copy backup into place
-        do {
-            try fm.removeItem(atPath: installPath)
-        } catch {
-            logSync("Rollback: Failed to remove broken app: \(error) — aborting rollback")
-            defaults.set(0, forKey: kLaunchCount)
-            return
+        // Copy backup to a temp location first, then atomically replace.
+        // This prevents the app from vanishing if the copy fails.
+        let tempRestore = installPath + ".rollback-tmp"
+
+        // Clean up any leftover temp from a previous failed attempt
+        if fm.fileExists(atPath: tempRestore) {
+            try? fm.removeItem(atPath: tempRestore)
         }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = [backupApp.path, installPath]
+        process.arguments = [backupApp.path, tempRestore]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
@@ -204,13 +204,45 @@ enum UpdateRollbackManager {
             try process.run()
             process.waitUntilExit()
         } catch {
-            logSync("Rollback: ditto restore failed: \(error)")
+            logSync("Rollback: ditto restore to temp failed: \(error) — aborting (app untouched)")
+            defaults.set(0, forKey: kLaunchCount)
             return
         }
 
         guard process.terminationStatus == 0 else {
-            logSync("Rollback: ditto restore exited with status \(process.terminationStatus)")
+            logSync("Rollback: ditto restore exited with status \(process.terminationStatus) — aborting (app untouched)")
+            try? fm.removeItem(atPath: tempRestore)
+            defaults.set(0, forKey: kLaunchCount)
             return
+        }
+
+        // Temp copy succeeded — now swap: remove broken app, move temp into place
+        do {
+            try fm.removeItem(atPath: installPath)
+        } catch {
+            logSync("Rollback: Failed to remove broken app: \(error) — aborting rollback")
+            try? fm.removeItem(atPath: tempRestore)
+            defaults.set(0, forKey: kLaunchCount)
+            return
+        }
+
+        do {
+            try fm.moveItem(atPath: tempRestore, toPath: installPath)
+        } catch {
+            logSync("Rollback: CRITICAL — broken app removed but move failed: \(error). Attempting direct ditto recovery.")
+            // Last resort: try ditto directly since the temp copy exists
+            let recovery = Process()
+            recovery.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            recovery.arguments = [tempRestore, installPath]
+            recovery.standardOutput = FileHandle.nullDevice
+            recovery.standardError = FileHandle.nullDevice
+            try? recovery.run()
+            recovery.waitUntilExit()
+            try? fm.removeItem(atPath: tempRestore)
+            guard fm.fileExists(atPath: installPath) else {
+                logSync("Rollback: CRITICAL — app lost, recovery failed")
+                return
+            }
         }
 
         logSync("Rollback: Restore complete — relaunching")
