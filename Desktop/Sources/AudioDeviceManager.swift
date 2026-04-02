@@ -26,7 +26,15 @@ class AudioDeviceManager: ObservableObject {
             restartLevelMonitoringIfNeeded()
         }
     }
-    @Published var currentAudioLevel: Float = 0.0
+    /// Audio level for VU meters. NOT @Published to avoid invalidating every
+    /// SwiftUI view that observes AudioDeviceManager (e.g. SettingsContentView
+    /// which has 7 @ObservedObjects and 140+ scaledFont modifiers).
+    /// Use `audioLevelPublisher` or `AudioLevelMonitor` for UI updates.
+    var currentAudioLevel: Float = 0.0 {
+        didSet { audioLevelSubject.send(currentAudioLevel) }
+    }
+    /// Fine-grained publisher for audio level — subscribe from leaf views only.
+    let audioLevelSubject = PassthroughSubject<Float, Never>()
 
     // MARK: - Computed
 
