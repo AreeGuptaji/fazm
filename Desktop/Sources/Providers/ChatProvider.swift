@@ -1920,10 +1920,24 @@ class ChatProvider: ObservableObject {
     }
 
     /// Interrupt the current query and send a message immediately.
-    /// The message jumps to the front of the queue.
+    /// If the AI is idle, sends the message directly without interrupting.
     func interruptAndSend(_ text: String) async {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty, isSending else { return }
+        guard !trimmedText.isEmpty else { return }
+
+        // Remove any existing enqueued copy to avoid sending the same message twice
+        // (e.g. user enqueues a follow-up, then taps "Send Now" on the queued item)
+        if let existingIdx = pendingMessages.firstIndex(where: { $0.text == trimmedText }) {
+            pendingMessages.remove(at: existingIdx)
+        }
+
+        // If idle, send directly as a follow-up
+        if !isSending {
+            log("ChatProvider: send-now (idle), sending directly")
+            NotificationCenter.default.post(name: .chatProviderDidDequeue, object: nil, userInfo: ["text": trimmedText])
+            await sendMessage(trimmedText, isFollowUp: false, sessionKey: activeSessionKey)
+            return
+        }
 
         // Add as user message in UI
         let userMessage = ChatMessage(
@@ -1954,12 +1968,6 @@ class ChatProvider: ObservableObject {
             } catch {
                 logError("Failed to persist follow-up message", error: error)
             }
-        }
-
-        // Remove any existing enqueued copy to avoid sending the same message twice
-        // (e.g. user enqueues a follow-up, then taps "Send Now" on the queued item)
-        if let existingIdx = pendingMessages.firstIndex(where: { $0.text == trimmedText }) {
-            pendingMessages.remove(at: existingIdx)
         }
 
         // Insert at front of queue and interrupt — userMessageAdded=true because we added it above
