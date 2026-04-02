@@ -272,6 +272,12 @@ struct AIResponseView: View {
     @AppStorage("aiChatWorkingDirectory") private var aiChatWorkingDirectory: String = ""
     @State private var connectClaudePulse = false
     @State private var showWorkspaceChangeConfirmation = false
+    @State private var showWorkspaceInfo = false
+
+    private var isHomeDirectory: Bool {
+        let home = NSHomeDirectory()
+        return aiChatWorkingDirectory.isEmpty || aiChatWorkingDirectory == home
+    }
 
     private var headerView: some View {
         HStack(spacing: 12) {
@@ -342,26 +348,63 @@ struct AIResponseView: View {
 
     @ViewBuilder
     private var workspaceLabel: some View {
-        if !aiChatWorkingDirectory.isEmpty, onChangeWorkspace != nil {
-            Button(action: { showWorkspaceChangeConfirmation = true }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "folder.fill")
-                        .scaledFont(size: 10)
-                    Text((aiChatWorkingDirectory as NSString).lastPathComponent)
-                        .scaledFont(size: 14)
-                        .lineLimit(1)
+        if onChangeWorkspace != nil {
+            HStack(spacing: 6) {
+                if isHomeDirectory {
+                    Button(action: { onChangeWorkspace?() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.rectangle.on.folder.fill")
+                                .scaledFont(size: 10)
+                            Text("Create project")
+                                .scaledFont(size: 14)
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button(action: { showWorkspaceChangeConfirmation = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.fill")
+                                .scaledFont(size: 10)
+                            Text((aiChatWorkingDirectory as NSString).lastPathComponent)
+                                .scaledFont(size: 14)
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(aiChatWorkingDirectory)
+                    .alert("Change Workspace?", isPresented: $showWorkspaceChangeConfirmation) {
+                        Button("Change", role: .destructive) {
+                            onChangeWorkspace?()
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Changing the workspace will start a new session. Current conversation will be preserved in history.")
+                    }
                 }
-                .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help(aiChatWorkingDirectory)
-            .alert("Change Workspace?", isPresented: $showWorkspaceChangeConfirmation) {
-                Button("Change", role: .destructive) {
-                    onChangeWorkspace?()
+
+                Button(action: { showWorkspaceInfo = true }) {
+                    Image(systemName: "info.circle")
+                        .scaledFont(size: 11)
+                        .foregroundColor(.secondary.opacity(0.6))
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Changing the workspace will start a new session. Current conversation will be preserved in history.")
+                .buttonStyle(.plain)
+                .popover(isPresented: $showWorkspaceInfo, arrowEdge: .bottom) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Projects")
+                            .scaledFont(size: 13, weight: .semibold)
+                        Text("Set a project directory to give Fazm context about your codebase. It will read CLAUDE.md and other config files to understand your project.")
+                            .scaledFont(size: 12)
+                            .foregroundColor(.secondary)
+                        Text("Changing the project starts a new session.")
+                            .scaledFont(size: 11)
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
+                    .padding(12)
+                    .frame(width: 260)
+                }
             }
         } else {
             Text("Fazm says")
