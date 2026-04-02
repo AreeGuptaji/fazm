@@ -77,6 +77,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     var onResetSession: (() -> Void)?
     var onConnectClaude: (() -> Void)?
     var onObserverCardAction: ((Int64, String) -> Void)?
+    var onChangeWorkspace: (() -> Void)?
 
     override init(
         contentRect: NSRect, styleMask style: NSWindow.StyleMask,
@@ -236,7 +237,8 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             onStopAgent: { [weak self] in self?.onStopAgent?() },
             onPopOut: { [weak self] in self?.onPopOut?() },
             onConnectClaude: { [weak self] in self?.onConnectClaude?() },
-            onObserverCardAction: { [weak self] activityId, action in self?.onObserverCardAction?(activityId, action) }
+            onObserverCardAction: { [weak self] activityId, action in self?.onObserverCardAction?(activityId, action) },
+            onChangeWorkspace: { [weak self] in self?.onChangeWorkspace?() }
         ).environmentObject(state)
 
         hostingView = NSHostingView(rootView: AnyView(
@@ -1185,6 +1187,31 @@ class FloatingControlBarManager {
 
         barWindow.onObserverCardAction = { [weak chatProvider] activityId, action in
             chatProvider?.handleObserverCardAction(activityId: activityId, action: action)
+        }
+
+        barWindow.onChangeWorkspace = { [weak self, weak chatProvider] in
+            guard let self, let provider = chatProvider else { return }
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.message = "Select a project directory"
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+
+            let newPath = url.path
+            provider.aiChatWorkingDirectory = newPath
+            provider.workingDirectory = newPath
+            Task { await provider.discoverClaudeConfig() }
+
+            // Reset session
+            let state = self.barWindow?.state
+            state?.chatHistory = []
+            state?.displayedQuery = ""
+            state?.currentAIMessage = nil
+            state?.isAILoading = false
+            state?.aiInputText = ""
+            state?.clearQueue()
+            self.barWindow?.onResetSession?()
         }
 
         // Observe ChatProvider dequeuing messages to sync UI queue
