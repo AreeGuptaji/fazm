@@ -822,10 +822,10 @@ class ChatProvider: ObservableObject {
             }
         }
 
-        // Defer start to avoid blocking main thread during init
-        // (killOrphanedCloudflared uses waitUntilExit which pumps the run loop,
-        //  causing AttributeGraph crash if called during SwiftUI view init)
-        Task { @MainActor in
+        // Start on a background thread — findNode() calls NodeBinaryHelper.verify()
+        // which busy-waits (Thread.sleep) while spawning `node --version`, blocking
+        // the main thread for up to 10 seconds (FAZM-9W).
+        Task.detached { [webRelay] in
             webRelay.start()
         }
     }
