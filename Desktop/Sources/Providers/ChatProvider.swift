@@ -822,10 +822,9 @@ class ChatProvider: ObservableObject {
             }
         }
 
-        // Start on a background thread — findNode() calls NodeBinaryHelper.verify()
-        // which busy-waits (Thread.sleep) while spawning `node --version`, blocking
-        // the main thread for up to 10 seconds (FAZM-9W).
-        Task.detached { [webRelay] in
+        // Start web relay — findNode() calls NodeBinaryHelper which does blocking I/O,
+        // but that's moved off the main thread inside WebRelay.start() (FAZM-9W fix).
+        Task { @MainActor in
             webRelay.start()
         }
     }
