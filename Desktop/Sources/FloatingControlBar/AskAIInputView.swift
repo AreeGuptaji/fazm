@@ -114,7 +114,7 @@ struct AskAIInputView: View {
                             .fill(hasInput ? FazmColors.overlayForeground : Color.secondary.opacity(0.15))
                             .frame(width: 24, height: 24)
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 12, weight: .heavy))
+                            .scaledFont(size: 12, weight: .heavy)
                             .foregroundColor(hasInput ? FazmColors.backgroundPrimary : Color.secondary.opacity(0.5))
                     }
                     .shadow(
@@ -131,7 +131,7 @@ struct AskAIInputView: View {
 
             if state.showSendButtonHint && hasInput {
                 Text("⏎")
-                    .font(.system(size: 10))
+                    .scaledFont(size: 10)
                     .foregroundColor(FazmColors.overlayForeground.opacity(0.6))
                     .frame(width: 20, height: 14)
                     .background(FazmColors.overlayForeground.opacity(0.1))
