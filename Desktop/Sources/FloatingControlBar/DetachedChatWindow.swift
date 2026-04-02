@@ -504,7 +504,7 @@ class DetachedChatWindowController {
             // Sync the latest AI message directly from provider.messages to close the
             // race window where sendMessage has returned but the Combine $messages sink
             // (scheduled via .receive(on: .main)) hasn't fired yet.
-            if let latestAI = provider.messages.last, latestAI.sender == .ai,
+            if let latestAI = provider.messages.last(where: { $0.sender == .ai && $0.sessionKey == sessionKey }),
                !latestAI.text.isEmpty || !latestAI.contentBlocks.isEmpty {
                 state.currentAIMessage = latestAI
             }
@@ -513,14 +513,17 @@ class DetachedChatWindowController {
 
     /// Subscribe to ChatProvider messages for streaming response updates.
     private func subscribeToResponse(provider: ChatProvider, state: FloatingControlBarState, winId: ObjectIdentifier, messageCountBefore: Int) {
+        let sessionKey = entries[winId]?.sessionKey
         entries[winId]?.chatCancellable?.cancel()
         entries[winId]?.chatCancellable = provider.$messages
             .receive(on: DispatchQueue.main)
-            .sink { [weak state, weak provider] messages in
+            .sink { [weak self, weak state, weak provider] messages in
                 guard let state else { return }
+                // Filter to messages belonging to this detached window's session
+                let currentKey = self?.entries[winId]?.sessionKey ?? sessionKey
                 guard messages.count > messageCountBefore,
-                      let aiMessage = messages.last,
-                      aiMessage.sender == .ai else { return }
+                      let aiMessage = messages.last(where: { $0.sender == .ai && $0.sessionKey == currentKey })
+                      else { return }
                 state.currentAIMessage = aiMessage
                 if aiMessage.isStreaming {
                     state.isAILoading = false
