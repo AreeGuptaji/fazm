@@ -110,6 +110,7 @@ struct AskAIInputView: View {
                 onSend?(localInput.trimmingCharacters(in: .whitespacesAndNewlines))
             }) {
                 Image(systemName: "arrow.up.circle.fill")
+                    .symbolRenderingMode(.monochrome)
                     .scaledFont(size: 24)
                     .foregroundColor(hasInput ? FazmColors.overlayForeground : .secondary)
                     .shadow(
