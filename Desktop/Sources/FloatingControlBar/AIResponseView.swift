@@ -195,7 +195,6 @@ struct AIResponseView: View {
             }
         }
         .padding()
-        .tint(FazmColors.purplePrimary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onExitCommand {
             onClose?()
