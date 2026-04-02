@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Animated equalizer-style bars that respond to an audio level (0.0–1.0).
@@ -129,5 +130,31 @@ struct AudioLevelBarsSettingsView: View {
         if progress > 0.75 { return .red }
         if progress > 0.5 { return .yellow }
         return .green
+    }
+}
+
+/// Self-contained audio level meter that subscribes directly to
+/// AudioDeviceManager.audioLevelSubject. Only THIS view re-renders
+/// on audio level changes — not the parent SettingsContentView.
+struct ObservedAudioLevelBarsSettingsView: View {
+    @State private var level: Float = 0
+    var barCount: Int = 20
+    var barWidth: CGFloat = 4
+    var spacing: CGFloat = 2
+    var maxHeight: CGFloat = 24
+    var minHeight: CGFloat = 2
+
+    var body: some View {
+        AudioLevelBarsSettingsView(
+            level: level,
+            barCount: barCount,
+            barWidth: barWidth,
+            spacing: spacing,
+            maxHeight: maxHeight,
+            minHeight: minHeight
+        )
+        .onReceive(AudioDeviceManager.shared.audioLevelSubject) { newLevel in
+            level = newLevel
+        }
     }
 }
