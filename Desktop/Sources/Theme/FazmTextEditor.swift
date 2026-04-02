@@ -26,6 +26,7 @@ struct FazmTextEditor: NSViewRepresentable {
     var textColor: NSColor = .labelColor
     var lineFragmentPadding: CGFloat = 0
     var textContainerInset: NSSize = NSSize(width: 0, height: 8)
+    @Environment(\.fontScale) private var fontScale
 
     // Behavior
     var onSubmit: (() -> Void)? = nil
@@ -38,7 +39,8 @@ struct FazmTextEditor: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
-        textView.font = .systemFont(ofSize: fontSize)
+        let scaledSize = round(fontSize * fontScale)
+        textView.font = .systemFont(ofSize: scaledSize)
         textView.textColor = textColor
         textView.backgroundColor = .clear
         textView.drawsBackground = false
@@ -129,7 +131,8 @@ struct FazmTextEditor: NSViewRepresentable {
         // Keep closures fresh so they capture the latest SwiftUI state
         context.coordinator.onSubmit = onSubmit
 
-        let newFont = NSFont.systemFont(ofSize: fontSize)
+        let scaledSize = round(fontSize * fontScale)
+        let newFont = NSFont.systemFont(ofSize: scaledSize)
         if textView.font != newFont {
             textView.font = newFont
         }
