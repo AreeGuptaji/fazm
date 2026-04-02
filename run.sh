@@ -161,6 +161,9 @@ fi
 step "Checking schema docs..."
 bash scripts/check_schema_docs.sh
 
+step "Checking search coverage..."
+bash scripts/check_search_coverage.sh
+
 step "Building Swift app (swift build -c debug)..."
 xcrun swift build -c debug --package-path Desktop
 
