@@ -113,8 +113,8 @@ struct AskAIInputView: View {
                     .symbolRenderingMode(.palette)
                     .scaledFont(size: 24)
                     .foregroundStyle(
-                        hasInput ? Color.white : Color.secondary.opacity(0.5),
-                        hasInput ? Color.black : Color.secondary.opacity(0.3)
+                        hasInput ? FazmColors.backgroundPrimary : Color.secondary.opacity(0.5),
+                        hasInput ? FazmColors.overlayForeground : Color.secondary.opacity(0.3)
                     )
                     .shadow(
                         color: state.showSendButtonHint && hasInput
