@@ -601,16 +601,17 @@ struct AIResponseView: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(exchange.question, forType: .string)
                 } content: {
-                    Text(exchange.question)
-                        .scaledFont(size: 13)
-                        .foregroundColor(FazmColors.overlayForeground)
-                        .textSelection(.enabled)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(FazmColors.overlayForeground.opacity(0.1))
-                        .cornerRadius(8)
+                    SelectableText(
+                        text: exchange.question,
+                        fontSize: 13,
+                        textColor: NSColor(FazmColors.overlayForeground),
+                        lineLimit: 2
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(FazmColors.overlayForeground.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
 
@@ -639,21 +640,22 @@ struct AIResponseView: View {
             Group {
                 if isQuestionExpanded {
                     ScrollView {
-                        Text(userInput)
-                            .scaledFont(size: 13)
-                            .foregroundColor(FazmColors.overlayForeground)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        SelectableText(
+                            text: userInput,
+                            fontSize: 13,
+                            textColor: NSColor(FazmColors.overlayForeground)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxHeight: 120)
                 } else {
-                    Text(userInput)
-                        .scaledFont(size: 13)
-                        .foregroundColor(FazmColors.overlayForeground)
-                        .textSelection(.enabled)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    SelectableText(
+                        text: userInput,
+                        fontSize: 13,
+                        textColor: NSColor(FazmColors.overlayForeground),
+                        lineLimit: 1
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
