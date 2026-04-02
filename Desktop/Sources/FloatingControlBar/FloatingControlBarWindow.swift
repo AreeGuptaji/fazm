@@ -1805,7 +1805,9 @@ class FloatingControlBarManager {
         let displayedQuery = state.displayedQuery
         let currentAIMessage = state.currentAIMessage
         let isAILoading = state.isAILoading
-        let messageCountBefore = provider.messages.count
+        // If a query is in-flight, subtract 1 so the detached window's subscriber
+        // picks up streaming updates to the existing AI message (already in messages).
+        let messageCountBefore = provider.messages.count - (isAILoading ? 1 : 0)
 
         // Cancel existing streaming subscription — the detached window will create its own
         chatCancellable?.cancel()
