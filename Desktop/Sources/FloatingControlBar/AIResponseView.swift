@@ -46,7 +46,6 @@ struct AIResponseView: View {
     var onConnectClaude: (() -> Void)?
     var onObserverCardAction: ((Int64, String) -> Void)?
     var onChangeWorkspace: (() -> Void)?
-    var workspacePath: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -270,6 +269,7 @@ struct AIResponseView: View {
         }
     }
 
+    @AppStorage("aiChatWorkingDirectory") private var aiChatWorkingDirectory: String = ""
     @State private var connectClaudePulse = false
     @State private var showWorkspaceChangeConfirmation = false
 
@@ -342,19 +342,19 @@ struct AIResponseView: View {
 
     @ViewBuilder
     private var workspaceLabel: some View {
-        if let path = workspacePath, !path.isEmpty, onChangeWorkspace != nil {
+        if !aiChatWorkingDirectory.isEmpty, onChangeWorkspace != nil {
             Button(action: { showWorkspaceChangeConfirmation = true }) {
                 HStack(spacing: 4) {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 10))
-                    Text((path as NSString).lastPathComponent)
+                    Text((aiChatWorkingDirectory as NSString).lastPathComponent)
                         .scaledFont(size: 14)
                         .lineLimit(1)
                 }
                 .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help(path)
+            .help(aiChatWorkingDirectory)
             .alert("Change Workspace?", isPresented: $showWorkspaceChangeConfirmation) {
                 Button("Change", role: .destructive) {
                     onChangeWorkspace?()
