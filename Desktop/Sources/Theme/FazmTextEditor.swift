@@ -47,6 +47,10 @@ struct FazmTextEditor: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        textView.selectedTextAttributes = [
+            .backgroundColor: NSColor(Color(hex: 0x8B5CF6)).withAlphaComponent(0.3),
+            .foregroundColor: NSColor.labelColor,
+        ]
         textView.delegate = context.coordinator
 
         textView.textContainer?.lineFragmentPadding = lineFragmentPadding
