@@ -917,23 +917,21 @@ private struct QuestionBarButtons: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            if isHovered || showCopied {
-                Button(action: {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(userInput, forType: .string)
-                    showCopied = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                        showCopied = false
-                    }
-                }) {
-                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10))
-                        .foregroundColor(showCopied ? .green : .secondary)
-                        .frame(width: 20, height: 20)
+            Button(action: {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(userInput, forType: .string)
+                showCopied = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    showCopied = false
                 }
-                .buttonStyle(.plain)
-                .transition(.opacity)
+            }) {
+                Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 10))
+                    .foregroundColor(showCopied ? .green : .secondary)
+                    .frame(width: 20, height: 20)
             }
+            .buttonStyle(.plain)
+            .opacity(isHovered || showCopied ? 1 : 0)
 
             if needsExpansion {
                 Button(action: { isExpanded.toggle() }) {
