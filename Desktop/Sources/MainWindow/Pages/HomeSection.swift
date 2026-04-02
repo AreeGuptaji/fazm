@@ -421,7 +421,7 @@ struct HomeKeyboardView: View {
     private func highlightableKey(_ label: String, w: CGFloat, for pttOption: ShortcutSettings.PTTKey) -> some View {
         let isHighlighted = pttOption == pttKey
         return Text(label)
-            .font(.system(size: 12, weight: isHighlighted ? .semibold : .medium))
+            .scaledFont(size: 12, weight: isHighlighted ? .semibold : .medium)
             .foregroundColor(isHighlighted ? .white : Color.white.opacity(0.4))
             .frame(width: w, height: kh)
             .background(
@@ -439,7 +439,7 @@ struct HomeKeyboardView: View {
 
     private func key(_ label: String, w: CGFloat, h: CGFloat? = nil) -> some View {
         Text(label)
-            .font(.system(size: 9, weight: .medium))
+            .scaledFont(size: 9, weight: .medium)
             .foregroundColor(Color.white.opacity(0.4))
             .frame(width: w, height: h ?? kh)
             .background(
