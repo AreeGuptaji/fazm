@@ -1096,7 +1096,7 @@ struct NewChatButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: "plus")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                 if isHovered {
                     Text("New chat")
                         .scaledFont(size: 11)
@@ -1133,7 +1133,7 @@ struct CopyConversationButton: View {
         Button(action: copyAll) {
             HStack(spacing: 4) {
                 Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                 if isHovered {
                     Text(showCopied ? "Copied!" : "Copy all")
                         .scaledFont(size: 11)
@@ -1192,7 +1192,7 @@ struct ReportIssueButton: View {
         Button(action: sendReport) {
             HStack(spacing: 4) {
                 Image(systemName: showSent ? "checkmark" : "exclamationmark.triangle.fill")
-                    .font(.system(size: isHanging ? 13 : 11))
+                    .scaledFont(size: isHanging ? 13 : 11)
                     .foregroundColor(showSent ? .green : (isHanging ? .orange : .secondary))
                     .opacity(flashOpacity)
                     .scaleEffect(flashScale)
