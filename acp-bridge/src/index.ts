@@ -1842,23 +1842,29 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
   const code = (err as NodeJS.ErrnoException).code;
   if (code === "EPIPE" || code === "ERR_STREAM_DESTROYED") {
-    logErr(`Caught ${code} in uncaughtException (subprocess pipe closed)`);
-    logCrash(`Caught ${code} (pipe closed)`);
-    return;
+    logCrash(`Caught ${code} (pipe closed) — exiting`);
+    process.exit(0);
   }
-  logErr(`Uncaught exception: ${err.message}\n${err.stack ?? ""}`);
   logCrash(`Uncaught exception: ${err.message}\n${err.stack ?? ""}`);
-  send({ type: "error", message: `Uncaught: ${err.message}` });
+  logErr(`Uncaught exception: ${err.message}\n${err.stack ?? ""}`);
   process.exit(1);
 });
 
-process.stdout.on("error", (err) => {
-  if ((err as NodeJS.ErrnoException).code === "EPIPE") {
-    logErr("stdout pipe closed (parent process disconnected)");
-    logCrash("stdout EPIPE — parent disconnected");
+process.stderr.on("error", (err) => {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === "EPIPE" || code === "ERR_STREAM_DESTROYED") {
+    logCrash("stderr EPIPE — parent disconnected, exiting");
     process.exit(0);
   }
-  logErr(`stdout error: ${err.message}`);
+  logCrash(`stderr error: ${err.message}`);
+});
+
+process.stdout.on("error", (err) => {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === "EPIPE" || code === "ERR_STREAM_DESTROYED") {
+    logCrash("stdout EPIPE — parent disconnected, exiting");
+    process.exit(0);
+  }
   logCrash(`stdout error: ${err.message}`);
 });
 
