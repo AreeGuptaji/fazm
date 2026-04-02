@@ -22,6 +22,7 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
     var onNewChat: (() -> Void)?
     var onConnectClaude: (() -> Void)?
     var onObserverCardAction: ((Int64, String) -> Void)?
+    var onChangeWorkspace: (() -> Void)?
     var onWindowClose: (() -> Void)?
 
     init(state: FloatingControlBarState) {
@@ -135,6 +136,8 @@ struct DetachedChatView: View {
     var onStopAgent: () -> Void
     var onConnectClaude: () -> Void
     var onObserverCardAction: (Int64, String) -> Void
+    var onChangeWorkspace: (() -> Void)?
+    var workspacePath: String?
 
     var body: some View {
         AIResponseView(
@@ -216,7 +219,9 @@ struct DetachedChatView: View {
             },
             onStopAgent: onStopAgent,
             onConnectClaude: onConnectClaude,
-            onObserverCardAction: onObserverCardAction
+            onObserverCardAction: onObserverCardAction,
+            onChangeWorkspace: onChangeWorkspace,
+            workspacePath: workspacePath
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .floatingBackground(cornerRadius: 0)
