@@ -58,7 +58,13 @@ for i in $(seq 0 $((NUM_CHATS - 1))); do
 
     log "Spawning session for $EMAIL ($UNREAD unread)"
 
-    # Immediately claim this chat by resetting unread_by_founder to 0
+    # Check cooldown first — if another session recently handled this user, skip
+    if ! "$NODE_BIN" "$SCRIPTS_DIR/claim-chat.js" "$UID_VAL" --check-only 2>>"$LOG_DIR/founder-chat.log"; then
+        log "Chat for $EMAIL is in cooldown, skipping"
+        continue
+    fi
+
+    # Claim this chat (resets unread_by_founder=0, sets 5-min cooldown)
     # Prevents duplicate spawns if the Claude session finishes before next poll
     "$NODE_BIN" "$SCRIPTS_DIR/claim-chat.js" "$UID_VAL" 2>>"$LOG_DIR/founder-chat.log" || log "WARNING: Failed to claim chat for $UID_VAL"
 
