@@ -964,25 +964,24 @@ struct MessageWithCopyButton<Content: View>: View {
         ZStack(alignment: alignment) {
             content
 
-            if isHovered || showCopied {
-                Button(action: {
-                    onCopy()
-                    showCopied = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                        showCopied = false
-                    }
-                }) {
-                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10))
-                        .foregroundColor(showCopied ? .green : .secondary)
-                        .padding(4)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(4)
+            Button(action: {
+                onCopy()
+                showCopied = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    showCopied = false
                 }
-                .buttonStyle(.plain)
-                .padding(4)
-                .transition(.opacity)
+            }) {
+                Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 10))
+                    .foregroundColor(showCopied ? .green : .secondary)
+                    .padding(4)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(4)
             }
+            .buttonStyle(.plain)
+            .padding(4)
+            .opacity(isHovered || showCopied ? 1 : 0)
+            .allowsHitTesting(isHovered || showCopied)
         }
         .onHover { isHovered = $0 }
         .animation(.easeInOut(duration: 0.15), value: isHovered)
