@@ -153,8 +153,10 @@ class PushToTalkManager: ObservableObject {
   // MARK: - Option Key Handling
 
   private func handleFlagsChanged(_ event: NSEvent) {
-    // Don't process PTT when the floating bar is hidden
-    guard FloatingControlBarManager.shared.isVisible else { return }
+    // Keyboard PTT always targets the floating bar — skip if the bar is disabled
+    // (hidden by user via Cmd+\). When the bar is visible (even collapsed/pill),
+    // PTT will open it and route the transcript there.
+    guard FloatingControlBarManager.shared.isEnabled else { return }
 
     let settings = ShortcutSettings.shared
 
