@@ -1137,7 +1137,7 @@ class FloatingControlBarManager {
         }
 
         barWindow.onEnqueueMessage = { [weak chatProvider] message in
-            chatProvider?.enqueueMessage(message)
+            chatProvider?.enqueueMessage(message, sessionKey: "floating")
         }
 
         barWindow.onSendNowQueued = { [weak chatProvider] item in
@@ -1626,7 +1626,7 @@ class FloatingControlBarManager {
         }
 
         window.onEnqueueMessage = { [weak provider] message in
-            provider?.enqueueMessage(message)
+            provider?.enqueueMessage(message, sessionKey: "floating")
         }
 
         window.onSendNowQueued = { [weak provider] item in
@@ -1863,7 +1863,7 @@ class FloatingControlBarManager {
         // If a query is already in-flight, enqueue instead of silently dropping.
         // The queue drains automatically after the current response finishes.
         if provider.isSending {
-            provider.enqueueMessage(message)
+            provider.enqueueMessage(message, sessionKey: "floating")
             barWindow.state.isAILoading = false
             log("FloatingControlBarManager: Query enqueued (agent busy): \(message.prefix(80))")
             return
