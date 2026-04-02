@@ -1533,7 +1533,10 @@ class FloatingControlBarManager {
         // Activate the app so the window can become key and accept keyboard input.
         // Without this, makeFirstResponder silently fails when triggered from a global shortcut.
         // Collect non-floating windows BEFORE activation so we can push them back afterward.
-        let otherWindows = NSApp.windows.filter { $0 !== window && $0.isVisible && $0.level == .normal }
+        // Exclude detached chat windows — they should stay visible alongside the floating bar.
+        let otherWindows = NSApp.windows.filter {
+            $0 !== window && $0.isVisible && $0.level == .normal && !($0 is DetachedChatWindow)
+        }
         NSApp.activate(ignoringOtherApps: true)
         // Push non-floating windows back so they don't cover the user's other apps.
         // The floating bar has .floating level and stays on top regardless.
