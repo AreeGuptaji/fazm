@@ -568,9 +568,9 @@ struct CollapsibleCodeBlockView: View {
                     Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
                         HStack(spacing: 3) {
                             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 9))
+                                .scaledFont(size: 9)
                             Text(isExpanded ? "Show less" : "\(lines.count - maxCollapsedLines) more lines")
-                                .font(.system(size: 11))
+                                .scaledFont(size: 11)
                         }
                         .foregroundColor(.secondary)
                     }
@@ -582,9 +582,9 @@ struct CollapsibleCodeBlockView: View {
                 Button(action: copyCode) {
                     HStack(spacing: 3) {
                         Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                         Text(showCopied ? "Copied" : "Copy")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                     }
                     .foregroundColor(showCopied ? .green : .secondary)
                 }
