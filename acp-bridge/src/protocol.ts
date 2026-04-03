@@ -253,4 +253,4 @@ export type OutboundMessage =
   | ToolProgressMessage
   | ToolUseSummaryMessage
   | RateLimitMessage
-  | ObserverPollMessage;
+  | ChatObserverPollMessage;
