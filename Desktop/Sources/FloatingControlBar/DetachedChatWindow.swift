@@ -5,11 +5,11 @@ import SwiftUI
 /// A normal macOS window that hosts the chat conversation after "popping out" from the floating bar.
 /// Not always-on-top — behaves like a regular app window.
 class DetachedChatWindow: NSWindow, NSWindowDelegate {
-    private static let sizeKey = "DetachedChatWindowSize"
-    private static let positionKey = "DetachedChatWindowPosition"
-    private static let defaultSize = NSSize(width: 624, height: 900)
+    static let defaultSize = NSSize(width: 624, height: 900)
 
     let state: FloatingControlBarState
+    /// The session key for this window, used for per-window frame persistence.
+    var sessionKey: String
     private var hostingView: NSHostingView<AnyView>?
 
     var onSendFollowUp: ((String) -> Void)?
@@ -25,12 +25,12 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
     var onChangeWorkspace: (() -> Void)?
     var onWindowClose: (() -> Void)?
 
-    init(state: FloatingControlBarState) {
+    init(state: FloatingControlBarState, sessionKey: String, savedFrame: NSRect? = nil) {
         self.state = state
+        self.sessionKey = sessionKey
 
-        let savedSize = UserDefaults.standard.string(forKey: DetachedChatWindow.sizeKey)
-            .map(NSSizeFromString) ?? DetachedChatWindow.defaultSize
-        let contentRect = NSRect(origin: .zero, size: savedSize)
+        let size = savedFrame?.size ?? DetachedChatWindow.defaultSize
+        let contentRect = NSRect(origin: .zero, size: size)
 
         super.init(
             contentRect: contentRect,
@@ -50,13 +50,12 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
         self.backgroundColor = NSColor(FazmColors.backgroundPrimary)
 
         // Restore saved position
-        if let savedPos = UserDefaults.standard.string(forKey: DetachedChatWindow.positionKey) {
-            let origin = NSPointFromString(savedPos)
+        if let savedOrigin = savedFrame?.origin {
             let onScreen = NSScreen.screens.contains {
-                $0.visibleFrame.contains(NSPoint(x: origin.x + 50, y: origin.y + 50))
+                $0.visibleFrame.contains(NSPoint(x: savedOrigin.x + 50, y: savedOrigin.y + 50))
             }
             if onScreen {
-                setFrameOrigin(origin)
+                setFrameOrigin(savedOrigin)
             } else {
                 center()
             }
@@ -127,17 +126,15 @@ class DetachedChatWindow: NSWindow, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
-        UserDefaults.standard.set(NSStringFromSize(frame.size), forKey: DetachedChatWindow.sizeKey)
-        UserDefaults.standard.set(NSStringFromPoint(frame.origin), forKey: DetachedChatWindow.positionKey)
         onWindowClose?()
     }
 
     func windowDidResize(_ notification: Notification) {
-        UserDefaults.standard.set(NSStringFromSize(frame.size), forKey: DetachedChatWindow.sizeKey)
+        DetachedChatWindowController.shared.saveWindowRegistry()
     }
 
     func windowDidMove(_ notification: Notification) {
-        UserDefaults.standard.set(NSStringFromPoint(frame.origin), forKey: DetachedChatWindow.positionKey)
+        DetachedChatWindowController.shared.saveWindowRegistry()
     }
 }
 
@@ -254,6 +251,9 @@ struct DetachedChatView: View {
 class DetachedChatWindowController {
     static let shared = DetachedChatWindowController()
 
+    /// UserDefaults key for the list of open detached windows.
+    private static let registryKey = "DetachedWindowRegistry"
+
     /// Per-window state: the window, its ACP session key, and Combine subscriptions.
     private struct WindowEntry {
         let window: DetachedChatWindow
@@ -263,9 +263,38 @@ class DetachedChatWindowController {
         var dequeueCancellable: AnyCancellable?
     }
 
+    /// Serializable snapshot of a detached window for persistence.
+    private struct WindowSnapshot: Codable {
+        let sessionKey: String
+        let x: Double
+        let y: Double
+        let width: Double
+        let height: Double
+    }
+
     private var entries: [ObjectIdentifier: WindowEntry] = [:]
 
     var isShowing: Bool { entries.values.contains { $0.window.isVisible } }
+
+    /// Persist the current set of open detached windows (session keys + frames) to UserDefaults.
+    func saveWindowRegistry() {
+        let snapshots: [WindowSnapshot] = entries.values.map { entry in
+            let f = entry.window.frame
+            return WindowSnapshot(
+                sessionKey: entry.sessionKey,
+                x: f.origin.x, y: f.origin.y,
+                width: f.size.width, height: f.size.height
+            )
+        }
+        if let data = try? JSONEncoder().encode(snapshots) {
+            UserDefaults.standard.set(data, forKey: Self.registryKey)
+        }
+    }
+
+    /// Remove all saved window state (called when user explicitly closes all windows or starts new chat).
+    private func clearWindowRegistry() {
+        UserDefaults.standard.removeObject(forKey: Self.registryKey)
+    }
 
     /// Pop out the current floating bar conversation into a new detached window.
     /// Each call creates a separate window with its own ACP session.
@@ -287,7 +316,7 @@ class DetachedChatWindowController {
         detachedState.showingAIConversation = true
         detachedState.showingAIResponse = true
 
-        let win = DetachedChatWindow(state: detachedState)
+        let win = DetachedChatWindow(state: detachedState, sessionKey: sessionKey)
         let winId = ObjectIdentifier(win)
 
         win.onSendFollowUp = { [weak self, weak win] message in
