@@ -1145,6 +1145,9 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
     // Set up notification handler for this query
     let notificationCount = 0;
     let lastNotificationTime = Date.now();
+    // Track task IDs started in THIS prompt turn vs stale ones from previous turns
+    const currentTurnTaskIds = new Set<string>();
+    let staleTaskNotificationCount = 0;
     acpNotificationHandler = (method: string, params: unknown) => {
       if (abortController.signal.aborted) return;
 
@@ -1170,7 +1173,7 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
         }
         handleSessionUpdate(p, pendingTools, (text) => {
           fullText += text;
-        });
+        }, { currentTurnTaskIds, onStaleNotification: () => { staleTaskNotificationCount++; } });
       }
     };
 
@@ -1236,7 +1239,58 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
         }
 
         const promptDurationMs = Date.now() - promptStartTime;
+        const outputTokens = promptResult.usage?.outputTokens ?? 0;
         logErr(`Prompt completed: stopReason=${promptResult.stopReason} duration=${promptDurationMs}ms`);
+
+        // Detect stale-task-response: prompt completed very fast with stale task
+        // notifications and minimal output. This means Claude responded to a background
+        // task completion from a previous turn instead of the user's actual question.
+        // Auto-retry the prompt so the user gets a real answer.
+        if (
+          staleTaskNotificationCount > 0 &&
+          promptDurationMs < 2000 &&
+          outputTokens < 100 &&
+          !isNewSession &&
+          _retryDepth < 1
+        ) {
+          logErr(`[STALE-TASK-RETRY] Detected stale task response (duration=${promptDurationMs}ms, staleNotifications=${staleTaskNotificationCount}, outputTokens=${outputTokens}). Re-sending prompt.`);
+          // Reset state for retry
+          fullText = "";
+          notificationCount = 0;
+          staleTaskNotificationCount = 0;
+          currentTurnTaskIds.clear();
+          pendingTools.length = 0;
+          // Re-send the same prompt; the stale task notification is now consumed
+          promptStartTime = Date.now();
+          const retryPayload = { sessionId, prompt: [{ type: "text", text: fullPrompt }] };
+          const retryResult = (await acpRequest("session/prompt", retryPayload)) as {
+            stopReason: string;
+            usage?: { inputTokens: number; outputTokens: number; cachedReadTokens?: number | null; cachedWriteTokens?: number | null; totalTokens: number };
+            _meta?: { costUsd?: number };
+          };
+          const retryDurationMs = Date.now() - promptStartTime;
+          logErr(`Prompt completed (after stale-task retry): stopReason=${retryResult.stopReason} duration=${retryDurationMs}ms`);
+
+          for (const name of pendingTools) {
+            send({ type: "tool_activity", name, status: "completed" });
+          }
+          pendingTools.length = 0;
+
+          if (sessionKey !== "observer" && sessions.has("observer")) {
+            bufferChatObserverTurn("user", fullPrompt);
+            if (fullText.trim()) {
+              bufferChatObserverTurn("assistant", fullText);
+            }
+          }
+
+          const retryInputTokens = retryResult.usage?.inputTokens ?? 0;
+          const retryOutputTokens = retryResult.usage?.outputTokens ?? 0;
+          const retryCacheReadTokens = retryResult.usage?.cachedReadTokens ?? 0;
+          const retryCacheWriteTokens = retryResult.usage?.cachedWriteTokens ?? 0;
+          const retryCostUsd = retryResult._meta?.costUsd ?? 0;
+          send({ type: "result", text: fullText, sessionId, costUsd: retryCostUsd, inputTokens: retryInputTokens, outputTokens: retryOutputTokens, cacheReadTokens: retryCacheReadTokens, cacheWriteTokens: retryCacheWriteTokens });
+          return;
+        }
 
         // Increment image turn counter so we know when to stop including screenshots.
         // Image turn counting removed — screenshots are now read by the model via Read tool
@@ -1256,7 +1310,6 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
         }
 
         const inputTokens = promptResult.usage?.inputTokens ?? 0;
-        const outputTokens = promptResult.usage?.outputTokens ?? 0;
         const cacheReadTokens = promptResult.usage?.cachedReadTokens ?? 0;
         const cacheWriteTokens = promptResult.usage?.cachedWriteTokens ?? 0;
         const costUsd = promptResult._meta?.costUsd ?? 0;
@@ -1505,7 +1558,8 @@ let pendingBoundary = false;
 function handleSessionUpdate(
   params: Record<string, unknown>,
   pendingTools: string[],
-  onText: (text: string) => void
+  onText: (text: string) => void,
+  taskTracking?: { currentTurnTaskIds: Set<string>; onStaleNotification: () => void }
 ): void {
   const update = params.update as Record<string, unknown> | undefined;
   if (!update) {
@@ -1766,6 +1820,7 @@ function handleSessionUpdate(
     case "task_started": {
       const taskId = (update.taskId as string) ?? "";
       const description = (update.description as string) ?? "";
+      if (currentTurnTaskIds) currentTurnTaskIds.add(taskId);
       send({ type: "task_started", taskId, description });
       logErr(`Task started: ${taskId} — ${description}`);
       break;
@@ -1775,6 +1830,14 @@ function handleSessionUpdate(
       const taskId = (update.taskId as string) ?? "";
       const status = (update.status as string) ?? "";
       const summary = (update.summary as string) ?? "";
+      // Detect stale task notifications from previous turns
+      if (currentTurnTaskIds && !currentTurnTaskIds.has(taskId)) {
+        staleTaskNotificationCount++;
+        logErr(`Task notification: ${taskId} ${status} [STALE — from previous turn, suppressing UI update]`);
+        // Still forward to bridge so the notification is acknowledged, but mark it
+        send({ type: "task_notification", taskId, status, summary });
+        break;
+      }
       send({ type: "task_notification", taskId, status, summary });
       logErr(`Task notification: ${taskId} ${status}`);
       break;
