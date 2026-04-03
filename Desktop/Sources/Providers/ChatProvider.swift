@@ -2202,6 +2202,9 @@ class ChatProvider: ObservableObject {
                 // User sent a message in the new chat — clear the "new chat" flag
                 // so this conversation restores if the app is killed mid-conversation
                 UserDefaults.standard.removeObject(forKey: Self.floatingChatClearedKey)
+            } else if let key = sessionKey, key.hasPrefix("detached-") {
+                let msg = userMessage
+                Task { await ChatMessageStore.saveMessage(msg, context: "__\(key)__") }
             }
         }
 
@@ -2485,6 +2488,9 @@ class ChatProvider: ObservableObject {
                         let msg = messages[freshIndex]
                         let sid = floatingChatSessionId
                         Task { await ChatMessageStore.saveMessage(msg, context: "__floating__", sessionId: sid) }
+                    } else if let key = sessionKey, key.hasPrefix("detached-"), !messageText.isEmpty {
+                        let msg = messages[freshIndex]
+                        Task { await ChatMessageStore.saveMessage(msg, context: "__\(key)__") }
                     }
                 }
             } else {
