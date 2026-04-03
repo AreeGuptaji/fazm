@@ -15,8 +15,6 @@ if [ -f "$ENV_FILE" ]; then
     export RESEND_API_KEY=$(grep '^RESEND_API_KEY=' "$ENV_FILE" | sed 's/^RESEND_API_KEY=//' | tr -d '"' | tr -d '\\n')
     export POSTHOG_PERSONAL_API_KEY=$(grep '^POSTHOG_PERSONAL_API_KEY=' "$ENV_FILE" | sed 's/^POSTHOG_PERSONAL_API_KEY=//' | tr -d '"' | tr -d '\\n')
     export CRON_SECRET=$(grep '^CRON_SECRET=' "$ENV_FILE" | sed 's/^CRON_SECRET=//' | tr -d '"' | tr -d '\\n')
-    # Firebase service account (multi-line JSON, extract carefully)
-    export FIREBASE_SERVICE_ACCOUNT_JSON=$(grep '^FIREBASE_SERVICE_ACCOUNT_JSON=' "$ENV_FILE" | sed 's/^FIREBASE_SERVICE_ACCOUNT_JSON=//' | tr -d '"')
 fi
 
 # Also load from .env.local if production doesn't have everything
@@ -24,8 +22,20 @@ ENV_LOCAL="$HOME/analytics/.env.local"
 if [ -f "$ENV_LOCAL" ]; then
     [ -z "${DATABASE_URL:-}" ] && export DATABASE_URL=$(grep '^DATABASE_URL=' "$ENV_LOCAL" | head -1 | sed 's/^DATABASE_URL=//' | tr -d '"')
     [ -z "${CRON_SECRET:-}" ] && export CRON_SECRET=$(grep '^CRON_SECRET=' "$ENV_LOCAL" | sed 's/^CRON_SECRET=//' | tr -d '"' | tr -d '\\n')
-    [ -z "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ] && export FIREBASE_SERVICE_ACCOUNT_JSON=$(grep '^FIREBASE_SERVICE_ACCOUNT_JSON=' "$ENV_LOCAL" | sed 's/^FIREBASE_SERVICE_ACCOUNT_JSON=//' | tr -d '"')
 fi
+
+# Firebase service account JSON is multi-line, needs Python to extract safely
+for envf in "$ENV_FILE" "$ENV_LOCAL"; do
+    if [ -z "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ] && [ -f "$envf" ]; then
+        export FIREBASE_SERVICE_ACCOUNT_JSON=$(python3 -c "
+import re
+with open('$envf') as f:
+    content = f.read()
+m = re.search(r'FIREBASE_SERVICE_ACCOUNT_JSON=\"(.+?)\"(?:\n|\$)', content, re.DOTALL)
+if m: print(m.group(1))
+" 2>/dev/null || true)
+    fi
+done
 
 export NODE_PATH="$HOME/analytics/node_modules"
 INBOX_DIR="$HOME/fazm/inbox"
