@@ -190,7 +190,7 @@ fi
 
 if [ "$REPORT_EMAIL_SENT" != "True" ]; then
     SHOULD_MARK=false
-    MARK_REASON="${MARK_REASON:+$MARK_REASON; }Report email was not sent to matt"
+    MARK_REASON="${MARK_REASON:+$MARK_REASON; }Report email was not sent"
 fi
 
 if $SHOULD_MARK; then
