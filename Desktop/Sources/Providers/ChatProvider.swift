@@ -840,6 +840,8 @@ class ChatProvider: ObservableObject {
     /// Test that the Playwright Chrome extension is connected and working.
     /// Stops the bridge and restarts via `ensureBridgeStarted()` which does a full
     /// warmup with session resume, preserving conversation history across the setup flow.
+    /// Retries up to 3 times with a short delay to allow the Playwright MCP server
+    /// to establish its WebSocket connection to the Chrome extension after startup.
     func testPlaywrightConnection() async throws -> Bool {
         // If a query is in progress, skip the bridge restart — it would kill the
         // in-flight query. The token is already saved in UserDefaults and will be
@@ -857,7 +859,27 @@ class ChatProvider: ObservableObject {
         guard await ensureBridgeStarted() else {
             throw NSError(domain: "ChatProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to restart bridge for Playwright test"])
         }
-        return try await acpBridge.testPlaywrightConnection()
+        // Retry with backoff: the Playwright MCP server may need a moment to connect
+        // to the Chrome extension via WebSocket after the bridge starts.
+        let maxAttempts = 3
+        for attempt in 1...maxAttempts {
+            do {
+                let connected = try await acpBridge.testPlaywrightConnection()
+                if connected {
+                    log("ChatProvider: Playwright connection test succeeded on attempt \(attempt)")
+                    return true
+                }
+            } catch {
+                log("ChatProvider: Playwright connection test attempt \(attempt) error: \(error)")
+                if attempt == maxAttempts { throw error }
+            }
+            if attempt < maxAttempts {
+                let delay = Double(attempt) * 2.0
+                log("ChatProvider: Retrying Playwright connection test in \(delay)s (attempt \(attempt)/\(maxAttempts))")
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+        }
+        return false
     }
 
     /// Ensure the ACP bridge is started (restarts if the process died)
