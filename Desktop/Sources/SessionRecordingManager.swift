@@ -417,7 +417,7 @@ class SessionRecordingManager {
         if let obs = appActiveObserver { NotificationCenter.default.removeObserver(obs) }
         if let obs = appResignObserver { NotificationCenter.default.removeObserver(obs) }
         stop()
-        stopObserver()
+        stopScreenObserver()
     }
 
     // MARK: - Auto-enrollment
