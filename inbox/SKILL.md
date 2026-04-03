@@ -6,14 +6,16 @@ Read ~/fazm/inbox/skill/AGENT-VOICE.md first — it has your persona, tone rules
 
 ## Workflow
 
-### Step 1: Understand the email
+### Step 1: Understand the email(s)
 
-Read the email and full thread history provided in the prompt. Categorize:
+Read all emails and the full thread history provided in the prompt. You may receive multiple unprocessed emails from the same user (e.g., they sent a bug report, then a follow-up, then a correction). Treat them as one batch: read all of them, then categorize the combined intent:
 - **Bug report** — user describes a crash, error, or broken behavior
 - **Feature request** — user wants something new
 - **Question** — user asks how to do something
 - **Feedback** — general positive/negative feedback
 - **Noise** — auto-replies, out-of-office, spam (skip these — just mark processed)
+
+If the emails cover multiple categories (e.g., a bug report and a feature request), address all of them.
 
 ### Step 2: Investigate
 
@@ -43,8 +45,10 @@ Send the report per AGENT-VOICE.md with subject: `FAZM Inbox: RE_SUBJECT — FRO
 ### Step 5: Mark as processed
 
 ```bash
-node ~/fazm/inbox/scripts/mark-processed.js EMAIL_ID
+node ~/fazm/inbox/scripts/mark-processed.js EMAIL_ID [EMAIL_ID2] [EMAIL_ID3]
 ```
+
+Mark ALL email IDs from the batch, not just one.
 
 ## Access
 
