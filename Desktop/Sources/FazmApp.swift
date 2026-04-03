@@ -1088,15 +1088,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             //    bundle, which invalidates the code signature seal.  Removing
             //    them once heals Sparkle-managed installs that carried the
             //    corruption forward through subsequent updates.
-            let fm = FileManager.default
+            let fileManager = FileManager.default
             let resourcesDir = (appPath as NSString).appendingPathComponent("Contents/Resources")
-            if let enumerator = fm.enumerator(atPath: resourcesDir) {
+            if let enumerator = fileManager.enumerator(atPath: resourcesDir) {
                 while let relativePath = enumerator.nextObject() as? String {
                     if (relativePath as NSString).lastPathComponent == "__pycache__" {
                         let fullPath = (resourcesDir as NSString).appendingPathComponent(relativePath)
                         var isDir: ObjCBool = false
-                        if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
-                            try? fm.removeItem(atPath: fullPath)
+                        if fileManager.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
+                            try? fileManager.removeItem(atPath: fullPath)
                             log("CodeSign: removed stale \(relativePath)")
                             enumerator.skipDescendants()
                         }
