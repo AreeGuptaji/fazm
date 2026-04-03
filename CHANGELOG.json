@@ -21,7 +21,8 @@
     "Fixed detached window creating parallel sessions with floating bar instead of independent sessions",
     "Fixed \"Transcribing...\" and voice input text being invisible in light mode",
     "Fixed duplicate AI responses being sent to phone users",
-    "Redesigned paywall to show all upgrade options as equally visible cards with inline pricing"
+    "Redesigned paywall to show all upgrade options as equally visible cards with inline pricing",
+    "Fixed crash on Intel Macs caused by Sparkle framework code signature validation failure"
   ],
   "releases": [
     {
