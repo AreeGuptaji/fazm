@@ -98,6 +98,10 @@ struct AskAIInputView: View {
         !localInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var canSend: Bool {
+        hasInput && !state.isAILoading
+    }
+
     private var micButton: some View {
         PushToTalkButton(isListening: state.isVoiceListening, iconSize: 18, frameSize: 28)
     }
@@ -105,17 +109,17 @@ struct AskAIInputView: View {
     private var sendButton: some View {
         VStack(spacing: 2) {
             Button(action: {
-                guard hasInput else { return }
+                guard hasInput, !state.isAILoading else { return }
                 state.showSendButtonHint = false
                 onSend?(localInput.trimmingCharacters(in: .whitespacesAndNewlines))
             }) {
                 ZStack {
                         Circle()
-                            .fill(hasInput ? FazmColors.overlayForeground : Color.secondary.opacity(0.15))
+                            .fill(canSend ? FazmColors.overlayForeground : Color.secondary.opacity(0.15))
                             .frame(width: 24, height: 24)
                         Image(systemName: "arrow.up")
                             .scaledFont(size: 12, weight: .heavy)
-                            .foregroundColor(hasInput ? FazmColors.backgroundPrimary : Color.secondary.opacity(0.5))
+                            .foregroundColor(canSend ? FazmColors.backgroundPrimary : Color.secondary.opacity(0.5))
                     }
                     .shadow(
                         color: state.showSendButtonHint && hasInput
