@@ -323,8 +323,7 @@ class DetachedChatWindowController {
 
         win.setupViews()
 
-        var entry = WindowEntry(window: win, sessionKey: sessionKey)
-        entries[winId] = entry
+        entries[winId] = WindowEntry(window: win, sessionKey: sessionKey)
         // Subscribe to ChatProvider messages for streaming updates
         subscribeToResponse(provider: chatProvider, state: detachedState, winId: winId, messageCountBefore: messageCountBefore)
         // Subscribe to shared provider state (auth, suggested replies, compaction)
@@ -653,5 +652,6 @@ class DetachedChatWindowController {
             entry.window.close()
         }
         entries.removeAll()
+        clearWindowRegistry()
     }
 }
