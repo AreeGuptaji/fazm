@@ -195,7 +195,7 @@ fi
 
 if $SHOULD_MARK; then
     log "Marking device as investigated: $OUTCOME_SUMMARY"
-    "$NODE_BIN" "$SCRIPTS_DIR/mark-device-investigated.js" "$DEVICE_ID" "$OUTCOME_SUMMARY" 2>>"$LOG_FILE" || log "WARNING: Failed to mark device $DEVICE_ID as investigated"
+    "$NODE_BIN" "$SCRIPTS_DIR/mark-device-investigated.js" "$DEVICE_ID" "$OUTCOME_SUMMARY" "$OUTCOME_FILE" 2>>"$LOG_FILE" || log "WARNING: Failed to mark device $DEVICE_ID as investigated"
 else
     log "NOT marking as investigated: $MARK_REASON"
     log "Device will be retried on next run."
