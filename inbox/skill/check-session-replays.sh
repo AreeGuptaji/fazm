@@ -99,6 +99,8 @@ log "Got $ANALYSIS_COUNT analyses for device $DEVICE_ID"
 
 # Step 3: Spawn Claude Code to investigate issues
 PROMPT_FILE=$(mktemp)
+OUTCOME_FILE="$LOG_DIR/outcome-${DEVICE_ID}-$(date +%Y%m%d_%H%M%S).json"
+
 cat > "$PROMPT_FILE" <<PROMPT_EOF
 Read ~/fazm/inbox/skill/SESSION-REPLAY-SKILL.md for the full workflow.
 
@@ -118,30 +120,88 @@ $ANALYSES_JSON
 
 $DEVICE_JSON
 
+## Environment
+
+The OUTCOME_FILE environment variable is set to: $OUTCOME_FILE
+You MUST write a JSON outcome file to this path (see Step 5 in the skill doc).
+
 Investigate this device's session recording analyses now. Follow the SESSION-REPLAY-SKILL.md workflow exactly.
 PROMPT_EOF
 
 log "Spawning Claude Code session for investigation..."
+log "  Outcome file: $OUTCOME_FILE"
 cd "$HOME/fazm"
+
+CLAUDE_EXIT=0
 gtimeout 2400 claude \
     -p "$(cat "$PROMPT_FILE")" \
     --dangerously-skip-permissions \
-    2>&1 | tee -a "$LOG_FILE" || log "WARNING: Claude exited with code $?"
+    2>&1 | tee -a "$LOG_FILE" || CLAUDE_EXIT=$?
 
 rm -f "$PROMPT_FILE"
 
-# Step 4: Mark device as investigated (only if all chunks are analyzed)
+# Interpret Claude exit code
+if [ $CLAUDE_EXIT -eq 124 ]; then
+    log "ERROR: Claude Code timed out after 40 minutes"
+elif [ $CLAUDE_EXIT -ne 0 ]; then
+    log "WARNING: Claude Code exited with code $CLAUDE_EXIT (possible credit exhaustion or error)"
+fi
+
+# Step 4: Validate outcome and mark as investigated
+log "--- Post-run validation ---"
+
+# Check outcome file
+if [ -f "$OUTCOME_FILE" ]; then
+    log "Outcome file found: $OUTCOME_FILE"
+    cat "$OUTCOME_FILE" >> "$LOG_FILE"
+
+    # Parse outcome
+    USER_EMAIL_SENT=$(python3 -c "import json; d=json.load(open('$OUTCOME_FILE')); print(d.get('userEmailSent', False))" 2>/dev/null || echo "False")
+    REPORT_EMAIL_SENT=$(python3 -c "import json; d=json.load(open('$OUTCOME_FILE')); print(d.get('reportEmailSent', False))" 2>/dev/null || echo "False")
+    ISSUES_FOUND=$(python3 -c "import json; d=json.load(open('$OUTCOME_FILE')); print(d.get('issuesFound', 0))" 2>/dev/null || echo "0")
+    BUGS_FIXED=$(python3 -c "import json; d=json.load(open('$OUTCOME_FILE')); print(d.get('bugsFixed', 0))" 2>/dev/null || echo "0")
+    OUTCOME_SUMMARY=$(python3 -c "import json; d=json.load(open('$OUTCOME_FILE')); print(d.get('summary', 'No summary'))" 2>/dev/null || echo "No summary")
+
+    log "  Issues found: $ISSUES_FOUND, Bugs fixed: $BUGS_FIXED"
+    log "  User email sent: $USER_EMAIL_SENT, Report email sent: $REPORT_EMAIL_SENT"
+    log "  Summary: $OUTCOME_SUMMARY"
+else
+    log "WARNING: No outcome file found. Claude agent may not have completed the workflow."
+    USER_EMAIL_SENT="False"
+    REPORT_EMAIL_SENT="False"
+    ISSUES_FOUND="0"
+    BUGS_FIXED="0"
+    OUTCOME_SUMMARY="No outcome file produced"
+fi
+
+# Check if all chunks are analyzed
 FINAL_STATUS=$(curl -s "https://omi-analytics.vercel.app/api/session-recordings/orchestrate?action=status&deviceId=$DEVICE_ID" \
     -H "Authorization: Bearer ${CRON_SECRET}" 2>/dev/null)
 FINAL_UNANALYZED=$(echo "$FINAL_STATUS" | python3 -c "import json,sys; print(json.load(sys.stdin).get('unanalyzedChunks', 0))" 2>/dev/null || echo "0")
 
+# Decide whether to mark as investigated
+SHOULD_MARK=true
+MARK_REASON=""
+
 if [ "$FINAL_UNANALYZED" -gt 0 ] 2>/dev/null; then
-    log "Device still has $FINAL_UNANALYZED unanalyzed chunks. NOT marking as investigated (will retry next run)."
-else
-    "$NODE_BIN" "$SCRIPTS_DIR/mark-device-investigated.js" "$DEVICE_ID" "Investigated $ANALYSIS_COUNT analyses" 2>>"$LOG_FILE" || log "WARNING: Failed to mark device $DEVICE_ID as investigated"
+    SHOULD_MARK=false
+    MARK_REASON="Device still has $FINAL_UNANALYZED unanalyzed chunks"
 fi
 
-log "=== Done investigating device $DEVICE_ID ==="
+if [ "$REPORT_EMAIL_SENT" != "True" ]; then
+    SHOULD_MARK=false
+    MARK_REASON="${MARK_REASON:+$MARK_REASON; }Report email was not sent to matt"
+fi
+
+if $SHOULD_MARK; then
+    log "Marking device as investigated: $OUTCOME_SUMMARY"
+    "$NODE_BIN" "$SCRIPTS_DIR/mark-device-investigated.js" "$DEVICE_ID" "$OUTCOME_SUMMARY" 2>>"$LOG_FILE" || log "WARNING: Failed to mark device $DEVICE_ID as investigated"
+else
+    log "NOT marking as investigated: $MARK_REASON"
+    log "Device will be retried on next run."
+fi
+
+log "=== Done investigating device $DEVICE_ID (claude_exit=$CLAUDE_EXIT, marked=$SHOULD_MARK) ==="
 
 # Cleanup old logs (keep 14 days)
 find "$LOG_DIR" -name "session-replay-*.log" -mtime +14 -delete 2>/dev/null || true
