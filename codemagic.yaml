@@ -667,6 +667,16 @@ workflows:
             thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/cloudflared"
             thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/node"
 
+            # Thin Sparkle framework binaries
+            if [ -d "$ARCH_APP/$APP_NAME.app/Contents/Frameworks/Sparkle.framework" ]; then
+              thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle"
+              thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+              for xpc in "$ARCH_APP/$APP_NAME.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/"*.xpc/Contents/MacOS/*; do
+                thin_binary "$xpc"
+              done
+              thin_binary "$ARCH_APP/$APP_NAME.app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater"
+            fi
+
             # Re-sign everything (same order as the main Sign step)
             A="$ARCH_APP/$APP_NAME.app"
 
