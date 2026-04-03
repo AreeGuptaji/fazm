@@ -79,6 +79,19 @@ node ~/analytics/scripts/send-email.js \
   --product fazm
 ```
 
+**Before sending, check for duplicates:**
+```bash
+node -e "
+const { neon } = require('@neondatabase/serverless');
+require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env.production.local') });
+const sql = neon(process.env.DATABASE_URL);
+sql.query(\`SELECT id, subject, created_at FROM fazm_emails WHERE to_email = 'USER_EMAIL' AND subject LIKE '%Fazm experience%' AND created_at > NOW() - INTERVAL '7 days'\`)
+  .then(r => console.log(JSON.stringify(r)))
+  .catch(e => console.error(e.message));
+"
+```
+If a similar email was already sent in the last 7 days, do NOT send another one. Set `userEmailSent` to `false` in the outcome file with a note like "skipped: duplicate within 7 days".
+
 **Tone rules for user email:**
 - Casual, friendly, from "matt" (the founder)
 - Frame observations as "from our crash logs" or "from our technical monitoring", never "from watching your screen recording"
@@ -113,12 +126,12 @@ bar. We've been watching your screen recordings and identified...
 
 ### Step 4: Email report to Matt
 
-Send a detailed technical report to matt@mediar.ai:
+Send a detailed technical report to i@m13v.com:
 
 ```bash
 node ~/analytics/scripts/send-email.js \
-  --to "matt@mediar.ai" \
-  --subject "Session Replay: DEVICE_ID — USER_EMAIL" \
+  --to "i@m13v.com" \
+  --subject "[Session Replay] DEVICE_ID, USER_EMAIL" \
   --body "YOUR_REPORT" \
   --from "Fazm Agent <matt@fazm.ai>" \
   --product fazm \
