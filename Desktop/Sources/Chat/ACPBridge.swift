@@ -1,5 +1,92 @@
 import Foundation
 
+/// Thread-safe box for a continuation that can be resumed synchronously from any context
+/// (including `withTaskCancellationHandler`'s `onCancel` which runs on an arbitrary thread).
+/// This avoids the race where `Task { await actor.method() }` in onCancel never executes
+/// because the actor is being deallocated during autorelease pool drain.
+private final class ContinuationBox<T, E: Error>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var continuation: CheckedContinuation<T, E>?
+  private var generation: UInt64 = 0
+
+  /// Store a continuation with its generation token.
+  func store(_ c: CheckedContinuation<T, E>, generation g: UInt64) {
+    lock.lock()
+    continuation = c
+    generation = g
+    lock.unlock()
+  }
+
+  /// Resume and clear the continuation if it matches the expected generation.
+  /// Returns true if it was resumed.
+  @discardableResult
+  func resume(throwing error: E, ifGeneration expected: UInt64) -> Bool {
+    lock.lock()
+    guard generation == expected, let c = continuation else {
+      lock.unlock()
+      return false
+    }
+    continuation = nil
+    lock.unlock()
+    c.resume(throwing: error)
+    return true
+  }
+
+  /// Resume and clear the continuation unconditionally (for deinit / stop).
+  /// Returns true if there was a pending continuation.
+  @discardableResult
+  func resumeAny(throwing error: E) -> Bool {
+    lock.lock()
+    guard let c = continuation else {
+      lock.unlock()
+      return false
+    }
+    continuation = nil
+    lock.unlock()
+    c.resume(throwing: error)
+    return true
+  }
+
+  /// Resume with a value if a continuation is pending. Returns true if resumed.
+  @discardableResult
+  func resume(returning value: T) -> Bool {
+    lock.lock()
+    guard let c = continuation else {
+      lock.unlock()
+      return false
+    }
+    continuation = nil
+    lock.unlock()
+    c.resume(returning: value)
+    return true
+  }
+
+  /// Check if a continuation is currently pending.
+  var isPending: Bool {
+    lock.lock()
+    let pending = continuation != nil
+    lock.unlock()
+    return pending
+  }
+
+  /// Check if pending and matches generation.
+  func isPending(generation expected: UInt64) -> Bool {
+    lock.lock()
+    let match = continuation != nil && generation == expected
+    lock.unlock()
+    return match
+  }
+
+  /// Clear without resuming (only for when generation has already moved on).
+  func clear(ifGeneration expected: UInt64) {
+    lock.lock()
+    if generation == expected {
+      continuation = nil
+    }
+    lock.unlock()
+  }
+}
+
 /// Manages a long-lived Node.js subprocess running the ACP (Agent Client Protocol) bridge.
 /// Supports three modes: built-in API key, user's OAuth, or Vertex AI.
 /// Communication uses JSON lines over stdin/stdout pipes.
@@ -173,7 +260,8 @@ actor ACPBridge {
 
   /// Pending messages from the bridge
   private var pendingMessages: [InboundMessage] = []
-  private var messageContinuation: CheckedContinuation<InboundMessage, Error>?
+  /// Lock-protected continuation box: can be resumed synchronously from onCancel without actor hop.
+  private let continuationBox = ContinuationBox<InboundMessage, Error>()
   private var messageGeneration: UInt64 = 0
   /// Set when stderr indicates OOM so handleTermination can throw the right error
   private var lastExitWasOOM = false
@@ -188,11 +276,8 @@ actor ACPBridge {
 
   deinit {
     // Resume any pending continuation to prevent "SWIFT TASK CONTINUATION MISUSE" crash.
-    // In deinit, no other references exist so direct access is safe.
-    if let continuation = messageContinuation {
-      messageContinuation = nil
-      continuation.resume(throwing: BridgeError.stopped)
-    }
+    // The lock-protected box is safe to access from deinit (no actor hop needed).
+    continuationBox.resumeAny(throwing: BridgeError.stopped)
   }
 
   // MARK: - Lifecycle
@@ -207,8 +292,7 @@ actor ACPBridge {
     process = nil
     closePipes()
     pendingMessages.removeAll()
-    messageContinuation?.resume(throwing: BridgeError.stopped)
-    messageContinuation = nil
+    continuationBox.resumeAny(throwing: BridgeError.stopped)
     lastExitWasOOM = false
 
     let nodePath = findNodeBinary()
@@ -380,8 +464,7 @@ actor ACPBridge {
     closePipes()
     isRunning = false
 
-    messageContinuation?.resume(throwing: BridgeError.stopped)
-    messageContinuation = nil
+    continuationBox.resumeAny(throwing: BridgeError.stopped)
   }
 
   /// Recursively kill a process and all its descendants (children, grandchildren, etc.)
@@ -920,7 +1003,7 @@ actor ACPBridge {
     // loop (which may also need to react).
     switch message {
     case .authRequired(let methods, let authUrl):
-      if messageContinuation == nil, let handler = onAuthRequiredGlobal {
+      if !continuationBox.isPending, let handler = onAuthRequiredGlobal {
         // No active query waiting — fire the global handler immediately
         handler(methods, authUrl)
         return
@@ -929,19 +1012,19 @@ actor ACPBridge {
       // Always fire global handler so UI clears auth sheets/buttons immediately,
       // even if a query is in-flight. The message is still delivered to the query loop below.
       onAuthSuccessGlobal?()
-      if messageContinuation == nil {
+      if !continuationBox.isPending {
         return  // No query waiting — nothing more to deliver
       }
     case .authTimeout(let reason):
       // Always fire global handler so UI shows timeout state
       onAuthTimeoutGlobal?(reason)
-      if messageContinuation == nil {
+      if !continuationBox.isPending {
         return
       }
     case .authFailed(let reason, let httpStatus):
       // Always fire global handler so UI shows failure state
       onAuthFailedGlobal?(reason, httpStatus)
-      if messageContinuation == nil {
+      if !continuationBox.isPending {
         return
       }
     case .observerPoll:
@@ -955,7 +1038,7 @@ actor ACPBridge {
       return
     case .toolUse(let callId, let name, let input):
       // If no active query is waiting, handle tool calls from background sessions (observer)
-      if messageContinuation == nil, let handler = onBackgroundToolCall {
+      if !continuationBox.isPending, let handler = onBackgroundToolCall {
         Task {
           let result = await handler(callId, name, input)
           let resultDict: [String: Any] = [
@@ -974,10 +1057,7 @@ actor ACPBridge {
       break
     }
 
-    if let continuation = messageContinuation {
-      messageContinuation = nil
-      continuation.resume(returning: message)
-    } else {
+    if !continuationBox.resume(returning: message) {
       pendingMessages.append(message)
     }
   }
@@ -996,9 +1076,10 @@ actor ACPBridge {
     messageGeneration &+= 1
     let expectedGeneration = messageGeneration
 
+    let box = self.continuationBox
     return try await withTaskCancellationHandler {
       try await withCheckedThrowingContinuation { continuation in
-        self.messageContinuation = continuation
+        box.store(continuation, generation: expectedGeneration)
 
         if let timeout = timeout {
           Task {
@@ -1009,35 +1090,24 @@ actor ACPBridge {
             // Defer up to 3 times (total ~12 min) while tools are actively running.
             var deferrals = 0
             let maxDeferrals = 3
-            while self.messageGeneration == expectedGeneration, self.messageContinuation != nil,
+            while box.isPending(generation: expectedGeneration),
                   self.acpToolsRunning > 0, deferrals < maxDeferrals {
               deferrals += 1
               log("ACPBridge: waitForMessage timeout deferred (\(deferrals)/\(maxDeferrals)) — \(self.acpToolsRunning) ACP tool(s) still running")
               try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             }
-            if self.messageGeneration == expectedGeneration, self.messageContinuation != nil {
-              self.messageContinuation = nil
+            if box.resume(throwing: BridgeError.timeout, ifGeneration: expectedGeneration) {
               log("ACPBridge: waitForMessage timeout fired after \(timeout)s — no message received, bridge may be stuck")
-              continuation.resume(throwing: BridgeError.timeout)
             }
           }
         }
       }
     } onCancel: {
-      // Resume the continuation when the calling Task is cancelled (e.g., view dismissed,
-      // ACPBridge deallocated while a query is in flight). Without this, the continuation
-      // leaks and Swift emits "SWIFT TASK CONTINUATION MISUSE: waitForMessage(timeout:)
-      // leaked its continuation" which corrupts memory and causes EXC_BAD_ACCESS crashes.
-      Task { await self.cancelPendingContinuation(generation: expectedGeneration) }
-    }
-  }
-
-  /// Resume and clear the pending continuation if it matches the expected generation.
-  /// Called from the cancellation handler to safely access actor-isolated state.
-  private func cancelPendingContinuation(generation: UInt64) {
-    if self.messageGeneration == generation, let continuation = self.messageContinuation {
-      self.messageContinuation = nil
-      continuation.resume(throwing: CancellationError())
+      // Resume the continuation synchronously when the calling Task is cancelled.
+      // This runs on an arbitrary thread, NOT on the actor. Using the lock-protected
+      // ContinuationBox avoids the race where `Task { await self... }` never executes
+      // because the actor is being deallocated during autorelease pool drain.
+      box.resume(throwing: CancellationError(), ifGeneration: expectedGeneration)
     }
   }
 
@@ -1083,8 +1153,7 @@ actor ACPBridge {
     log("ACPBridge: process terminated (code=\(exitCode), reason=\(reasonStr), error=\(error))")
     isRunning = false
     closePipes()
-    messageContinuation?.resume(throwing: error)
-    messageContinuation = nil
+    continuationBox.resumeAny(throwing: error)
   }
 
   private func closePipes() {
