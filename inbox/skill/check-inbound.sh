@@ -38,31 +38,32 @@ if [ "$EMAILS" = "[]" ] || [ -z "$EMAILS" ]; then
     exit 0
 fi
 
-# Parse the first email (we process one at a time)
-EMAIL_ID=$(echo "$EMAILS" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['email_id'])")
+# Parse emails (may be multiple from the same user)
+EMAIL_IDS=$(echo "$EMAILS" | python3 -c "import json,sys; print(' '.join(str(e['email_id']) for e in json.load(sys.stdin)))")
+EMAIL_COUNT=$(echo "$EMAILS" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
 SENDER_EMAIL=$(echo "$EMAILS" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['sender_email'])")
 SENDER_NAME=$(echo "$EMAILS" | python3 -c "import json,sys; d=json.load(sys.stdin)[0]; print(d.get('sender_name') or d['sender_email'])")
-SUBJECT=$(echo "$EMAILS" | python3 -c "import json,sys; print(json.load(sys.stdin)[0].get('subject','(no subject)'))")
+SUBJECTS=$(echo "$EMAILS" | python3 -c "import json,sys; print(' | '.join(e.get('subject','(no subject)') for e in json.load(sys.stdin)))")
 WORKFLOW_USER_ID=$(echo "$EMAILS" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['workflow_user_id'])")
 
-log "Processing email #$EMAIL_ID from $SENDER_EMAIL: $SUBJECT"
+log "Processing $EMAIL_COUNT email(s) [#$EMAIL_IDS] from $SENDER_EMAIL: $SUBJECTS"
 
 # Build the prompt for Claude
 PROMPT_FILE=$(mktemp)
 cat > "$PROMPT_FILE" <<PROMPT_EOF
 Read ~/fazm/inbox/SKILL.md for the full workflow.
 
-## Email to process
+## Emails to process
 
-Email ID: $EMAIL_ID
+Email IDs: $EMAIL_IDS
+Email count: $EMAIL_COUNT
 Workflow User ID: $WORKFLOW_USER_ID
 Sender: $SENDER_NAME <$SENDER_EMAIL>
-Subject: $SUBJECT
 
 Full email data (including thread history):
 $EMAILS
 
-Process this email now. Follow the SKILL.md workflow exactly.
+Process these emails now. There are $EMAIL_COUNT unprocessed inbound email(s) from this user. Treat them as one batch: investigate all issues mentioned across all emails, then send ONE combined reply addressing everything. Follow the SKILL.md workflow exactly.
 PROMPT_EOF
 
 # Run Claude Code with full permissions in the FAZM repo
@@ -75,10 +76,10 @@ gtimeout 1800 claude \
 
 rm -f "$PROMPT_FILE"
 
-# Mark the email as processed regardless of Claude's outcome
-"$NODE_BIN" "$SCRIPTS_DIR/mark-processed.js" "$EMAIL_ID" 2>>"$LOG_FILE" || log "WARNING: Failed to mark email $EMAIL_ID as processed"
+# Mark all emails as processed regardless of Claude's outcome
+"$NODE_BIN" "$SCRIPTS_DIR/mark-processed.js" $EMAIL_IDS 2>>"$LOG_FILE" || log "WARNING: Failed to mark emails $EMAIL_IDS as processed"
 
-log "=== Done processing email #$EMAIL_ID ==="
+log "=== Done processing $EMAIL_COUNT email(s) [#$EMAIL_IDS] ==="
 
 # Cleanup old logs (keep 14 days)
 find "$LOG_DIR" -name "check-inbound-*.log" -mtime +14 -delete 2>/dev/null || true
