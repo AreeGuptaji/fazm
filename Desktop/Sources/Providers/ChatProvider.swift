@@ -1073,6 +1073,13 @@ class ChatProvider: ObservableObject {
             UserDefaults.standard.removeObject(forKey: floatingSessionIdKey)
             UserDefaults.standard.set(true, forKey: Self.floatingChatClearedKey)
             pendingFloatingResume = nil
+            // Re-key existing messages so the detached window's subscriber can find them.
+            // The subscriber filters by sessionKey == toKey; without this, in-flight
+            // streaming messages still carry "floating" and the detached window never
+            // picks up the completion, leaving a stuck loading spinner.
+            for i in messages.indices where messages[i].sessionKey == fromKey {
+                messages[i].sessionKey = toKey
+            }
             // Don't clear messages here — an in-flight query may still be streaming
             // into the last AI message. The detached window's subscriber needs it alive.
             // Messages are cleared lazily: either when the detached window's subscriber
