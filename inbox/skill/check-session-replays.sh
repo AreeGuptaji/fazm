@@ -6,7 +6,7 @@
 set -euo pipefail
 
 source "$(dirname "$0")/lock.sh"
-acquire_lock "check-session-replays" 3600
+acquire_lock "check-session-replays" 5400
 
 # Load secrets from analytics
 ENV_FILE="$HOME/analytics/.env.production.local"
@@ -76,12 +76,18 @@ if [ "$NEEDS_GEMINI" = "True" ]; then
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 2 ]; then
         log "Device has too many chunks (>100). Skipping."
-        # Mark as investigated with a note so we don't keep picking it
         "$NODE_BIN" "$SCRIPTS_DIR/mark-device-investigated.js" "$DEVICE_ID" "Skipped: too many chunks ($UNANALYZED)" 2>>"$LOG_FILE" || true
         exit 0
     elif [ $EXIT_CODE -ne 0 ]; then
         log "WARNING: Analysis trigger failed with code $EXIT_CODE"
         exit 1
+    fi
+
+    # Verify all chunks are analyzed before proceeding to investigation
+    REMAINING=$(curl -s "${ORCHESTRATE_URL:-https://omi-analytics.vercel.app/api/session-recordings/orchestrate}?action=status&deviceId=$DEVICE_ID" \
+        -H "Authorization: Bearer ${CRON_SECRET}" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('unanalyzedChunks', 0))" 2>/dev/null || echo "0")
+    if [ "$REMAINING" -gt 0 ] 2>/dev/null; then
+        log "WARNING: $REMAINING chunks still unanalyzed after trigger. Will investigate what we have."
     fi
     log "Gemini analysis complete."
 else
