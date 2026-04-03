@@ -52,7 +52,7 @@ struct AskAIInputView: View {
                         lineFragmentPadding: 8,
                         onSubmit: {
                             let trimmed = localInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
+                            guard !trimmed.isEmpty, !state.isAILoading else { return }
                             state.showSendButtonHint = false
                             onSend?(trimmed)
                         },
@@ -126,7 +126,7 @@ struct AskAIInputView: View {
                     .scaleEffect(state.showSendButtonHint && hasInput && sendPulse ? 1.15 : 1.0)
                     .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: sendPulse)
             }
-            .disabled(!hasInput)
+            .disabled(!hasInput || state.isAILoading)
             .buttonStyle(.plain)
 
             if state.showSendButtonHint && hasInput {
