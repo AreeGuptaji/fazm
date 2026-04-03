@@ -194,7 +194,7 @@ struct DetachedChatView: View {
                    !currentMessage.text.isEmpty || !currentMessage.contentBlocks.isEmpty {
                     state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
                 }
-                state.flushPendingObserverExchanges()
+                state.flushPendingChatObserverExchanges()
                 state.displayedQuery = message
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     state.isAILoading = true
@@ -219,7 +219,7 @@ struct DetachedChatView: View {
                     }
                     state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
                 }
-                state.flushPendingObserverExchanges()
+                state.flushPendingChatObserverExchanges()
                 state.displayedQuery = item.text
                 state.isAILoading = true
                 state.currentAIMessage = nil
@@ -458,7 +458,7 @@ class DetachedChatWindowController {
                         }
                         state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
                     }
-                    state.flushPendingObserverExchanges()
+                    state.flushPendingChatObserverExchanges()
                     if let text = notification.userInfo?["text"] as? String {
                         state.displayedQuery = text
                     }
