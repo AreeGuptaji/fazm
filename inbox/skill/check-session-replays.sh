@@ -6,7 +6,7 @@
 set -euo pipefail
 
 source "$(dirname "$0")/lock.sh"
-acquire_lock "check-session-replays" 5400
+acquire_lock "check-session-replays" 3600
 
 # Load secrets from analytics
 ENV_FILE="$HOME/analytics/.env.production.local"
@@ -83,12 +83,6 @@ if [ "$NEEDS_GEMINI" = "True" ]; then
         exit 1
     fi
 
-    # Verify all chunks are analyzed before proceeding to investigation
-    REMAINING=$(curl -s "${ORCHESTRATE_URL:-https://omi-analytics.vercel.app/api/session-recordings/orchestrate}?action=status&deviceId=$DEVICE_ID" \
-        -H "Authorization: Bearer ${CRON_SECRET}" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('unanalyzedChunks', 0))" 2>/dev/null || echo "0")
-    if [ "$REMAINING" -gt 0 ] 2>/dev/null; then
-        log "WARNING: $REMAINING chunks still unanalyzed after trigger. Will investigate what we have."
-    fi
     log "Gemini analysis complete."
 else
     log "All chunks already analyzed. Fetching existing analyses..."

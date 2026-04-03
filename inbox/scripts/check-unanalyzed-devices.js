@@ -22,7 +22,7 @@ const { neon } = require('@neondatabase/serverless');
 
 const ORCHESTRATE_URL = 'https://omi-analytics.vercel.app/api/session-recordings/orchestrate';
 const CRON_SECRET = process.env.CRON_SECRET || '2d17eac34d9fdc61e555e972089a17c9';
-const MAX_CHUNKS = 100;
+const MAX_CHUNKS = 60;
 const MIN_CHUNKS = 5; // Skip devices with very few chunks (not enough data)
 
 function fetchJSON(url, options = {}) {
