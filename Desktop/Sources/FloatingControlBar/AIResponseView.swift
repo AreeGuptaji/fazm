@@ -44,7 +44,7 @@ struct AIResponseView: View {
     var onStopAgent: (() -> Void)?
     var onPopOut: (() -> Void)?
     var onConnectClaude: (() -> Void)?
-    var onObserverCardAction: ((Int64, String) -> Void)?
+    var onChatObserverCardAction: ((Int64, String) -> Void)?
     var onChangeWorkspace: (() -> Void)?
 
     var body: some View {
@@ -558,7 +558,7 @@ struct AIResponseView: View {
     }
 
     private func handleChatObserverCardAction(activityId: Int64, action: String) {
-        onObserverCardAction?(activityId, action)
+        onChatObserverCardAction?(activityId, action)
         // Persist the action in the content block so it survives view recreation
         if let barState = FloatingControlBarManager.shared.barState {
             for i in barState.chatHistory.indices {
