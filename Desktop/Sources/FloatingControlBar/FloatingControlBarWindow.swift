@@ -1684,8 +1684,12 @@ class FloatingControlBarManager {
         if let provider = self.chatProvider {
             Task { @MainActor in
                 await provider.restoreFloatingChatIfNeeded()
-                if window.state.lastConversation == nil && window.state.chatHistory.isEmpty && !provider.messages.isEmpty {
-                    window.state.loadHistory(from: provider.messages)
+                if window.state.lastConversation == nil && window.state.chatHistory.isEmpty
+                    && !provider.floatingChatWasCleared {
+                    let floatingMessages = provider.messages.filter { ($0.sessionKey ?? "floating") == "floating" }
+                    if !floatingMessages.isEmpty {
+                        window.state.loadHistory(from: floatingMessages)
+                    }
                 }
                 window.showAIConversation()
                 window.orderFrontRegardless()
@@ -1791,8 +1795,11 @@ class FloatingControlBarManager {
         // Must complete before showAIConversation() so the history check works.
         Task { @MainActor in
             await provider.restoreFloatingChatIfNeeded()
-            if window.state.chatHistory.isEmpty && !provider.messages.isEmpty {
-                window.state.loadHistory(from: provider.messages)
+            if window.state.chatHistory.isEmpty && !provider.floatingChatWasCleared {
+                let floatingMessages = provider.messages.filter { ($0.sessionKey ?? "floating") == "floating" }
+                if !floatingMessages.isEmpty {
+                    window.state.loadHistory(from: floatingMessages)
+                }
             }
 
             // Show the input view with the transcription pre-filled (user can edit before sending)
@@ -1985,9 +1992,22 @@ class FloatingControlBarManager {
         // Restore previous floating chat messages and session on first interaction
         await provider.restoreFloatingChatIfNeeded()
 
-        // Populate the floating bar's chat history from restored messages
-        if barWindow.state.chatHistory.isEmpty && barWindow.state.currentAIMessage == nil {
-            let restored = provider.messages
+        // Populate the floating bar's chat history from restored messages.
+        //
+        // Skip entirely if the floating chat was just cleared (e.g. by pop-out or
+        // explicit new chat). Without this check, messages left alive in
+        // `provider.messages` for an in-flight detached query would leak back into
+        // the fresh floating bar. Note: `restoreFloatingChatIfNeeded` has an
+        // in-memory `floatingChatRestored` one-shot guard that prevents its own
+        // cleared-flag check from firing more than once per app launch, so we must
+        // honor the flag here independently.
+        //
+        // Also filter by sessionKey == "floating" so any messages re-keyed to a
+        // detached session (see `transferSession`) are never pulled into the
+        // floating bar's exchange list.
+        if barWindow.state.chatHistory.isEmpty && barWindow.state.currentAIMessage == nil
+            && !provider.floatingChatWasCleared {
+            let restored = provider.messages.filter { ($0.sessionKey ?? "floating") == "floating" }
             if !restored.isEmpty {
                 // Pair up user/AI messages into exchanges for the history UI
                 var i = 0
@@ -2003,6 +2023,8 @@ class FloatingControlBarManager {
                 }
                 log("FloatingControlBarManager: Populated \(barWindow.state.chatHistory.count) exchanges from restored messages")
             }
+        } else if provider.floatingChatWasCleared {
+            log("FloatingControlBarManager: Skipping populate-from-messages (floating chat was cleared, e.g. pop-out)")
         }
 
         // Use pre-captured screenshot if available, otherwise capture now (e.g. follow-up in open bar)
