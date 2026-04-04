@@ -112,10 +112,15 @@ class ShortcutSettings: ObservableObject {
     }
 
     /// Available models for Ask Fazm.
-    static let availableModels: [(id: String, label: String)] = [
-        ("claude-opus-4-6", "Opus"),
-        ("claude-sonnet-4-6", "Sonnet"),
+    static let availableModels: [(id: String, label: String, shortLabel: String)] = [
+        ("claude-opus-4-6", "Smart (Opus)", "Smart"),
+        ("claude-sonnet-4-6", "Fast (Sonnet)", "Fast"),
     ]
+
+    /// Human-readable short label for the currently selected model.
+    var selectedModelShortLabel: String {
+        Self.availableModels.first(where: { $0.id == selectedModel })?.shortLabel ?? "Smart"
+    }
 
     /// Proactiveness level for the AI assistant.
     enum ProactivenessLevel: String, CaseIterable {
