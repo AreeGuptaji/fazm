@@ -1069,7 +1069,6 @@ struct ModelToggleButton: View {
 /// Inline toggle to mute/unmute voice responses (TTS).
 struct VoiceMuteButton: View {
     @AppStorage("voiceResponseEnabled") private var voiceResponseEnabled = true
-    @State private var isHovered = false
 
     var body: some View {
         Button {
@@ -1080,21 +1079,12 @@ struct VoiceMuteButton: View {
                 ChatToolExecutor.stopTTSPlayback()
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: voiceResponseEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                    .scaledFont(size: 11)
-                    .foregroundColor(voiceResponseEnabled ? .secondary : .orange)
-                if isHovered {
-                    Text(voiceResponseEnabled ? "Mute voice" : "Unmute voice")
-                        .scaledFont(size: 11)
-                        .foregroundColor(voiceResponseEnabled ? .secondary : .orange)
-                        .transition(.opacity)
-                }
-            }
+            Image(systemName: voiceResponseEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .scaledFont(size: 11)
+                .foregroundColor(voiceResponseEnabled ? .secondary : .orange)
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .help(voiceResponseEnabled ? "Mute voice" : "Unmute voice")
     }
 }
 
@@ -1102,24 +1092,15 @@ struct VoiceMuteButton: View {
 
 struct PopOutButton: View {
     let action: () -> Void
-    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                PopOutIcon()
-                    .frame(width: 12, height: 12)
-                if isHovered {
-                    Text("Pop out")
-                        .scaledFont(size: 11)
-                        .transition(.opacity)
-                }
-            }
-            .foregroundColor(.secondary)
+            PopOutIcon()
+                .frame(width: 12, height: 12)
+                .foregroundColor(.secondary)
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .help("Pop out")
     }
 }
 
@@ -1165,18 +1146,12 @@ struct PopOutIcon: View {
 
 struct NewChatButton: View {
     let action: () -> Void
-    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: "plus")
                     .scaledFont(size: 11)
-                if isHovered {
-                    Text("New chat")
-                        .scaledFont(size: 11)
-                        .transition(.opacity)
-                }
                 Text("⌘N")
                     .scaledFont(size: 9)
                     .padding(.horizontal, 3)
@@ -1187,8 +1162,7 @@ struct NewChatButton: View {
             .foregroundColor(.secondary)
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .help("New chat")
     }
 }
 
@@ -1202,24 +1176,14 @@ struct CopyConversationButton: View {
 
     @State private var showCopied = false
 
-    @State private var isHovered = false
-
     var body: some View {
         Button(action: copyAll) {
-            HStack(spacing: 4) {
-                Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                    .scaledFont(size: 11)
-                if isHovered {
-                    Text(showCopied ? "Copied!" : "Copy all")
-                        .scaledFont(size: 11)
-                        .transition(.opacity)
-                }
-            }
-            .foregroundColor(showCopied ? .green : .secondary)
+            Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                .scaledFont(size: 11)
+                .foregroundColor(showCopied ? .green : .secondary)
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .help(showCopied ? "Copied!" : "Copy all")
     }
 
     private func copyAll() {
@@ -1261,28 +1225,18 @@ struct ReportIssueButton: View {
     @State private var flashOpacity: Double = 1.0
     @State private var flashScale: Double = 1.0
     @State private var showSent = false
-    @State private var isHovered = false
 
     var body: some View {
         Button(action: sendReport) {
-            HStack(spacing: 4) {
-                Image(systemName: showSent ? "checkmark" : "exclamationmark.triangle.fill")
-                    .scaledFont(size: isHanging ? 13 : 11)
-                    .foregroundColor(showSent ? .green : (isHanging ? .orange : .secondary))
-                    .opacity(flashOpacity)
-                    .scaleEffect(flashScale)
-                    .shadow(color: isHanging ? .orange.opacity(flashOpacity * 0.9) : .clear, radius: 6)
-                if isHovered {
-                    Text(showSent ? "Report sent!" : "Report an issue")
-                        .scaledFont(size: 11)
-                        .foregroundColor(showSent ? .green : (isHanging ? .orange : .secondary))
-                        .transition(.opacity)
-                }
-            }
+            Image(systemName: showSent ? "checkmark" : "exclamationmark.triangle.fill")
+                .scaledFont(size: isHanging ? 13 : 11)
+                .foregroundColor(showSent ? .green : (isHanging ? .orange : .secondary))
+                .opacity(flashOpacity)
+                .scaleEffect(flashScale)
+                .shadow(color: isHanging ? .orange.opacity(flashOpacity * 0.9) : .clear, radius: 6)
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .help(showSent ? "Report sent!" : "Report an issue")
         .onChange(of: isHanging) {
             if isHanging {
                 withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
