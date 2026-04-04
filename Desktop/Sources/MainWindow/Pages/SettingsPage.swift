@@ -2291,7 +2291,7 @@ struct SettingsContentView: View {
 
     // MARK: - Preferences Button Helpers
 
-    private func preferencesModelButton(_ model: (id: String, label: String)) -> some View {
+    private func preferencesModelButton(_ model: (id: String, label: String, shortLabel: String)) -> some View {
         let isSelected = shortcutSettings.selectedModel == model.id
         return Button {
             shortcutSettings.selectedModel = model.id
