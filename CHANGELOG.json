@@ -5,7 +5,8 @@
     "Fixed stuck loading spinner when popping out chat to detached window mid-stream",
     "Fixed detached chat window losing responses after the first query",
     "Fixed AI agent accidentally typing its reasoning into user documents when controlling desktop apps",
-    "Fixed floating bar becoming a thin wide strip after hide/show with an error response"
+    "Fixed floating bar becoming a thin wide strip after hide/show with an error response",
+    "Added Smart/Fast model toggle in the chat header bar for quick switching between Opus and Sonnet"
   ],
   "releases": [
     {
