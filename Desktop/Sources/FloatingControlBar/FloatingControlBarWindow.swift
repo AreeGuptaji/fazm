@@ -440,7 +440,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     private func installGlobalClickOutsideMonitor() {
         removeGlobalClickOutsideMonitor()
         globalClickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self, self.state.showingAIConversation, !self.suppressClickOutsideDismiss, !self.state.isCollapsed, !self.state.isVoiceListening else { return }
+            guard let self, self.isVisible, self.state.showingAIConversation, !self.suppressClickOutsideDismiss, !self.state.isCollapsed, !self.state.isVoiceListening else { return }
             // Don't collapse while AI is generating a response
             if self.state.showingAIResponse, self.state.currentAIMessage?.isStreaming == true || self.state.isAILoading { return }
             self.dismissConversationAnimated()
@@ -464,7 +464,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         }
 
         resignKeyAnimationToken += 1
-        preCollapseHeight = frame.height
+        preCollapseHeight = max(frame.height, FloatingControlBarWindow.minResponseHeight)
 
         let halfHeight = frame.height / 2
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -519,6 +519,10 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     }
 
     func showAIConversation() {
+        // Clear stale collapse state so expandFromCollapsed doesn't fire with
+        // an outdated preCollapseHeight when the window next becomes key.
+        state.isCollapsed = false
+
         // Check if we have existing conversation to restore — if so, skip the input-only
         // view and go straight to the response/chat view with history visible.
         let hasLastConversation = state.lastConversation != nil
