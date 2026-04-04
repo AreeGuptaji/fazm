@@ -130,7 +130,7 @@ async function handleJsonRpc(
         result: {
           protocolVersion: "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "fazm-tools", version: "1.0.0" },
+          serverInfo: { name: "fazm_tools", version: "1.0.0" },
         },
       };
 
