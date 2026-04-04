@@ -410,6 +410,11 @@ class DetachedChatWindowController {
                 detachedState.loadHistory(from: savedMessages)
                 detachedState.showingAIConversation = true
                 detachedState.showingAIResponse = true
+                // FloatingControlBarState.isAILoading defaults to true, which would leave
+                // a restored window stuck on the "thinking" spinner with no active query.
+                // Restored windows have no in-flight work; the spinner only re-engages when
+                // the user sends a new follow-up via ChatQueryLifecycle.
+                detachedState.isAILoading = false
 
                 let win = DetachedChatWindow(state: detachedState, sessionKey: sessionKey, savedFrame: savedFrame)
                 let winId = ObjectIdentifier(win)
