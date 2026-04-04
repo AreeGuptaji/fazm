@@ -1058,8 +1058,8 @@ struct ModelToggleButton: View {
             }
             .foregroundColor(.secondary)
         }
-        .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize()
     }
 }
