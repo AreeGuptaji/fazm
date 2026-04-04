@@ -1093,8 +1093,12 @@ class ChatProvider: ObservableObject {
     /// Clear messages that were kept alive during a floating→detached session transfer.
     /// Called by the detached window's subscriber once the in-flight query finishes streaming.
     func clearTransferredMessages() {
-        // Only clear if the floating bar cleared flag is set (meaning a transfer happened)
+        // Only clear if the floating bar cleared flag is set (meaning a transfer happened).
+        // Clear the flag immediately so this only fires once per pop-out. Without this,
+        // every subsequent query completion in the detached window would wipe the messages
+        // array, causing responses to vanish ("Chat response arrived after session switch").
         guard UserDefaults.standard.bool(forKey: Self.floatingChatClearedKey) else { return }
+        UserDefaults.standard.removeObject(forKey: Self.floatingChatClearedKey)
         messages = []
     }
 
