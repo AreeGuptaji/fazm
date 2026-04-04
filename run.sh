@@ -471,16 +471,23 @@ else
     exit 1
 fi
 
-# Watchdog: hold the lock as long as the app is alive.
-# Only exits when the app process dies. Does NOT exit on idle, because
-# releasing the lock while the app runs confuses other agents.
+# Release the build lock now that the app is launched.
+# The lock only serializes build/install; once the app is running, another
+# agent must be able to acquire the lock, pkill this app, and rebuild.
+# Holding the lock for the app's lifetime creates a deadlock: the other
+# agent can't kill the app because it can't acquire the lock first.
+fazm_release_lock
+echo "[run.sh] Lock released — app is running (PID $APP_PID)."
+
+# Watchdog: monitor the app and update the status file when it exits.
+# Runs without holding the lock, so other agents can rebuild freely.
 echo "Watching app (PID $APP_PID)..."
 while true; do
     sleep 10
 
     # Is the app process still running?
     if ! kill -0 "$APP_PID" 2>/dev/null; then
-        echo "[watchdog] App process $APP_PID exited — releasing lock."
+        echo "[watchdog] App process $APP_PID exited."
         echo "exited $APP_PID $(date +%s)" > "$FAZM_STATUS_FILE"
         break
     fi
