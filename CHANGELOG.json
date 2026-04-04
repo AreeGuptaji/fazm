@@ -4,7 +4,8 @@
     "Detached chat windows now restore automatically after app restart or update",
     "Fixed stuck loading spinner when popping out chat to detached window mid-stream",
     "Fixed detached chat window losing responses after the first query",
-    "Fixed AI agent accidentally typing its reasoning into user documents when controlling desktop apps"
+    "Fixed AI agent accidentally typing its reasoning into user documents when controlling desktop apps",
+    "Fixed floating bar becoming a thin wide strip after hide/show with an error response"
   ],
   "releases": [
     {
