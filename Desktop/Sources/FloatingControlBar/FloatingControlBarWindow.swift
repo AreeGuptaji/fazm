@@ -1451,6 +1451,119 @@ class FloatingControlBarManager {
             }
         }
 
+        // Programmatic control: unified command interface for all floating bar controls.
+        // Trigger: xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.control"), object: nil, userInfo: ["command": "getState"], deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
+        //
+        // Supported commands:
+        //   getState              — writes JSON state to /tmp/fazm-control-state.json
+        //   newChat               — starts a new chat session
+        //   popOut                — pops conversation out to a detached window
+        //   setModel:<id>         — sets AI model (e.g. "setModel:claude-sonnet-4-6")
+        //   toggleVoice           — toggles voice response (TTS) on/off
+        //   setVoice:on|off       — explicitly sets voice response
+        //   show                  — shows the floating bar
+        //   hide                  — hides the floating bar
+        //   toggle                — toggles floating bar visibility
+        //   openInput             — opens the AI input field
+        //   sendFollowUp:<text>   — sends a follow-up message in active conversation
+        //   setWorkspace:<path>   — sets the working directory
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.fazm.control"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor in
+                guard let self else { return }
+                let command = notification.userInfo?["command"] as? String ?? ""
+                log("FloatingControlBarManager: Control command received: \(command)")
+
+                if command == "getState" {
+                    self.writeControlState()
+                } else if command == "newChat" {
+                    self.window?.startNewChat()
+                } else if command == "popOut" {
+                    self.popOutToWindow()
+                } else if command.hasPrefix("setModel:") {
+                    let modelId = String(command.dropFirst("setModel:".count))
+                    if ShortcutSettings.availableModels.contains(where: { $0.id == modelId }) {
+                        ShortcutSettings.shared.selectedModel = modelId
+                        log("FloatingControlBarManager: Model set to \(modelId)")
+                    } else {
+                        log("FloatingControlBarManager: Unknown model ID: \(modelId)")
+                    }
+                    self.writeControlState()
+                } else if command == "toggleVoice" {
+                    let current = UserDefaults.standard.bool(forKey: "voiceResponseEnabled")
+                    UserDefaults.standard.set(!current, forKey: "voiceResponseEnabled")
+                    if current { ChatToolExecutor.stopTTSPlayback() }
+                    log("FloatingControlBarManager: Voice toggled to \(!current)")
+                    self.writeControlState()
+                } else if command == "setVoice:on" {
+                    UserDefaults.standard.set(true, forKey: "voiceResponseEnabled")
+                    log("FloatingControlBarManager: Voice set to on")
+                    self.writeControlState()
+                } else if command == "setVoice:off" {
+                    UserDefaults.standard.set(false, forKey: "voiceResponseEnabled")
+                    ChatToolExecutor.stopTTSPlayback()
+                    log("FloatingControlBarManager: Voice set to off")
+                    self.writeControlState()
+                } else if command == "show" {
+                    self.show()
+                } else if command == "hide" {
+                    self.hide()
+                } else if command == "toggle" {
+                    self.toggle()
+                } else if command == "openInput" {
+                    self.openAIInput()
+                } else if command.hasPrefix("sendFollowUp:") {
+                    let text = String(command.dropFirst("sendFollowUp:".count))
+                    self.sendFollowUpQuery(text)
+                } else if command.hasPrefix("setWorkspace:") {
+                    let path = String(command.dropFirst("setWorkspace:".count))
+                    UserDefaults.standard.set(path, forKey: "aiChatWorkingDirectory")
+                    log("FloatingControlBarManager: Workspace set to \(path)")
+                    self.writeControlState()
+                } else {
+                    log("FloatingControlBarManager: Unknown control command: \(command)")
+                }
+            }
+        }
+
+    }
+
+    /// Write current floating bar state to /tmp/fazm-control-state.json for programmatic access.
+    private func writeControlState() {
+        let state = window?.state
+        let voiceEnabled = UserDefaults.standard.bool(forKey: "voiceResponseEnabled")
+        let workspace = UserDefaults.standard.string(forKey: "aiChatWorkingDirectory") ?? ""
+
+        var dict: [String: Any] = [
+            "model": ShortcutSettings.shared.selectedModel,
+            "modelLabel": ShortcutSettings.shared.selectedModelShortLabel,
+            "voiceEnabled": voiceEnabled,
+            "workspace": workspace,
+            "isVisible": window?.isVisible ?? false,
+            "showingAIConversation": state?.showingAIConversation ?? false,
+            "showingAIResponse": state?.showingAIResponse ?? false,
+            "isAILoading": state?.isAILoading ?? false,
+            "isVoiceListening": state?.isVoiceListening ?? false,
+            "chatHistoryCount": state?.chatHistory.count ?? 0,
+            "displayedQuery": state?.displayedQuery ?? "",
+            "queueCount": state?.messageQueue.count ?? 0,
+            "isTutorialActive": state?.isTutorialChatActive ?? false,
+            "availableModels": ShortcutSettings.availableModels.map { ["id": $0.id, "label": $0.label, "shortLabel": $0.shortLabel] }
+        ]
+
+        if let currentMessage = state?.currentAIMessage {
+            dict["currentMessagePreview"] = String(currentMessage.text.prefix(200))
+            dict["isStreaming"] = currentMessage.isStreaming
+        }
+
+        if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            try? json.write(toFile: "/tmp/fazm-control-state.json", atomically: true, encoding: .utf8)
+            log("FloatingControlBarManager: State written to /tmp/fazm-control-state.json")
+        }
     }
 
     /// Whether the floating bar window is currently visible.
