@@ -7,7 +7,7 @@
     "Fixed AI agent accidentally typing its reasoning into user documents when controlling desktop apps",
     "Fixed floating bar becoming a thin wide strip after hide/show with an error response",
     "Added Smart/Fast model toggle in the chat header bar for quick switching between Opus and Sonnet",
-    "Chat header icon buttons now show labels as a native tooltip on hover instead of expanding the button inline",
+    "Chat header icon buttons now show labels as a floating hint below on hover instead of expanding the button inline",
     "Fixed floating bar not starting a fresh chat after popping the conversation out to a detached window"
   ],
   "releases": [
