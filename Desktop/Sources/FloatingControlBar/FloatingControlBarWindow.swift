@@ -1233,7 +1233,10 @@ class FloatingControlBarManager {
                    !latestAI.text.isEmpty {
                     aiMessage = latestAI
                 }
-                if var currentMessage = aiMessage, !currentQuery.isEmpty {
+                // Skip archiving if onSendNow already set displayedQuery to this
+                // message. Otherwise a race with the $messages subscriber causes
+                // the same exchange to be archived twice (duplicate bubble).
+                if currentQuery != text, var currentMessage = aiMessage, !currentQuery.isEmpty {
                     currentMessage.contentBlocks = currentMessage.contentBlocks.map { block in
                         if case .toolCall(let id, let name, .running, let toolUseId, let input, let output) = block {
                             return .toolCall(id: id, name: name, status: .completed, toolUseId: toolUseId, input: input, output: output)
