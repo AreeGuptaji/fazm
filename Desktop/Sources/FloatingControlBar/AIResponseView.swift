@@ -16,6 +16,9 @@ struct AIResponseView: View {
     /// True when the hang state was triggered by a previous crash, not the 30s timer.
     /// Prevents the isLoading onChange from clearing it when a query completes.
     @State private var isHangingFromCrash = false
+    @State private var isUserAtBottom = true
+    @State private var shouldFollowContent = true
+    @State private var isProgrammaticScroll = false
 
     let userInput: String
     let chatHistory: [FloatingChatExchange]
