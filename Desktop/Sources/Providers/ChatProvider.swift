@@ -1111,16 +1111,14 @@ class ChatProvider: ObservableObject {
             pendingMessages.removeAll()
             floatingChatSessionId = UUID().uuidString
 
-            // Drop the bridge's in-memory session map entry for "floating" so the next
-            // floating bar query creates a fresh ACP session instead of reusing the one
-            // that was just handed off to the detached window. Without this, the bridge
-            // logs "Reusing existing ACP session" and the new floating chat inherits the
-            // old conversation context. The bridge also pre-warms a replacement "floating"
-            // session in the background so the next query doesn't pay warmup latency.
-            // We call acpBridge directly (not self.resetSession) because the latter also
-            // wipes `messages`, which must stay alive for the detached window's subscriber.
+            // Re-key the bridge's in-memory session from "floating" to the detached key
+            // so the detached window's first query finds it instantly (no resume needed).
+            // Then reset "floating" so the next floating bar query starts fresh.
             let bridge = acpBridge
-            Task { await bridge.resetSession(key: "floating") }
+            Task {
+                await bridge.transferSession(fromKey: "floating", toKey: toKey)
+                await bridge.resetSession(key: "floating")
+            }
         }
     }
 
