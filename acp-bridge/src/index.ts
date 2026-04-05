@@ -1504,14 +1504,24 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
         msg.resume = failedSessionId;
         return handleQuery(msg, _retryDepth + 1);
       }
-      // For non-retryable errors, surface the raw message immediately
+      // Non-retryable errors: surface the raw message to the user.
+      // Only use credit_exhausted for actual billing/rate errors;
+      // everything else goes as a generic error so the user sees the real message.
       if (isNonRetryable) {
         logErr(`Non-retryable error, surfacing to user: ${errMsg}`);
         for (const name of pendingTools) {
           send({ type: "tool_activity", name, status: "completed" });
         }
         pendingTools.length = 0;
-        send({ type: "credit_exhausted", message: errMsg });
+        const isBillingOrRate = isStructuredNonRetryable
+          && (apiRetryErrorType === "billing_error" || apiRetryErrorType === "rate_limit");
+        const isRegexBilling = /credit|balance|quota|exhausted|hit your.*limit|out of extra usage/i.test(errMsg);
+        if (isBillingOrRate || isRegexBilling) {
+          send({ type: "credit_exhausted", message: errMsg });
+        } else {
+          send({ type: "error", message: errMsg });
+        }
+        lastApiRetry = null;
         return;
       }
       throw err;
