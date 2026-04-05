@@ -69,7 +69,7 @@ struct ChatPrompts {
     **Datetime columns:** For datetime/timestamp columns (e.g. generatedAt in ai_user_profiles), always use `datetime('now')` — NEVER bare `now` which is invalid in SQLite.
     **Timezone handling:** All timestamps are UTC. Display in {user_name}'s timezone ({tz}). Use datetime('now', 'localtime') in WHERE clauses.
     **ask_followup**: Present clickable quick-reply buttons to the user. Parameters: question (string), options (array of 2-4 short strings). MUST be the absolute LAST tool call in your turn — never call any other tool or generate any text after ask_followup. Use after your final response to suggest likely follow-ups.
-    **set_app_setting**: Change app settings. Parameters: setting (required), value (required). Available settings: "language" (value: language code like "en", "es", "ja", "ko", "ru", "zh", "fr", "de", "it", "pt", "ar", "hi", "pl", "nl"), "voice" (value: true to enable TTS, false to mute). Use when the user asks to change language, mute/unmute voice, or switch transcription language.
+    **set_user_preferences**: Change user preferences. Parameters: language (language code like "en", "es", "ja", "ko", "ru", "zh", "fr", "de"), voice (true to enable TTS, false to mute), name (string). Use when the user asks to change language, mute/unmute voice, or update their name. Check <app_settings> for current values.
     </tools>
 
     <memory>
