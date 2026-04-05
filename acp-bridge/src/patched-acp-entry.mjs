@@ -39,16 +39,23 @@ ClaudeAcpAgent.prototype.createSession = async function (params, creationOpts) {
     session.query.next = async function (...args) {
       const item = await originalNext(...args);
 
-      // Capture cost/usage from SDKResultSuccess
-      if (
-        item.value?.type === "result" &&
-        item.value?.subtype === "success"
-      ) {
-        const prevSessionCost = session._sessionCostUsd ?? 0;
-        session._lastCostUsd = item.value.total_cost_usd - prevSessionCost;
-        session._sessionCostUsd = item.value.total_cost_usd;
-        session._lastUsage = item.value.usage;
-        session._lastModelUsage = item.value.modelUsage;
+      // Capture cost/usage and error metadata from SDK results
+      if (item.value?.type === "result") {
+        if (item.value.subtype === "success") {
+          const prevSessionCost = session._sessionCostUsd ?? 0;
+          session._lastCostUsd = item.value.total_cost_usd - prevSessionCost;
+          session._sessionCostUsd = item.value.total_cost_usd;
+          session._lastUsage = item.value.usage;
+          session._lastModelUsage = item.value.modelUsage;
+        }
+        // Capture terminal_reason from both success and error results
+        if (item.value.terminal_reason) {
+          session._lastTerminalReason = item.value.terminal_reason;
+        }
+        // Capture structured errors from error results
+        if (item.value.errors?.length) {
+          session._lastErrors = item.value.errors;
+        }
       }
 
       // --- Forward dropped system messages ---
