@@ -529,6 +529,7 @@ class PushToTalkManager: ObservableObject {
       effectiveBarState?.audioLevel.transcript = "Transcribing..."
 
       Task {
+        var transcriptionError = false
         do {
           let language = AssistantSettings.shared.effectiveTranscriptionLanguage
           let transcript = try await TranscriptionService.batchTranscribe(
@@ -541,6 +542,11 @@ class PushToTalkManager: ObservableObject {
           }
         } catch {
           logError("PushToTalkManager: batch transcription failed", error: error)
+          transcriptionError = true
+        }
+        if transcriptionError && self.transcriptSegments.isEmpty {
+          // Show the silence overlay so the user gets feedback instead of silent dismissal
+          self.effectiveBarState?.showSilenceOverlay()
         }
         self.sendTranscript()
       }
