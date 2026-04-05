@@ -1,6 +1,29 @@
 import Cocoa
 import SwiftUI
 
+/// NSTextView subclass that reports its layout height as intrinsicContentSize
+/// so SwiftUI can size the container correctly.
+private class AutoSizingTextView: NSTextView {
+    override var intrinsicContentSize: NSSize {
+        guard let layoutManager = layoutManager, let textContainer = textContainer else {
+            return super.intrinsicContentSize
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        return NSSize(width: NSView.noIntrinsicMetric, height: ceil(usedRect.height + textContainerInset.height * 2))
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        invalidateIntrinsicContentSize()
+    }
+
+    override func layout() {
+        super.layout()
+        invalidateIntrinsicContentSize()
+    }
+}
+
 /// A read-only selectable text view with visible selection highlighting.
 /// Use instead of `Text(...).textSelection(.enabled)` when the default
 /// selection color is invisible (e.g. vibrantLight floating bar).
@@ -11,9 +34,9 @@ struct SelectableText: NSViewRepresentable {
     var lineLimit: Int? = nil
     @Environment(\.fontScale) private var fontScale
 
-    func makeNSView(context: Context) -> NSTextView {
+    func makeNSView(context: Context) -> AutoSizingTextView {
         let scaledSize = round(fontSize * fontScale)
-        let textView = NSTextView()
+        let textView = AutoSizingTextView()
         textView.string = text
         textView.isEditable = false
         textView.isSelectable = true
@@ -31,6 +54,7 @@ struct SelectableText: NSViewRepresentable {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        textView.setContentHuggingPriority(.required, for: .vertical)
         if let lineLimit {
             textView.textContainer?.maximumNumberOfLines = lineLimit
             textView.textContainer?.lineBreakMode = .byTruncatingTail
@@ -38,7 +62,7 @@ struct SelectableText: NSViewRepresentable {
         return textView
     }
 
-    func updateNSView(_ textView: NSTextView, context: Context) {
+    func updateNSView(_ textView: AutoSizingTextView, context: Context) {
         let scaledSize = round(fontSize * fontScale)
         if textView.string != text {
             textView.string = text
