@@ -1421,7 +1421,7 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
       const errMsg = err instanceof Error ? err.message : String(err);
 
       // Credit balance or rate limit exhausted — do NOT retry, surface immediately
-      const isCreditExhausted = /credit balance is too low|insufficient.*(credit|funds|balance)|you've hit your limit|you have hit your limit|hit your.*limit|rate.?limit.*rejected|out of extra usage/i.test(errMsg);
+      const isCreditExhausted = /credit balance is too low|insufficient.*(credit|funds|balance)|you've hit your limit|you have hit your limit|hit your.*limit|rate.?limit.*rejected|out of extra usage|unable to verify.*membership/i.test(errMsg);
       if (isCreditExhausted) {
         logErr(`Credit/rate limit exhausted, not retrying: ${errMsg}`);
         for (const name of pendingTools) {
@@ -1525,7 +1525,7 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
     }
     const errMsg = err instanceof Error ? err.message : String(err);
     // Credit balance or rate limit exhausted — surface as specific type (outer catch)
-    const isCreditExhausted = /credit balance is too low|insufficient.*(credit|funds|balance)|you've hit your limit|you have hit your limit|hit your.*limit|rate.?limit.*rejected|out of extra usage/i.test(errMsg);
+    const isCreditExhausted = /credit balance is too low|insufficient.*(credit|funds|balance)|you've hit your limit|you have hit your limit|hit your.*limit|rate.?limit.*rejected|out of extra usage|unable to verify.*membership/i.test(errMsg);
     if (isCreditExhausted) {
       logErr(`Credit/rate limit exhausted (outer): ${errMsg}`);
       send({ type: "credit_exhausted", message: errMsg });
