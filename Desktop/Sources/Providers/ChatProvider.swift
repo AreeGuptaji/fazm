@@ -2380,7 +2380,7 @@ class ChatProvider: ObservableObject {
                     } else if status == "completed", let startTime = toolStartTimes.removeValue(forKey: name) {
                         let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
                         let result = toolResults.removeValue(forKey: name)
-                        let isError = result?.hasPrefix("Error:") == true || result?.hasPrefix("error:") == true
+                        let isError = result?.hasPrefix("Error:") == true || result?.hasPrefix("error:") == true || result?.hasPrefix("ERROR:") == true
                         AnalyticsManager.shared.chatToolCallCompleted(
                             toolName: name,
                             durationMs: durationMs,
