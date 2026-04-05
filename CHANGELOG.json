@@ -1,6 +1,7 @@
 {
   "unreleased": [
-    "Fixed error messages not showing when Claude credits are exhausted"
+    "Fixed error messages not showing when Claude credits are exhausted",
+    "Added scroll-to-bottom button in chat when scrolled up"
   ],
   "releases": [
     {
