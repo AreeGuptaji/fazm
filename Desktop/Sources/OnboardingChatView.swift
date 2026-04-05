@@ -167,8 +167,17 @@ struct OnboardingChatView: View {
     @State private var explorationTask: Task<Void, Never>?
     @State private var graphTask: Task<Void, Never>?
 
+    // Error handling state
+    @State private var onboardingError: OnboardingError? = nil
+
     // Timer to periodically check permission status
     let permissionCheckTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
+    enum OnboardingError {
+        case creditExhausted
+        case claudeAuthRequired
+        case general(String)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -215,6 +224,29 @@ struct OnboardingChatView: View {
                                     .padding(.leading, 44)
                                     .id("typing")
                             }
+                        }
+
+                        // Error state — shown when credits run out or bridge errors occur
+                        if let error = onboardingError, !chatProvider.isSending {
+                            OnboardingErrorBanner(
+                                error: error,
+                                onConnectClaude: {
+                                    ClaudeAuthWindowController.shared.show(chatProvider: chatProvider)
+                                },
+                                onRetry: {
+                                    onboardingError = nil
+                                    // Resend the last user message
+                                    if let lastUserMsg = chatProvider.messages.last(where: { $0.sender == .user }) {
+                                        Task {
+                                            await chatProvider.sendMessage(lastUserMsg.text, model: "claude-sonnet-4-6")
+                                        }
+                                    }
+                                },
+                                onSkip: onSkip
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 44)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
 
                         // Quick reply buttons
@@ -404,6 +436,31 @@ struct OnboardingChatView: View {
         }
         .onChange(of: appState.hasAccessibilityPermission) { _, granted in
             if granted { handlePermissionGranted("accessibility", label: "Accessibility") }
+        }
+        // Detect errors when AI finishes responding
+        .onChange(of: chatProvider.isSending) { wasSending, isSending in
+            // Only check when transitioning from sending to not-sending
+            guard wasSending && !isSending else { return }
+
+            if chatProvider.isClaudeAuthRequired {
+                withAnimation { onboardingError = .claudeAuthRequired }
+            } else if chatProvider.showCreditExhaustedAlert {
+                chatProvider.showCreditExhaustedAlert = false
+                withAnimation { onboardingError = .creditExhausted }
+            } else if let errorText = chatProvider.errorMessage {
+                withAnimation { onboardingError = .general(errorText) }
+            } else {
+                // Successful response, clear any previous error
+                if onboardingError != nil {
+                    withAnimation { onboardingError = nil }
+                }
+            }
+        }
+        // Clear error when Claude auth succeeds (user connected their account)
+        .onChange(of: chatProvider.isClaudeAuthRequired) { _, isRequired in
+            if !isRequired && onboardingError != nil {
+                withAnimation { onboardingError = nil }
+            }
         }
         .alert("Skip setup?", isPresented: $showSkipConfirmation) {
             Button("Continue Setup", role: .cancel) { }
@@ -1525,6 +1582,86 @@ struct ExplorationInlineLoader: View {
         }
         .onReceive(timer) { _ in
             dotCount = (dotCount + 1) % 3
+        }
+    }
+}
+
+// MARK: - Onboarding Error Banner
+
+/// Displays an actionable error message when credit exhaustion or bridge errors
+/// occur during onboarding. Mirrors the error handling in ChatQueryLifecycle
+/// but adapted for the onboarding context.
+private struct OnboardingErrorBanner: View {
+    let error: OnboardingChatView.OnboardingError
+    var onConnectClaude: () -> Void
+    var onRetry: () -> Void
+    var onSkip: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(errorMessage)
+                .scaledFont(size: 13)
+                .foregroundColor(FazmColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                switch error {
+                case .creditExhausted, .claudeAuthRequired:
+                    Button(action: onConnectClaude) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "person.badge.key")
+                                .scaledFont(size: 11)
+                            Text("Connect Claude")
+                                .scaledFont(size: 12, weight: .medium)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(FazmColors.purplePrimary)
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+
+                case .general:
+                    Button(action: onRetry) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "arrow.clockwise")
+                                .scaledFont(size: 11)
+                            Text("Retry")
+                                .scaledFont(size: 12, weight: .medium)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(FazmColors.purplePrimary)
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button(action: onSkip) {
+                    Text("Skip Setup")
+                        .scaledFont(size: 12)
+                        .foregroundColor(FazmColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(FazmColors.backgroundSecondary)
+        )
+    }
+
+    private var errorMessage: String {
+        switch error {
+        case .creditExhausted:
+            return "Your free built-in credits have run out. Connect your Claude account to continue setup."
+        case .claudeAuthRequired:
+            return "Please connect your Claude account to continue setup."
+        case .general(let text):
+            return text
         }
     }
 }
