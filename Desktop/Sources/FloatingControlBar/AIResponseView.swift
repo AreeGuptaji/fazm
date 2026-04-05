@@ -1361,10 +1361,83 @@ extension View {
 
 // MARK: - Scroll Position Detection
 
-/// Preference key that carries the bottom anchor's maxY in the scroll view coordinate space.
-private struct BottomVisiblePreference: PreferenceKey {
-    static var defaultValue: CGFloat = .infinity
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+/// Detects whether the enclosing NSScrollView is scrolled to the bottom.
+/// Must be placed as `.background()` on a view INSIDE the ScrollView content
+/// so the NSView's superview chain includes the NSScrollView.
+private struct ScrollPositionDetector: NSViewRepresentable {
+    let onScrollPositionChange: (Bool) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        // Delay to ensure the scroll view hierarchy is fully assembled
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            context.coordinator.setupScrollObserver(for: view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScrollPositionChange: onScrollPositionChange)
+    }
+
+    class Coordinator: NSObject {
+        let onScrollPositionChange: (Bool) -> Void
+        private var scrollView: NSScrollView?
+        private var observation: NSObjectProtocol?
+        private var coalesceWorkItem: DispatchWorkItem?
+        private var lastReportedValue: Bool?
+
+        init(onScrollPositionChange: @escaping (Bool) -> Void) {
+            self.onScrollPositionChange = onScrollPositionChange
+        }
+
+        func setupScrollObserver(for view: NSView) {
+            var current: NSView? = view
+            while let v = current {
+                if let sv = v as? NSScrollView {
+                    scrollView = sv
+                    break
+                }
+                current = v.superview
+            }
+            guard let scrollView = scrollView else { return }
+
+            scrollView.contentView.postsBoundsChangedNotifications = true
+            observation = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: scrollView.contentView,
+                queue: .main
+            ) { [weak self] _ in
+                self?.checkScrollPosition()
+            }
+            checkScrollPosition()
+        }
+
+        func checkScrollPosition() {
+            guard let sv = scrollView, let docView = sv.documentView else { return }
+            let clipBounds = sv.contentView.bounds
+            let documentHeight = docView.frame.height
+            let visibleMaxY = clipBounds.origin.y + clipBounds.height
+            let threshold: CGFloat = 80
+            let atBottom = visibleMaxY >= documentHeight - threshold
+
+            guard atBottom != lastReportedValue else { return }
+            coalesceWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.lastReportedValue = atBottom
+                self?.onScrollPositionChange(atBottom)
+            }
+            coalesceWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06, execute: work)
+        }
+
+        deinit {
+            coalesceWorkItem?.cancel()
+            if let obs = observation {
+                NotificationCenter.default.removeObserver(obs)
+            }
+        }
     }
 }
