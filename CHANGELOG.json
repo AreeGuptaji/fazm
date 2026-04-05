@@ -1,5 +1,7 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    "Upgraded ACP protocol to v0.25.0 with improved error handling for credit exhaustion and rate limits"
+  ],
   "releases": [
     {
       "version": "2.0.9",
