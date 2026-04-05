@@ -424,8 +424,10 @@ workflows:
               fi
               # Copy stdlib so Python can find encodings, os, etc. on machines without uv
               if [ -d "$GWMCP_MANAGED_DIR/lib/python3.12" ]; then
-                rsync -a --ignore-existing "$GWMCP_MANAGED_DIR/lib/python3.12/" "$WORKSPACE_MCP_BUNDLE/.venv/lib/python3.12/"
+                rsync -a --ignore-existing --exclude='__pycache__' "$GWMCP_MANAGED_DIR/lib/python3.12/" "$WORKSPACE_MCP_BUNDLE/.venv/lib/python3.12/"
               fi
+              # Final __pycache__ cleanup — catches any .pyc files introduced by rsync or uv
+              find "$WORKSPACE_MCP_BUNDLE/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
               # Rewrite pyvenv.cfg so Python finds stdlib relative to venv, not the managed install
               printf 'home = bin\nimplementation = CPython\nversion_info = 3.12\ninclude-system-site-packages = false\n' > "$WORKSPACE_MCP_BUNDLE/.venv/pyvenv.cfg"
             fi
