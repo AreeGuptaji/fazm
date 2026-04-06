@@ -36,7 +36,7 @@ struct InstallerView: View {
             }
             .padding(.horizontal, 40)
 
-            // Error / Cancel
+            // Error / Cancel / Manual drag
             if let error = installer.error {
                 VStack(spacing: 8) {
                     Text(error)
@@ -49,6 +49,27 @@ struct InstallerView: View {
                         installer.start()
                     }
                     .buttonStyle(.borderedProminent)
+                }
+            } else if installer.phase == .manualDrag {
+                VStack(spacing: 12) {
+                    Text("Drag Fazm into your Applications folder to complete the installation.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+
+                    HStack(spacing: 16) {
+                        Button("Open in Finder") {
+                            installer.openInFinder()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("Quit") {
+                            NSApplication.shared.terminate(nil)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             } else if installer.phase != .done {
                 Button("Cancel") {
@@ -75,6 +96,7 @@ enum InstallPhase {
     case installing
     case launching
     case done
+    case manualDrag
 }
 
 @MainActor
@@ -86,6 +108,7 @@ class InstallerViewModel: ObservableObject {
 
     private var downloadManager: DownloadManager?
     private var cancelled = false
+    private var manualDragAppURL: URL?
 
     var statusText: String {
         switch phase {
@@ -95,6 +118,7 @@ class InstallerViewModel: ObservableObject {
         case .installing: return "Installing Fazm..."
         case .launching: return "Launching Fazm..."
         case .done: return "Done!"
+        case .manualDrag: return "Almost there!"
         }
     }
 
@@ -155,18 +179,28 @@ class InstallerViewModel: ObservableObject {
                 // 5. Install
                 phase = .installing
                 progress = 0.97
-                let appURL = try InstallManager.install(zipURL: zipURL)
+                let result = try InstallManager.install(zipURL: zipURL)
 
-                // 6. Launch
-                phase = .launching
-                progress = 1.0
-                InstallManager.launch(appURL: appURL)
+                switch result.fallback {
+                case .none, .userApplications:
+                    // 6. Launch
+                    phase = .launching
+                    progress = 1.0
+                    InstallManager.launch(appURL: result.appURL)
 
-                phase = .done
+                    phase = .done
 
-                // Quit after a short delay
-                try? await Task.sleep(for: .seconds(1))
-                NSApplication.shared.terminate(nil)
+                    // Quit after a short delay
+                    try? await Task.sleep(for: .seconds(1))
+                    NSApplication.shared.terminate(nil)
+
+                case .manualDrag(let appURL):
+                    // Show drag-to-Applications UI
+                    manualDragAppURL = appURL
+                    phase = .manualDrag
+                    progress = 1.0
+                    InstallManager.revealInFinderWithApplications(appURL: appURL)
+                }
 
             } catch {
                 if !cancelled {
@@ -179,6 +213,12 @@ class InstallerViewModel: ObservableObject {
     func cancel() {
         cancelled = true
         downloadManager?.cancel()
+    }
+
+    func openInFinder() {
+        if let appURL = manualDragAppURL {
+            InstallManager.revealInFinderWithApplications(appURL: appURL)
+        }
     }
 }
 
