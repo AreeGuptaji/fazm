@@ -107,11 +107,8 @@ struct DesktopHomeView: View {
                 ClaudeAuthWindowController.shared.show(chatProvider: viewModelContainer.chatProvider)
             }
         }
-        .onReceive(viewModelContainer.chatProvider.$showPaywall) { show in
-            if show {
-                PaywallWindowController.shared.show(chatProvider: viewModelContainer.chatProvider)
-            }
-        }
+        // Paywall window is now triggered directly in ChatProvider.sendMessage()
+        // so it works from all surfaces (floating bar, detached window, main window)
         .onAppear {
             log("DesktopHomeView: View appeared - hasCompletedOnboarding=\(appState.hasCompletedOnboarding)")
             DispatchQueue.main.async {
