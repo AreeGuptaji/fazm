@@ -2,6 +2,17 @@ import AppKit
 import CryptoKit
 import Foundation
 
+struct InstallResult {
+    let appURL: URL
+    let fallback: InstallFallback
+}
+
+enum InstallFallback {
+    case none                   // Installed to /Applications successfully
+    case userApplications       // Fell back to ~/Applications
+    case manualDrag(appURL: URL) // Both failed, app extracted for manual drag
+}
+
 enum InstallManager {
 
     static func verifySHA256(fileURL: URL, expected: String) throws {
@@ -14,7 +25,7 @@ enum InstallManager {
         }
     }
 
-    static func install(zipURL: URL) throws -> URL {
+    static func install(zipURL: URL) throws -> InstallResult {
         let fm = FileManager.default
         let extractDir = fm.temporaryDirectory.appendingPathComponent("FazmExtract-\(UUID().uuidString)")
 
@@ -37,24 +48,78 @@ enum InstallManager {
             throw InstallerError.appNotFound
         }
 
-        // Remove old installations
-        let applicationsDir = URL(fileURLWithPath: "/Applications")
-        let targetApp = applicationsDir.appendingPathComponent(appName)
+        // Try /Applications first
+        if let result = try? installTo(
+            directory: URL(fileURLWithPath: "/Applications"),
+            sourceApp: sourceApp,
+            appName: appName,
+            fallback: .none
+        ) {
+            try? fm.removeItem(at: zipURL)
+            try? fm.removeItem(at: extractDir)
+            return result
+        }
 
-        // Remove old Fazm
+        // Fall back to ~/Applications
+        let userAppsDir = fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+        try? fm.createDirectory(at: userAppsDir, withIntermediateDirectories: true)
+
+        if let result = try? installTo(
+            directory: userAppsDir,
+            sourceApp: sourceApp,
+            appName: appName,
+            fallback: .userApplications
+        ) {
+            try? fm.removeItem(at: zipURL)
+            try? fm.removeItem(at: extractDir)
+            return result
+        }
+
+        // Both failed: move app to Desktop for manual drag
+        let desktopApp = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop")
+            .appendingPathComponent(appName)
+        try? fm.removeItem(at: desktopApp)
+
+        let dittoProcess = Process()
+        dittoProcess.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        dittoProcess.arguments = [sourceApp.path, desktopApp.path]
+        try? dittoProcess.run()
+        dittoProcess.waitUntilExit()
+
+        let manualApp = fm.fileExists(atPath: desktopApp.path) ? desktopApp : sourceApp
+        try? fm.removeItem(at: zipURL)
+        // Don't remove extractDir if we're using sourceApp as the fallback
+        if manualApp != sourceApp {
+            try? fm.removeItem(at: extractDir)
+        }
+
+        return InstallResult(appURL: manualApp, fallback: .manualDrag(appURL: manualApp))
+    }
+
+    private static func installTo(
+        directory: URL,
+        sourceApp: URL,
+        appName: String,
+        fallback: InstallFallback
+    ) throws -> InstallResult {
+        let fm = FileManager.default
+        let targetApp = directory.appendingPathComponent(appName)
+
+        // Remove existing
         if fm.fileExists(atPath: targetApp.path) {
             try fm.removeItem(at: targetApp)
         }
 
         // Remove legacy Omi installations
         for legacy in ["Omi.app", "omi.app"] {
-            let legacyPath = applicationsDir.appendingPathComponent(legacy)
+            let legacyPath = directory.appendingPathComponent(legacy)
             if fm.fileExists(atPath: legacyPath.path) {
                 try? fm.removeItem(at: legacyPath)
             }
         }
 
-        // Move to /Applications using ditto (preserves everything)
+        // Copy using ditto (preserves code signatures)
         let installProcess = Process()
         installProcess.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         installProcess.arguments = [sourceApp.path, targetApp.path]
@@ -62,14 +127,10 @@ enum InstallManager {
         installProcess.waitUntilExit()
 
         guard installProcess.terminationStatus == 0 else {
-            throw InstallerError.installFailed("Failed to copy app to /Applications")
+            throw InstallerError.installFailed("Failed to copy app to \(directory.path)")
         }
 
-        // Cleanup temp files
-        try? fm.removeItem(at: zipURL)
-        try? fm.removeItem(at: extractDir)
-
-        return targetApp
+        return InstallResult(appURL: targetApp, fallback: fallback)
     }
 
     static func launch(appURL: URL) {
@@ -80,6 +141,13 @@ enum InstallManager {
                 print("Failed to launch app: \(error)")
             }
         }
+    }
+
+    static func revealInFinderWithApplications(appURL: URL) {
+        // Open /Applications in one Finder window, and select the app
+        NSWorkspace.shared.activateFileViewerSelecting([appURL])
+        // Also open /Applications so user can drag
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: "/Applications")
     }
 
     // Recursively find the .app bundle
