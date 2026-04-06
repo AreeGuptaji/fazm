@@ -2012,6 +2012,7 @@ class ChatProvider: ObservableObject {
     func stopAgent() {
         guard isSending else { return }
         isStopping = true
+        log("ChatProvider: user stopped agent, sending interrupt")
         Task {
             await acpBridge.interrupt()
         }
@@ -2300,6 +2301,7 @@ class ChatProvider: ObservableObject {
         var toolResults: [String: String] = [:]  // Track last result per tool for success/failure
         var activeBrowserToolCount = 0
         var retryAfterModelFallback = false
+        var hadError = false
 
         do {
             // Use the system prompt built at warmup. The ACP bridge applies it only
@@ -2716,10 +2718,19 @@ class ChatProvider: ObservableObject {
                 await GoalsAIService.shared.extractProgressFromAllGoals(text: chatText)
             }
         } catch {
+            hadError = true
+
             // On timeout, cancel the stuck ACP session so it's not left dangling
             if let bridgeError = error as? BridgeError, case .timeout = bridgeError {
                 log("ChatProvider: ACP query timed out, sending interrupt to cancel stuck session")
                 await acpBridge.interrupt()
+                // Purge queued messages for the timed-out session — they are stale
+                let timedOutKey = activeSessionKey
+                let removedCount = pendingMessages.filter { $0.sessionKey == timedOutKey }.count
+                pendingMessages.removeAll { $0.sessionKey == timedOutKey }
+                if removedCount > 0 {
+                    log("ChatProvider: purged \(removedCount) stale queued message(s) for session \(timedOutKey ?? "floating") after timeout")
+                }
             }
 
             // Flush any remaining buffered streaming text before handling the error
@@ -2841,8 +2852,9 @@ class ChatProvider: ObservableObject {
         }
 
         // If messages are queued, chain the next one as a follow-up query.
-        // Skip chaining if the user explicitly stopped — queue stays visible for manual use.
-        if !wasStopped, !pendingMessages.isEmpty {
+        // Skip chaining if the user explicitly stopped (queue stays visible for manual use)
+        // or if an error occurred (stale messages should not replay).
+        if !wasStopped, !hadError, !pendingMessages.isEmpty {
             let next = pendingMessages.removeFirst()
             log("ChatProvider: chaining queued message (\(pendingMessages.count) remaining)")
             // Notify UI to dequeue (posted on main actor)
