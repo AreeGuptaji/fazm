@@ -196,12 +196,39 @@ pub async fn subscription_status(
     }
 
     let firebase_uid = auth.firebase_uid.unwrap_or_default();
+    let firebase_email = auth.firebase_email.clone().unwrap_or_default();
     let client = reqwest::Client::new();
 
-    // Look up customer by metadata
-    let customer_id = find_customer(&client, stripe_secret, &firebase_uid)
+    // Look up customer by Firebase UID metadata
+    let mut customer_id = find_customer(&client, stripe_secret, &firebase_uid)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+
+    // Fallback: search by email (e.g., customer created on website without Firebase UID)
+    if customer_id.is_none() && !firebase_email.is_empty() {
+        if let Some(cid) = find_customer_by_email(&client, stripe_secret, &firebase_email)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?
+        {
+            // Auto-link: add firebase_uid to this customer so future lookups are fast
+            let _ = client
+                .post(&format!("https://api.stripe.com/v1/customers/{cid}"))
+                .bearer_auth(stripe_secret)
+                .form(&[
+                    ("metadata[firebase_uid]", firebase_uid.as_str()),
+                    ("metadata[device_id]", &auth.device_id),
+                ])
+                .send()
+                .await;
+            tracing::info!(
+                customer = %cid,
+                firebase_uid = %firebase_uid,
+                email = %firebase_email,
+                "Auto-linked website Stripe customer to Firebase UID"
+            );
+            customer_id = Some(cid);
+        }
+    }
 
     let Some(customer_id) = customer_id else {
         return Ok(Json(SubscriptionStatusResponse {
@@ -340,6 +367,32 @@ async fn get_or_create_customer(
         .as_str()
         .map(|s| s.to_string())
         .ok_or_else(|| format!("No customer ID in response: {body}"))
+}
+
+/// Find a Stripe customer by email address
+async fn find_customer_by_email(
+    client: &reqwest::Client,
+    secret: &str,
+    email: &str,
+) -> Result<Option<String>, String> {
+    let resp = client
+        .get("https://api.stripe.com/v1/customers/search")
+        .bearer_auth(secret)
+        .query(&[("query", &format!("email:'{email}'"))])
+        .send()
+        .await
+        .map_err(|e| format!("Stripe search error: {e}"))?;
+
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Stripe parse error: {e}"))?;
+
+    Ok(body["data"]
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|c| c["id"].as_str())
+        .map(|s| s.to_string()))
 }
 
 /// Find a Stripe customer by Firebase UID metadata
