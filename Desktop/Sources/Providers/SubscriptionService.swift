@@ -122,15 +122,12 @@ final class SubscriptionService {
     }
 
     /// Whether the paywall should be shown right now.
-    /// Returns true when: (trial expired OR subscription expired) AND daily free limit exceeded.
+    /// Returns true when: no active Stripe subscription AND daily free limit exceeded.
     func shouldShowPaywall() -> Bool {
-        // Active subscribers never see the paywall
+        // Active subscribers (including trialing) never see the paywall
         if isActive { return false }
 
-        // During the trial period, no paywall
-        if !isTrialExpired { return false }
-
-        // After trial: allow 3 free messages per day, block on the 4th+
+        // No subscription: allow 3 free messages per day, block on the 4th+
         return dailyMessageCount > freeMessagesPerDay
     }
 
