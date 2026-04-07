@@ -157,6 +157,8 @@ struct SignInView: View {
                 UserDefaults.standard.set(true, forKey: "signInJustCompleted")
                 authState.update(isSignedIn: true, userEmail: AuthService.shared.userEmail)
                 authState.isLoading = false
+                // Refresh subscription status for the newly signed-in user
+                Task { await SubscriptionService.shared.refreshStatus() }
             } catch AuthError.cancelled {
                 authState.isLoading = false
             } catch {
