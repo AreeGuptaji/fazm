@@ -2054,7 +2054,20 @@ struct SettingsContentView: View {
 
                         Spacer()
 
-                        if !SubscriptionService.shared.isActive {
+                        if SubscriptionService.shared.isActive {
+                            Button(action: {
+                                Task { try? await SubscriptionService.shared.openBillingPortal() }
+                            }) {
+                                Text("Manage")
+                                    .scaledFont(size: 13, weight: .semibold)
+                                    .foregroundColor(FazmColors.textSecondary)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(FazmColors.bgTertiary)
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
                             Button(action: {
                                 AnalyticsManager.shared.subscriptionUpgradeTapped(source: "settings")
                                 Task { try? await SubscriptionService.shared.openCheckout() }
