@@ -1,5 +1,7 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    "Added Manage Subscription button in Settings for Fazm Pro subscribers"
+  ],
   "releases": [
     {
       "version": "2.1.2",
