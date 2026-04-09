@@ -2918,13 +2918,32 @@ class ChatProvider: ObservableObject {
                 messages[index].contentBlocks[lastBlockIndex] = .text(id: blockId, text: existing + buffered)
                 messages[index].text += buffered
             } else {
-                messages[index].contentBlocks.append(.text(id: UUID().uuidString, text: buffered))
-                // Add separator to plain text when starting a new text block
-                // so copy-paste and fallback rendering have proper paragraph breaks
-                if !messages[index].text.isEmpty {
-                    messages[index].text += "\n\n"
+                // Deduplicate: when the model repeats the same text after an
+                // internal tool call (e.g. ToolSearch for deferred tool loading),
+                // the second text block is identical to the last one. Skip it to
+                // avoid showing the same message twice in the UI.
+                let trimmed = buffered.trimmingCharacters(in: .whitespacesAndNewlines)
+                let isDuplicate: Bool = {
+                    // Find the last text block (may not be the very last block if tool calls are in between)
+                    for block in messages[index].contentBlocks.reversed() {
+                        if case .text(_, let existing) = block {
+                            return existing.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed
+                        }
+                    }
+                    return false
+                }()
+
+                if isDuplicate {
+                    // Skip the duplicate text block entirely
+                } else {
+                    messages[index].contentBlocks.append(.text(id: UUID().uuidString, text: buffered))
+                    // Add separator to plain text when starting a new text block
+                    // so copy-paste and fallback rendering have proper paragraph breaks
+                    if !messages[index].text.isEmpty {
+                        messages[index].text += "\n\n"
+                    }
+                    messages[index].text += buffered
                 }
-                messages[index].text += buffered
             }
             forceNewTextBlock = false
         }
