@@ -1655,9 +1655,6 @@ function handleSessionUpdate(
     }
 
     case "tool_call": {
-      // Mark that text after tool use should get a boundary separator
-      pendingBoundary = true;
-
       const toolCallId = (update.toolCallId as string) ?? "";
       let title = (update.title as string) ?? "unknown";
       const kind = (update.kind as string) ?? "";
@@ -1678,28 +1675,40 @@ function handleSessionUpdate(
         }
       }
 
-      if (status === "pending" || status === "in_progress") {
-        pendingTools.push(title);
-        send({
-          type: "tool_activity",
-          name: title,
-          status: "started",
-          toolUseId: toolCallId,
-        });
+      // ToolSearch is an internal ACP tool for loading deferred tool schemas.
+      // Hide it from the UI: don't set pendingBoundary (which would split
+      // the text into separate bubbles) and don't send tool_activity events.
+      const isInternalTool = title === "ToolSearch";
+      if (!isInternalTool) {
+        // Mark that text after tool use should get a boundary separator
+        pendingBoundary = true;
+      }
 
-        // Extract input from rawInput if available
-        const rawInput = update.rawInput as Record<string, unknown> | undefined;
-        if (rawInput && Object.keys(rawInput).length > 0) {
+      if (status === "pending" || status === "in_progress") {
+        if (!isInternalTool) {
+          pendingTools.push(title);
           send({
             type: "tool_activity",
             name: title,
             status: "started",
             toolUseId: toolCallId,
-            input: rawInput,
           });
+
+          // Extract input from rawInput if available
+          const rawInput = update.rawInput as Record<string, unknown> | undefined;
+          if (rawInput && Object.keys(rawInput).length > 0) {
+            send({
+              type: "tool_activity",
+              name: title,
+              status: "started",
+              toolUseId: toolCallId,
+              input: rawInput,
+            });
+          }
         }
 
         // Log tool start with input summary so hung tools are diagnosable
+        const rawInput = update.rawInput as Record<string, unknown> | undefined;
         const inputSummary = rawInput ? Object.entries(rawInput).map(([k, v]) => {
           const s = typeof v === "string" ? v : JSON.stringify(v);
           return `${k}=${s && s.length > 120 ? s.slice(0, 120) + "…" : s}`;
@@ -1723,17 +1732,22 @@ function handleSessionUpdate(
         }
       }
 
+      // ToolSearch is hidden from UI (see tool_call case)
+      const isInternalTool = title === "ToolSearch";
+
       if (status === "completed" || status === "failed" || status === "cancelled") {
         // Remove from pending
         const idx = pendingTools.indexOf(title);
         if (idx >= 0) pendingTools.splice(idx, 1);
 
-        send({
-          type: "tool_activity",
-          name: title,
-          status: "completed",
-          toolUseId: toolCallId,
-        });
+        if (!isInternalTool) {
+          send({
+            type: "tool_activity",
+            name: title,
+            status: "completed",
+            toolUseId: toolCallId,
+          });
+        }
 
         // Check if this is an MCP tool error (isError flag from MCP protocol)
         const isError = !!(update.isError ?? (update as Record<string, unknown>).is_error);
@@ -1791,7 +1805,7 @@ function handleSessionUpdate(
           }
         }
 
-        if (output) {
+        if (output && !isInternalTool) {
           const truncated =
             output.length > 2000
               ? output.slice(0, 2000) + "\n... (truncated)"
