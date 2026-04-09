@@ -1,6 +1,8 @@
 {
   "unreleased": [
-    "Added Manage Subscription button in Settings for Fazm Pro subscribers"
+    "Added Manage Subscription button in Settings for Fazm Pro subscribers",
+    "Fixed error messages not showing in pop-out chat window",
+    "Fixed follow-up messages replacing previous user messages when sent during a stuck loading state"
   ],
   "releases": [
     {
