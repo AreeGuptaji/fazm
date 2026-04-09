@@ -202,9 +202,12 @@ struct DetachedChatView: View {
                 state.suggestedReplies = []
                 state.suggestedReplyQuestion = ""
                 let currentQuery = state.displayedQuery
-                if let currentMessage = state.currentAIMessage, !currentQuery.isEmpty,
-                   !currentMessage.text.isEmpty || !currentMessage.contentBlocks.isEmpty {
-                    state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+                if !currentQuery.isEmpty {
+                    let aiMessage = state.currentAIMessage ?? ChatMessage(
+                        id: UUID().uuidString, text: "", createdAt: Date(), sender: .ai,
+                        isStreaming: false, rating: nil, isSynced: false, citations: [], contentBlocks: [], sessionKey: nil
+                    )
+                    state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: aiMessage))
                 }
                 state.flushPendingChatObserverExchanges()
                 state.displayedQuery = message
@@ -222,14 +225,18 @@ struct DetachedChatView: View {
             onSendNow: { item in
                 state.dequeue(item.id)
                 let currentQuery = state.displayedQuery
-                if var currentMessage = state.currentAIMessage, !currentQuery.isEmpty {
-                    currentMessage.contentBlocks = currentMessage.contentBlocks.map { block in
+                if !currentQuery.isEmpty {
+                    var aiMessage = state.currentAIMessage ?? ChatMessage(
+                        id: UUID().uuidString, text: "", createdAt: Date(), sender: .ai,
+                        isStreaming: false, rating: nil, isSynced: false, citations: [], contentBlocks: [], sessionKey: nil
+                    )
+                    aiMessage.contentBlocks = aiMessage.contentBlocks.map { block in
                         if case .toolCall(let id, let name, .running, let toolUseId, let input, let output) = block {
                             return .toolCall(id: id, name: name, status: .completed, toolUseId: toolUseId, input: input, output: output)
                         }
                         return block
                     }
-                    state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+                    state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: aiMessage))
                 }
                 state.flushPendingChatObserverExchanges()
                 state.displayedQuery = item.text
@@ -617,14 +624,18 @@ class DetachedChatWindowController {
                     // Skip archiving if onSendNow already set displayedQuery to this
                     // message. Otherwise a race with the $messages subscriber causes
                     // the same exchange to be archived twice (duplicate bubble).
-                    if currentQuery != dequeuedText, var currentMessage = aiMessage, !currentQuery.isEmpty {
-                        currentMessage.contentBlocks = currentMessage.contentBlocks.map { block in
+                    if currentQuery != dequeuedText, !currentQuery.isEmpty {
+                        var resolved = aiMessage ?? ChatMessage(
+                            id: UUID().uuidString, text: "", createdAt: Date(), sender: .ai,
+                            isStreaming: false, rating: nil, isSynced: false, citations: [], contentBlocks: [], sessionKey: nil
+                        )
+                        resolved.contentBlocks = resolved.contentBlocks.map { block in
                             if case .toolCall(let id, let name, .running, let toolUseId, let input, let output) = block {
                                 return .toolCall(id: id, name: name, status: .completed, toolUseId: toolUseId, input: input, output: output)
                             }
                             return block
                         }
-                        state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+                        state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: resolved))
                     }
                     state.flushPendingChatObserverExchanges()
                     if let text = dequeuedText {
