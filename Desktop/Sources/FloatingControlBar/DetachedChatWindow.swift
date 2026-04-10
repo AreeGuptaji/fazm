@@ -601,8 +601,7 @@ class DetachedChatWindowController {
         let provider = FloatingControlBarManager.shared.chatProvider
         guard let provider else { return }
 
-        if provider.isSending(sessionKey: sessionKey) {
-            // THIS window's session is busy: enqueue and wait for it to finish
+        if provider.isSending {
             provider.enqueueMessage(message, sessionKey: sessionKey)
             // Listen for when this message is dequeued so we can set up the response subscriber
             entries[winId]?.dequeueCancellable?.cancel()
@@ -658,8 +657,6 @@ class DetachedChatWindowController {
             return
         }
 
-        // Another session is busy (or idle): start this window's query directly.
-        // The bridge serializes internally; this window should not wait for unrelated sessions.
         startQuery(message: message, for: win, winId: winId, sessionKey: sessionKey, state: state, provider: provider)
     }
 
