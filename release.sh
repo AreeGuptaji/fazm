@@ -428,7 +428,7 @@ if [ -f "fazm_icon.icns" ]; then
 fi
 
 # Copy GoogleService-Info.plist for Firebase
-cp Desktop/Sources/GoogleService-Info.plist "$APP_BUNDLE/Contents/Resources/"
+cp Desktop/Sources/Resources/GoogleService-Info.plist "$APP_BUNDLE/Contents/Resources/"
 
 # Copy resource bundle (contains app assets like permissions.gif, herologo.png, etc.)
 # Note: Bundle goes in Contents/Resources/ - our custom BundleExtension.swift looks for it there
