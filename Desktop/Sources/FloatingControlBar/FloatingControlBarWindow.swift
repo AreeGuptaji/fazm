@@ -1495,6 +1495,8 @@ class FloatingControlBarManager {
                     self.window?.startNewChat()
                 } else if command == "popOut" {
                     self.popOutToWindow()
+                } else if command == "newPopOutChat" {
+                    self.popOutNewChat()
                 } else if command.hasPrefix("setModel:") {
                     let modelId = String(command.dropFirst("setModel:".count))
                     if ShortcutSettings.availableModels.contains(where: { $0.id == modelId }) {
