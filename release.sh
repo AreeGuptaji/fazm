@@ -768,6 +768,8 @@ $CHANGELOG_MD
 ### Downloads
 - **DMG Installer**: For fresh installs, download the DMG below
 - **Auto-Update**: Existing users will receive this update automatically
+
+<!-- edSignature="${ED_SIGNATURE:-}" -->
 EOF
 )
 
