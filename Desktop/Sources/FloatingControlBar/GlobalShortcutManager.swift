@@ -9,15 +9,18 @@ class GlobalShortcutManager {
 
     static let toggleFloatingBarNotification = Notification.Name("com.fazm.desktop.toggleFloatingBar")
     static let askAINotification = Notification.Name("com.fazm.desktop.askAI")
+    static let newPopOutChatNotification = Notification.Name("com.fazm.desktop.newPopOutChat")
 
     private var hotKeyRefs: [HotKeyID: EventHotKeyRef] = [:]
 
     private enum HotKeyID: UInt32 {
         case toggleBar = 1
         case askFazm = 2
+        case newPopOutChat = 3
     }
 
     private var shortcutObserver: NSObjectProtocol?
+    private var popOutChatObserver: NSObjectProtocol?
 
     private init() {
         var eventType = EventTypeSpec(
@@ -40,6 +43,15 @@ class GlobalShortcutManager {
         ) { [weak self] _ in
             self?.registerAskFazm()
         }
+
+        // Re-register New Pop-Out Chat shortcut when user changes it in settings
+        popOutChatObserver = NotificationCenter.default.addObserver(
+            forName: ShortcutSettings.newPopOutChatShortcutChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.registerNewPopOutChat()
+        }
     }
 
     func registerShortcuts() {
@@ -48,6 +60,8 @@ class GlobalShortcutManager {
         registerHotKey(keyCode: 42, modifiers: Int(cmdKey), id: .toggleBar)
         // Register Ask Fazm shortcut from user settings
         registerAskFazm()
+        // Register New Pop-Out Chat shortcut from user settings
+        registerNewPopOutChat()
     }
 
     private func registerAskFazm() {
