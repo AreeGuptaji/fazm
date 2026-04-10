@@ -2138,6 +2138,16 @@ class ChatProvider: ObservableObject {
         log("ChatProvider: pending queue cleared")
     }
 
+    /// Clear pending messages for a specific session only.
+    func clearPendingMessages(forSession sessionKey: String) {
+        let before = pendingMessages.count
+        pendingMessages.removeAll { $0.sessionKey == sessionKey }
+        let removed = before - pendingMessages.count
+        if removed > 0 {
+            log("ChatProvider: cleared \(removed) pending messages for session \(sessionKey)")
+        }
+    }
+
     // MARK: - Send Message
 
     /// Send a message and get AI response via Claude Agent SDK bridge
