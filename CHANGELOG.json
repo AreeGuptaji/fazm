@@ -3,7 +3,8 @@
     "Fixed pop-out windows not restoring after app update or restart",
     "Fixed suggested replies persisting after starting a new chat",
     "Fixed typing indicator flickering during network retries by adding a 600ms debounce",
-    "Added global shortcut (\u2318\u21e7N) to open a new pop-out chat window from anywhere"
+    "Added global shortcut (\u2318\u21e7N) to open a new pop-out chat window from anywhere",
+    "Fixed duplicate AI response bubble appearing in pop-out window after sending a follow-up question"
   ],
   "releases": [
     {
