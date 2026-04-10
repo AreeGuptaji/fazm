@@ -207,7 +207,7 @@ struct PaywallSheet: View {
 
             // Features list
             VStack(alignment: .leading, spacing: 6) {
-                featureRow("Unlimited AI messages")
+                featureRow("AI agent with full desktop control")
                 featureRow("Voice and text queries")
                 featureRow("Screen context awareness")
             }
