@@ -801,6 +801,8 @@ struct SettingsContentView: View {
     // MARK: - AI Chat Section
 
     @AppStorage("bridgeMode") private var bridgeMode: String = "builtin"
+    @AppStorage("customApiEndpoint") private var customApiEndpoint: String = ""
+    @State private var showCustomEndpoint: Bool = false
 
     private var aiChatSection: some View {
         VStack(spacing: 20) {
@@ -861,6 +863,54 @@ struct SettingsContentView: View {
                             .scaledFont(size: 12, weight: .medium)
                             .foregroundColor(.red)
                         }
+                    }
+                }
+            }
+
+            // Custom API Endpoint (advanced)
+            settingsCard(settingId: "aichat.endpoint") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "server.rack")
+                            .scaledFont(size: 16)
+                            .foregroundColor(FazmColors.textTertiary)
+
+                        Text("Custom API Endpoint")
+                            .scaledFont(size: 15, weight: .semibold)
+                            .foregroundColor(FazmColors.textPrimary)
+
+                        Spacer()
+
+                        Toggle("", isOn: Binding(
+                            get: { showCustomEndpoint || !customApiEndpoint.isEmpty },
+                            set: { newValue in
+                                showCustomEndpoint = newValue
+                                if !newValue {
+                                    customApiEndpoint = ""
+                                    Task { await chatProvider?.restartBridgeForEndpointChange() }
+                                }
+                            }
+                        ))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                    }
+
+                    if showCustomEndpoint || !customApiEndpoint.isEmpty {
+                        TextField("https://your-proxy:8766", text: $customApiEndpoint)
+                            .textFieldStyle(.roundedBorder)
+                            .scaledFont(size: 13)
+                            .onSubmit {
+                                Task { await chatProvider?.restartBridgeForEndpointChange() }
+                            }
+
+                        Text("Route API calls through a custom endpoint (e.g. corporate proxy, GitHub Copilot bridge). Leave empty to use the default Anthropic API.")
+                            .scaledFont(size: 12)
+                            .foregroundColor(FazmColors.textTertiary)
+                    } else {
+                        Text("Override the Anthropic API URL for proxies or custom gateways.")
+                            .scaledFont(size: 12)
+                            .foregroundColor(FazmColors.textTertiary)
                     }
                 }
             }
@@ -1361,6 +1411,7 @@ struct SettingsContentView: View {
         .onAppear {
             refreshAIChatConfig()
             playwrightExtensionToken = UserDefaults.standard.string(forKey: "playwrightExtensionToken") ?? ""
+            showCustomEndpoint = !customApiEndpoint.isEmpty
         }
         .sheet(isPresented: $showFileViewer) {
             fileViewerSheet
