@@ -270,7 +270,15 @@ export function useDesktopRelay(token: string | null): RelayHook {
 
   const sendMessage = useCallback(
     (text: string) => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        console.error(
+          "[useDesktopRelay] sendMessage called but WebSocket is not open (state:",
+          wsRef.current?.readyState,
+          "). Triggering reconnect."
+        );
+        connectRef.current();
+        return;
+      }
 
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
