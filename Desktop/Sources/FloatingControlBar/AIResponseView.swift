@@ -833,7 +833,7 @@ struct AIResponseView: View {
         HStack(alignment: .bottom, spacing: 6) {
             ZStack(alignment: .topLeading) {
                 if followUpText.isEmpty {
-                    Text(isAgentBusy ? "Type next question (queued)..." : "Ask follow up...")
+                    Text(isLoading && isThisSessionStreaming ? "Type next question (queued)..." : "Ask follow up...")
                         .scaledFont(size: 13)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 8)
@@ -911,8 +911,8 @@ struct AIResponseView: View {
         }
     }
 
-    private var isAgentBusy: Bool {
-        isLoading || currentMessage?.isStreaming == true
+    private var isThisSessionStreaming: Bool {
+        currentMessage?.isStreaming == true
     }
 
     private func sendFollowUp() {
@@ -920,10 +920,12 @@ struct AIResponseView: View {
         guard !trimmed.isEmpty else { return }
         followUpText = ""
 
-        if isAgentBusy {
-            // Agent is busy — queue the message instead of interrupting
+        if isLoading && isThisSessionStreaming {
+            // THIS window is actively streaming a response — queue the message
             onEnqueueMessage?(trimmed)
         } else {
+            // Window is idle (or another window is busy) — always render the user
+            // message immediately. sendQuery handles bridge serialization via the queue.
             onSendFollowUp?(trimmed)
         }
     }
