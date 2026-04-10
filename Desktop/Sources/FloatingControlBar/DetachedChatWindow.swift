@@ -524,8 +524,14 @@ class DetachedChatWindowController {
             }
         }
 
-        win.onClearQueue = { [weak chatProvider] in
-            chatProvider?.clearPendingMessages()
+        win.onClearQueue = { [weak self, weak win, weak chatProvider] in
+            guard let win else { return }
+            let key = self?.entries[ObjectIdentifier(win)]?.sessionKey
+            if let key {
+                chatProvider?.clearPendingMessages(forSession: key)
+            } else {
+                chatProvider?.clearPendingMessages()
+            }
         }
 
         win.onReorderQueue = { [weak chatProvider] source, dest in
