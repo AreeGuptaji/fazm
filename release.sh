@@ -510,6 +510,15 @@ if [ -f "$NODE_BUNDLE_PATH" ]; then
         "$NODE_BUNDLE_PATH"
 fi
 
+# Sign cloudflared binary in resource bundle (if present)
+CLOUDFLARED_BUNDLE_PATH="$APP_BUNDLE/Contents/Resources/Fazm_Fazm.bundle/cloudflared"
+if [ -f "$CLOUDFLARED_BUNDLE_PATH" ]; then
+    echo "  Signing cloudflared binary..."
+    codesign --force --options runtime --timestamp \
+        --sign "$SIGN_IDENTITY" \
+        "$CLOUDFLARED_BUNDLE_PATH"
+fi
+
 # Sign ALL native binaries in acp-bridge node_modules
 # Apple notarization requires every binary/dylib/jnilib to be signed
 ACP_BRIDGE_BUNDLE="$APP_BUNDLE/Contents/Resources/acp-bridge"
