@@ -2061,6 +2061,15 @@ class ChatProvider: ObservableObject {
         acpBridgeStarted = false
     }
 
+    /// Stop the ACP bridge so it picks up the new custom API endpoint on next start.
+    func restartBridgeForEndpointChange() async {
+        guard acpBridgeStarted else { return }
+        let endpoint = UserDefaults.standard.string(forKey: "customApiEndpoint") ?? ""
+        log("ChatProvider: Stopping bridge to apply custom endpoint change (endpoint=\(endpoint.isEmpty ? "default" : endpoint), will restart on next query)")
+        await acpBridge.stop()
+        acpBridgeStarted = false
+    }
+
     /// Stop the ACP bridge so it picks up the new voice response setting on next start.
     func restartBridgeForVoiceResponse() async {
         guard acpBridgeStarted else { return }
