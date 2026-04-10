@@ -4,7 +4,8 @@
     "Fixed suggested replies persisting after starting a new chat",
     "Fixed typing indicator flickering during network retries by adding a 600ms debounce",
     "Added global shortcut (\u2318\u21e7N) to open a new pop-out chat window from anywhere",
-    "Fixed duplicate AI response bubble appearing in pop-out window after sending a follow-up question"
+    "Fixed duplicate AI response bubble appearing in pop-out window after sending a follow-up question",
+    "Added custom API endpoint setting for proxies and corporate gateways"
   ],
   "releases": [
     {
