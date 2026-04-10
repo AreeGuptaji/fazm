@@ -1945,6 +1945,27 @@ class FloatingControlBarManager {
         window.closeAIConversation()
     }
 
+    /// Create a new detached pop-out chat window with an empty conversation.
+    /// Triggered by the global "New Pop-Out Chat" shortcut.
+    func popOutNewChat() {
+        guard let provider = chatProvider else { return }
+
+        log("FloatingControlBarManager: Creating new pop-out chat window via global shortcut")
+        AnalyticsManager.shared.floatingBarChatPoppedOut(historyCount: 0)
+
+        let detachedSessionKey = "detached-\(UUID().uuidString)"
+
+        DetachedChatWindowController.shared.show(
+            chatHistory: [],
+            displayedQuery: "",
+            currentAIMessage: nil,
+            isAILoading: false,
+            chatProvider: provider,
+            messageCountBefore: provider.messages.count,
+            sessionKey: detachedSessionKey
+        )
+    }
+
     /// Re-send the pending message that was interrupted by browser extension setup.
     /// Opens the floating bar and routes through `sendAIQuery` so streaming is wired up.
     ///
