@@ -130,6 +130,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var windowObservers: [NSObjectProtocol] = []
     private var statusBarItem: NSStatusItem?
     private var toggleBarObserver: NSObjectProtocol?
+    private var newPopOutChatObserver: NSObjectProtocol?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Crash-loop detection must run before ANY other init.
@@ -345,6 +346,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ) { _ in
             Task { @MainActor in
                 FloatingControlBarManager.shared.toggle()
+            }
+        }
+
+        newPopOutChatObserver = NotificationCenter.default.addObserver(
+            forName: GlobalShortcutManager.newPopOutChatNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                FloatingControlBarManager.shared.popOutNewChat()
             }
         }
 
