@@ -1072,7 +1072,7 @@ class ChatProvider: ObservableObject {
             // Only remove floating-session messages; preserve detached-session messages
             // so in-flight queries in popped-out windows aren't destroyed.
             messages.removeAll { ($0.sessionKey ?? "floating") == "floating" }
-            pendingMessages.removeAll()
+            pendingMessages.removeAll { ($0.sessionKey ?? "floating") == "floating" }
             floatingChatSessionId = UUID().uuidString
         }
     }
@@ -1108,7 +1108,7 @@ class ChatProvider: ObservableObject {
             // Messages are cleared lazily: either when the detached window's subscriber
             // calls clearFloatingMessages() after the query finishes, or when the
             // floating bar starts a new chat (resetSession).
-            pendingMessages.removeAll()
+            pendingMessages.removeAll { ($0.sessionKey ?? "floating") == "floating" }
             floatingChatSessionId = UUID().uuidString
 
             // Re-key the bridge's in-memory session from "floating" to the detached key
