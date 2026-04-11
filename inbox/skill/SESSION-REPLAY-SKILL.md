@@ -192,7 +192,7 @@ node ~/fazm/inbox/scripts/mark-device-investigated.js DEVICE_ID "BRIEF_SUMMARY"
 
 **Analytics orchestrate API (for session recording data):**
 ```bash
-curl -s "https://omi-analytics.vercel.app/api/session-recordings/orchestrate?action=analyses&deviceId=DEVICE_ID" \
+curl -s "https://dash.m13v.com/api/session-recordings/orchestrate?action=analyses&deviceId=DEVICE_ID" \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
 

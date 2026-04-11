@@ -140,7 +140,7 @@ If no notable findings:
 
 **User queries API:**
 ```bash
-curl -s "https://omi-analytics.vercel.app/api/posthog/queries?limit=500&after=TIMESTAMP"
+curl -s "https://dash.m13v.com/api/posthog/queries?limit=500&after=TIMESTAMP"
 ```
 
 **PostHog (for user investigation):**
