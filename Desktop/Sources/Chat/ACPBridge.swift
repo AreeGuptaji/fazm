@@ -190,12 +190,10 @@ actor ACPBridge {
 
   /// How the bridge authenticates with Claude
   enum BridgeMode {
-    /// User's own Claude account via OAuth (strip API key + Vertex vars)
+    /// User's own Claude account via OAuth (strip API key)
     case personalOAuth
     /// Bundled Anthropic API key (direct API, fastest)
     case bundledKey(apiKey: String)
-    /// Vertex AI via Workload Identity Federation
-    case vertex(adcFilePath: String, projectId: String, region: String)
 
     var isPersonalOAuth: Bool {
       if case .personalOAuth = self { return true }
@@ -326,16 +324,8 @@ actor ACPBridge {
     switch mode {
     case .personalOAuth:
       env.removeValue(forKey: "ANTHROPIC_API_KEY")
-      env.removeValue(forKey: "CLAUDE_CODE_USE_VERTEX")
     case .bundledKey(let apiKey):
       env["ANTHROPIC_API_KEY"] = apiKey
-      env.removeValue(forKey: "CLAUDE_CODE_USE_VERTEX")
-    case .vertex(let adcFilePath, let projectId, let region):
-      env.removeValue(forKey: "ANTHROPIC_API_KEY")
-      env["CLAUDE_CODE_USE_VERTEX"] = "1"
-      env["GOOGLE_APPLICATION_CREDENTIALS"] = adcFilePath
-      env["ANTHROPIC_VERTEX_PROJECT_ID"] = projectId
-      env["CLOUD_ML_REGION"] = region
     }
 
     // Ensure the directory containing node is in PATH
