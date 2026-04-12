@@ -1,5 +1,7 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    "Fixed duplicate AI response appearing in pop-out and floating bar when sending follow-up messages"
+  ],
   "releases": [
     {
       "version": "2.2.0",
