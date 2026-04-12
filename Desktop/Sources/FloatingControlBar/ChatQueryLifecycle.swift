@@ -17,19 +17,35 @@ enum ChatQueryLifecycle {
     ///   - provider: The ChatProvider that just finished a query.
     ///   - state: The FloatingControlBarState to update with error/auth UI.
     ///   - sessionKey: The session key used for the query (to sync latest AI message).
+    ///   - messageCountBefore: Message count before the query started. When provided,
+    ///     only messages added since this index are considered for AI message sync,
+    ///     preventing a stale prior AI response from being re-set as currentAIMessage.
     static func handlePostQuery(
         provider: ChatProvider,
         state: FloatingControlBarState,
-        sessionKey: String
+        sessionKey: String,
+        messageCountBefore: Int? = nil
     ) {
         state.isAILoading = false
 
         // Sync the latest AI message directly from provider.messages to close the
         // race window where sendMessage has returned but the Combine $messages sink
         // (scheduled via .receive(on: .main)) hasn't fired yet.
-        if let latestAI = provider.messages.last(where: { $0.sender == .ai && $0.sessionKey == sessionKey }),
+        // Only search messages added AFTER this query started (the new slice) to
+        // avoid re-setting currentAIMessage to a stale prior AI response, which
+        // produces a duplicate bubble when the same message is also in chatHistory.
+        let searchRange: ArraySlice<ChatMessage>
+        if let start = messageCountBefore, start < provider.messages.count {
+            searchRange = provider.messages[start...]
+        } else {
+            searchRange = provider.messages[provider.messages.startIndex...]
+        }
+        if let latestAI = searchRange.last(where: { $0.sender == .ai && $0.sessionKey == sessionKey }),
            !latestAI.text.isEmpty || !latestAI.contentBlocks.isEmpty {
+            log("ChatQueryLifecycle: handlePostQuery synced AI message id=\(latestAI.id) session=\(sessionKey) fromSlice=\(messageCountBefore != nil)")
             state.currentAIMessage = latestAI
+        } else {
+            log("ChatQueryLifecycle: handlePostQuery found no new AI in \(searchRange.count) message(s) for session=\(sessionKey)")
         }
 
         // Don't update state if the conversation was closed while the query was in flight.
