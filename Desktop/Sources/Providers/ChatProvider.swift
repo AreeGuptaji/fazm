@@ -405,12 +405,11 @@ class ChatProvider: ObservableObject {
     // MARK: - Web Relay (phone → desktop tunnel)
     let webRelay = WebRelay()
 
-    // MARK: - Bridge (prefers user's Claude session, falls back to Vertex or bundled key)
+    // MARK: - Bridge (prefers user's Claude session, falls back to bundled Anthropic API key)
     private lazy var acpBridge: ACPBridge = {
         return createBridge()
     }()
     private var acpBridgeStarted = false
-    private var vertexTokenManager: VertexTokenManager?
 
     /// Whether the paywall should be shown (blocks AI response until subscription)
     @Published var showPaywall = false
@@ -462,16 +461,7 @@ class ChatProvider: ObservableObject {
                 log("ChatProvider: Using bundled Anthropic API key (direct API)")
                 return ACPBridge(mode: .bundledKey(apiKey: apiKey))
             }
-            // Fallback: try Vertex if bundled key is unavailable
-            if vertexTokenManager != nil {
-                let tmpDir = NSTemporaryDirectory()
-                let adcPath = (tmpDir as NSString).appendingPathComponent("fazm-vertex-adc.json")
-                let projectId = { if let p = getenv("VERTEX_PROJECT_ID") { return String(cString: p) } else { return "fazm-prod" } }()
-                let region = { if let r = getenv("VERTEX_REGION") { return String(cString: r) } else { return "us-east5" } }()
-                log("ChatProvider: Falling back to Vertex mode (ADC=\(adcPath))")
-                return ACPBridge(mode: .vertex(adcFilePath: adcPath, projectId: projectId, region: region))
-            }
-            log("ChatProvider: No bundled key or Vertex available, falling back to personal OAuth")
+            log("ChatProvider: No bundled key available, falling back to personal OAuth")
             return ACPBridge(mode: .personalOAuth)
         } else {
             // Personal mode: always use OAuth
@@ -556,24 +546,6 @@ class ChatProvider: ObservableObject {
         // Stop current bridge
         await acpBridge.stop()
         acpBridgeStarted = false
-
-        // Tear down or set up vertex token manager
-        if newMode == "builtin" {
-            let vtm = VertexTokenManager()
-            vertexTokenManager = vtm
-            do {
-                let config = try await vtm.setup()
-                await vtm.startRefreshLoop()
-                log("ChatProvider: Vertex token manager set up (project=\(config.projectId), region=\(config.region))")
-            } catch {
-                logError("ChatProvider: Vertex setup failed, falling back to API key", error: error)
-            }
-        } else {
-            if let vtm = vertexTokenManager {
-                await vtm.stop()
-                vertexTokenManager = nil
-            }
-        }
 
         bridgeMode = newMode
         acpBridge = createBridge()
@@ -933,27 +905,6 @@ class ChatProvider: ObservableObject {
 
         // Ensure API keys are fetched before checking availability
         await KeyService.shared.ensureKeys()
-
-        // Set up Vertex token manager for Gemini API access.
-        if vertexTokenManager == nil {
-            let vtm = VertexTokenManager()
-            if await vtm.isConfigured {
-                do {
-                    let config = try await vtm.setup()
-                    vertexTokenManager = vtm
-                    await vtm.startRefreshLoop()
-                    log("ChatProvider: Vertex token manager set up (project=\(config.projectId), region=\(config.region))")
-                    // If builtin mode with no Anthropic key, recreate bridge to use Vertex for chat too
-                    if bridgeMode == "builtin" && (KeyService.shared.anthropicAPIKey ?? "").isEmpty {
-                        acpBridge = createBridge()
-                    }
-                } catch {
-                    logError("ChatProvider: Vertex setup failed on bridge start", error: error)
-                }
-            } else {
-                log("ChatProvider: Vertex env vars not configured")
-            }
-        }
 
         do {
             try await acpBridge.start()
