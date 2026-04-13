@@ -80,6 +80,15 @@ function send(msg: OutboundMessage): void {
   }
 }
 
+/** Send a message tagged with the query's sessionId for concurrent demuxing */
+function sendWithSession(sessionId: string | undefined, msg: OutboundMessage): void {
+  if (sessionId) {
+    send({ ...msg, sessionId } as OutboundMessage);
+  } else {
+    send(msg);
+  }
+}
+
 function logErr(msg: string): void {
   try {
     process.stderr.write(`[acp-bridge] ${msg}\n`);
@@ -1610,6 +1619,12 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
     if (activeAbort === abortController) {
       activeAbort = null;
     }
+    // Clean up per-session state
+    if (queryCtx) {
+      sessionNotificationHandlers.delete(queryCtx.sessionId);
+      activeQueries.delete(queryCtx.sessionKey);
+    }
+    // Legacy: clear global handler if it's still set (backward compat)
     acpNotificationHandler = null;
   }
 }
@@ -1632,8 +1647,10 @@ function handleSessionUpdate(
   params: Record<string, unknown>,
   pendingTools: string[],
   onText: (text: string) => void,
-  taskTracking?: { currentTurnTaskIds: Set<string>; onStaleNotification: () => void }
+  taskTracking?: { currentTurnTaskIds: Set<string>; onStaleNotification: () => void },
+  ctx?: QueryContext
 ): void {
+  const sid = ctx?.sessionId;
   const update = params.update as Record<string, unknown> | undefined;
   if (!update) {
     logErr(`session/update missing 'update' field: ${JSON.stringify(params).slice(0, 200)}`);
