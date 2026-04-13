@@ -319,6 +319,9 @@ class ChatProvider: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isLoading = false
     @Published var isSending = false
+    /// Per-session send state. Enables concurrent queries across sessions
+    /// (pop-out windows) while preserving the global `isSending` for legacy bindings.
+    @Published private(set) var sendingSessionKeys: Set<String> = []
     @Published var isStopping = false
     /// Number of pending messages at the time the user clicked Stop.
     /// Messages enqueued after this point should still be drained on completion.
@@ -1995,6 +1998,20 @@ class ChatProvider: ObservableObject {
         // Result flows back normally through the bridge with partial text
     }
 
+    /// Stop the running agent for a specific session only. Other concurrent sessions continue.
+    func stopAgent(sessionKey: String) {
+        guard sendingSessionKeys.contains(sessionKey) else { return }
+        log("ChatProvider: user stopped agent for session=\(sessionKey)")
+        Task {
+            await acpBridge.interrupt(sessionKey: sessionKey)
+        }
+    }
+
+    /// Returns true if a query is currently in flight for the given session key.
+    func isSending(sessionKey: String) -> Bool {
+        return sendingSessionKeys.contains(sessionKey)
+    }
+
     /// Re-send the message that was interrupted by browser extension setup.
     func retryPendingMessage() {
         guard let text = pendingRetryMessage else { return }
@@ -2138,22 +2155,23 @@ class ChatProvider: ObservableObject {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
 
-        // Guard against concurrent sendMessage calls.
-        // The bridge uses a single message continuation, so concurrent queries
-        // would cause responses to be consumed by the wrong caller.
-        // Set isSending=true immediately (before any await) to close the race
-        // window where multiple calls could pass this guard concurrently.
-        guard !isSending else {
-            log("ChatProvider: sendMessage called while already sending, ignoring")
+        // Per-session guard: allow concurrent queries for different session keys
+        // (e.g. different pop-out windows), but block the same session from
+        // double-sending. Set state immediately (before any await) to close the
+        // race window where multiple calls could pass this guard concurrently.
+        let effectiveKey = sessionKey ?? activeSessionKey ?? "__default__"
+        guard !sendingSessionKeys.contains(effectiveKey) else {
+            log("ChatProvider: sendMessage called while session=\(effectiveKey) already sending, ignoring")
             AnalyticsManager.shared.chatMessageDropped(
                 messageLength: trimmedText.count,
                 reason: "concurrent_send"
             )
             let breadcrumb = Breadcrumb(level: .warning, category: "chat")
-            breadcrumb.message = "sendMessage dropped: already sending (\(trimmedText.prefix(50))...)"
+            breadcrumb.message = "sendMessage dropped: session \(effectiveKey) already sending (\(trimmedText.prefix(50))...)"
             SentrySDK.addBreadcrumb(breadcrumb)
             return
         }
+        sendingSessionKeys.insert(effectiveKey)
         isSending = true
 
         // Notify observers (e.g. floating bar) that a new query is starting
