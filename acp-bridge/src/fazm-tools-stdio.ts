@@ -163,7 +163,8 @@ async function requestSwiftTool(
         resolve(result);
       },
     });
-    const msg = JSON.stringify({ type: "tool_use", callId, name, input });
+    const sessionKey = process.env.FAZM_SESSION_KEY;
+    const msg = JSON.stringify({ type: "tool_use", callId, name, input, ...(sessionKey && { sessionKey }) });
     pipeConnection!.write(msg + "\n");
   });
 }
