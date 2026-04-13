@@ -658,13 +658,22 @@ actor ACPBridge {
       throw BridgeError.encodingError
     }
 
-    isInterrupted = false
-    acpToolsRunning = 0
-    // Discard any stale messages from a previous interrupted/timed-out query
-    // to avoid desynchronizing the request-response protocol.
-    if !pendingMessages.isEmpty {
-      log("ACPBridge: clearing \(pendingMessages.count) stale pending messages before new query")
-      pendingMessages.removeAll()
+    // Reset per-query interrupt flag
+    if let sk = sessionKey {
+      sessionInterrupted[sk] = false
+      sessionAcpToolsRunning[sk] = 0
+      // Clear any stale messages for this session from a previous interrupted query
+      if let queue = sessionPendingMessages[sk], !queue.isEmpty {
+        log("ACPBridge: clearing \(queue.count) stale pending messages for session=\(sk)")
+        sessionPendingMessages[sk] = nil
+      }
+    } else {
+      isInterrupted = false
+      acpToolsRunning = 0
+      if !pendingMessages.isEmpty {
+        log("ACPBridge: clearing \(pendingMessages.count) stale pending messages before new query")
+        pendingMessages.removeAll()
+      }
     }
     sendLine(jsonString)
 
@@ -907,11 +916,18 @@ actor ACPBridge {
   private static func parseMessage(_ json: String) -> (message: InboundMessage, sessionKey: String?)? {
     guard let data = json.data(using: .utf8),
       let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      let type = dict["type"] as? String
+      let _ = dict["type"] as? String
     else {
       logError("ACPBridge: failed to parse message: \(json.prefix(200))")
       return nil
     }
+    let sessionKey = dict["sessionKey"] as? String
+    guard let inner = parseMessageInner(dict) else { return nil }
+    return (inner, sessionKey)
+  }
+
+  private static func parseMessageInner(_ dict: [String: Any]) -> InboundMessage? {
+    guard let type = dict["type"] as? String else { return nil }
 
     switch type {
     case "init":
@@ -1045,7 +1061,7 @@ actor ACPBridge {
     }
   }
 
-  private func deliverMessage(_ message: InboundMessage) {
+  private func deliverMessage(_ message: InboundMessage, sessionKey: String? = nil) {
     // Handle auth messages via global handlers. Auth UI state (sheets, buttons)
     // must update regardless of whether a query is in-flight. For auth_required,
     // only fire the global handler when no query is active (the query loop handles
@@ -1108,9 +1124,78 @@ actor ACPBridge {
       break
     }
 
+    // Route by sessionKey if available; otherwise fall back to legacy single queue.
+    if let key = sessionKey, let box = sessionContinuations[key] {
+      if !box.resume(returning: message) {
+        var queue = sessionPendingMessages[key] ?? []
+        queue.append(message)
+        sessionPendingMessages[key] = queue
+      }
+      return
+    }
+    // If a sessionKey is present but no box exists yet, queue per-session so the
+    // waiter picks it up when it registers.
+    if let key = sessionKey {
+      var queue = sessionPendingMessages[key] ?? []
+      queue.append(message)
+      sessionPendingMessages[key] = queue
+      return
+    }
+    // No sessionKey — legacy path (auth, observer, bridge init)
     if !continuationBox.resume(returning: message) {
       pendingMessages.append(message)
     }
+  }
+
+  /// Wait for a message on a specific session's queue. Concurrent-safe.
+  private func waitForMessage(sessionKey: String, timeout: TimeInterval? = nil) async throws -> InboundMessage {
+    // Drain any queued pending messages first
+    if var queue = sessionPendingMessages[sessionKey], !queue.isEmpty {
+      let msg = queue.removeFirst()
+      sessionPendingMessages[sessionKey] = queue.isEmpty ? nil : queue
+      return msg
+    }
+    guard isRunning else {
+      throw BridgeError.stopped
+    }
+
+    let box = sessionContinuations[sessionKey] ?? {
+      let b = ContinuationBox<InboundMessage, Error>()
+      sessionContinuations[sessionKey] = b
+      return b
+    }()
+    let gen = (sessionMessageGenerations[sessionKey] ?? 0) &+ 1
+    sessionMessageGenerations[sessionKey] = gen
+
+    return try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation { continuation in
+        box.store(continuation, generation: gen)
+        if let timeout = timeout {
+          Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            // Defer timeout if ACP tools are running for this session
+            var deferrals = 0
+            let maxDeferrals = 3
+            while box.isPending(generation: gen),
+                  (await self?.getSessionAcpToolsRunning(sessionKey) ?? 0) > 0,
+                  deferrals < maxDeferrals {
+              deferrals += 1
+              log("ACPBridge: waitForMessage[\(sessionKey)] timeout deferred (\(deferrals)/\(maxDeferrals))")
+              try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            }
+            if box.resume(throwing: BridgeError.timeout, ifGeneration: gen) {
+              log("ACPBridge: waitForMessage[\(sessionKey)] timeout fired after \(timeout)s")
+            }
+          }
+        }
+      }
+    } onCancel: {
+      box.resume(throwing: CancellationError(), ifGeneration: gen)
+    }
+  }
+
+  private func getSessionAcpToolsRunning(_ sessionKey: String) -> Int {
+    return sessionAcpToolsRunning[sessionKey] ?? 0
   }
 
   private func waitForMessage(timeout: TimeInterval? = nil) async throws -> InboundMessage {
