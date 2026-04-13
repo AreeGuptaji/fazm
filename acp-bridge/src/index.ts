@@ -1085,6 +1085,8 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
   let retryingWithHint = false;
   let sessionRetryCount = 0;
   const pendingTools: string[] = [];
+  // Per-query text tracking is initialized in queryCtx below; keep legacy
+  // globals for backward compat with any code paths that don't use ctx.
   lastTextContentBlockIndex = -1;
   pendingBoundary = false;
 
@@ -1685,12 +1687,14 @@ function handleSessionUpdate(
         // Signal a boundary between text blocks:
         // - when content block index changes within a single response
         // - when resuming text after a tool call (pendingBoundary)
-        if (pendingBoundary || (blockIndex >= 0 && lastTextContentBlockIndex >= 0 && blockIndex !== lastTextContentBlockIndex)) {
+        const effPendingBoundary = ctx ? ctx.pendingBoundary : pendingBoundary;
+        const effLastIndex = ctx ? ctx.lastTextContentBlockIndex : lastTextContentBlockIndex;
+        if (effPendingBoundary || (blockIndex >= 0 && effLastIndex >= 0 && blockIndex !== effLastIndex)) {
           sendWithSession(sid, { type: "text_block_boundary" });
-          pendingBoundary = false;
+          if (ctx) ctx.pendingBoundary = false; else pendingBoundary = false;
         }
         if (blockIndex >= 0) {
-          lastTextContentBlockIndex = blockIndex;
+          if (ctx) ctx.lastTextContentBlockIndex = blockIndex; else lastTextContentBlockIndex = blockIndex;
         }
 
         onText(text);
@@ -1735,7 +1739,7 @@ function handleSessionUpdate(
       const isInternalTool = title === "ToolSearch";
       if (!isInternalTool) {
         // Mark that text after tool use should get a boundary separator
-        pendingBoundary = true;
+        if (ctx) ctx.pendingBoundary = true; else pendingBoundary = true;
       }
 
       if (status === "pending" || status === "in_progress") {
