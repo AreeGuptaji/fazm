@@ -276,10 +276,15 @@ struct AIResponseView: View {
         }
     }
 
-    @AppStorage("aiChatWorkingDirectory") private var aiChatWorkingDirectory: String = ""
+    @AppStorage("aiChatWorkingDirectory") private var globalWorkspaceDirectory: String = ""
     @State private var connectClaudePulse = false
     @State private var showWorkspaceChangeConfirmation = false
     @State private var showWorkspaceInfo = false
+
+    /// The effective workspace for this view: per-window state if set, otherwise global default.
+    private var aiChatWorkingDirectory: String {
+        state.workspaceDirectory.isEmpty ? globalWorkspaceDirectory : state.workspaceDirectory
+    }
 
     private func scrollToBottom(proxy: ScrollViewProxy, anchor: String = "bottom") {
         isProgrammaticScroll = true
