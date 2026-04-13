@@ -2146,7 +2146,7 @@ class ChatProvider: ObservableObject {
     /// - Parameters:
     ///   - text: The message text
     ///   - model: Optional model override for this query (e.g. "claude-sonnet-4-6" for floating bar)
-    func sendMessage(_ text: String, model: String? = nil, isFollowUp: Bool = false, systemPromptSuffix: String? = nil, systemPromptPrefix: String? = nil, sessionKey: String? = nil, resume: String? = nil) async {
+    func sendMessage(_ text: String, model: String? = nil, isFollowUp: Bool = false, systemPromptSuffix: String? = nil, systemPromptPrefix: String? = nil, sessionKey: String? = nil, resume: String? = nil, cwd: String? = nil) async {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
 
@@ -2469,12 +2469,13 @@ class ChatProvider: ObservableObject {
                 }
             }
 
-            log("Chat query started (session=\(sessionKey ?? "main"), mode=\(bridgeMode), model=\(model ?? modelOverride ?? "default"))")
+            let effectiveCwd = cwd ?? workingDirectory
+            log("Chat query started (session=\(sessionKey ?? "main"), mode=\(bridgeMode), model=\(model ?? modelOverride ?? "default"), cwd=\(effectiveCwd ?? "nil"))")
             let queryResult = try await acpBridge.query(
                 prompt: trimmedText,
                 systemPrompt: systemPrompt,
                 sessionKey: isOnboarding ? "onboarding" : (sessionKey ?? "main"),
-                cwd: workingDirectory,
+                cwd: effectiveCwd,
                 mode: chatMode.rawValue,
                 model: model ?? modelOverride,
                 resume: resume,
