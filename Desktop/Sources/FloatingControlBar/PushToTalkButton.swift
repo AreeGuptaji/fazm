@@ -10,16 +10,40 @@ struct PushToTalkButton: View {
     var iconSize: CGFloat = 18
     var frameSize: CGFloat = 28
 
+    /// Spins continuously while finalizing transcription.
+    @State private var spinAngle: Double = 0
+
     var body: some View {
-        Image(systemName: isListening ? "mic.fill" : "mic")
-            .scaledFont(size: iconSize)
-            .foregroundColor(isListening ? .red : .secondary)
-            .frame(width: frameSize, height: frameSize)
-            .contentShape(Rectangle())
-            .scaleEffect(isListening ? 1.15 : 1.0)
-            .animation(.easeInOut(duration: 0.3), value: isListening)
-            .overlay(PushToTalkMouseHandler(targetState: state))
-            .help("Hold to talk")
+        ZStack {
+            if state.isVoiceFinalizing {
+                // Spinning arc to indicate transcription is processing
+                Circle()
+                    .trim(from: 0, to: 0.65)
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: frameSize - 4, height: frameSize - 4)
+                    .rotationEffect(.degrees(spinAngle))
+                    .onAppear { spinAngle = 0 }
+                    .animation(
+                        .linear(duration: 0.8).repeatForever(autoreverses: false),
+                        value: spinAngle
+                    )
+                    .onAppear { spinAngle = 360 }
+
+                Image(systemName: "mic.fill")
+                    .scaledFont(size: iconSize * 0.75)
+                    .foregroundColor(.accentColor)
+            } else {
+                Image(systemName: isListening ? "mic.fill" : "mic")
+                    .scaledFont(size: iconSize)
+                    .foregroundColor(isListening ? .red : .secondary)
+                    .scaleEffect(isListening ? 1.15 : 1.0)
+                    .animation(.easeInOut(duration: 0.3), value: isListening)
+            }
+        }
+        .frame(width: frameSize, height: frameSize)
+        .contentShape(Rectangle())
+        .overlay(PushToTalkMouseHandler(targetState: state))
+        .help(state.isVoiceFinalizing ? "Processing voice…" : "Hold to talk")
     }
 }
 
