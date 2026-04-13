@@ -1213,9 +1213,9 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
         }
         handleSessionUpdate(p, pendingTools, (text) => {
           fullText += text;
-        }, { currentTurnTaskIds, onStaleNotification: () => { staleTaskNotificationCount++; } });
+        }, { currentTurnTaskIds, onStaleNotification: () => { staleTaskNotificationCount++; } }, ctx);
       }
-    };
+    });
 
     // Send the prompt — retry with fresh session if stale
     const wasInterrupted = interruptedSessions.has(sessionId);
