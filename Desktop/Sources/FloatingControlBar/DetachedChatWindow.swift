@@ -592,9 +592,21 @@ class DetachedChatWindowController {
             guard panel.runModal() == .OK, let url = panel.url else { return }
 
             let newPath = url.path
-            provider.aiChatWorkingDirectory = newPath
-            provider.workingDirectory = newPath
-            Task { await provider.discoverClaudeConfig() }
+
+            // Store workspace on per-window state (not the shared provider)
+            state.workspaceDirectory = newPath
+
+            // Discover project CLAUDE.md for this window's workspace
+            Task {
+                let result = await Task.detached(priority: .utility) {
+                    ChatProvider.loadClaudeConfigFromDisk(workspace: newPath)
+                }.value
+                await MainActor.run {
+                    state.projectClaudeMdContent = result.projectClaudeMdContent
+                    state.projectClaudeMdPath = result.projectClaudeMdPath
+                    state.projectDiscoveredSkills = result.projectSkills
+                }
+            }
 
             let id = ObjectIdentifier(win)
             state.chatHistory = []
@@ -729,13 +741,15 @@ class DetachedChatWindowController {
 
         subscribeToResponse(provider: provider, state: state, winId: winId, messageCountBefore: messageCountBefore)
 
+        let windowCwd = state.workspaceDirectory.isEmpty ? nil : state.workspaceDirectory
         Task { @MainActor in
             await provider.sendMessage(
                 message,
                 model: ShortcutSettings.shared.selectedModel,
                 systemPromptSuffix: nil,
                 systemPromptPrefix: ChatProvider.floatingBarSystemPromptPrefixCurrent,
-                sessionKey: sessionKey
+                sessionKey: sessionKey,
+                cwd: windowCwd
             )
 
             // Shared post-query: error handling, credit exhaustion, auth, paywall, etc.
