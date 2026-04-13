@@ -677,6 +677,18 @@ actor ACPBridge {
     }
     sendLine(jsonString)
 
+    // Clean up per-session state when this query returns (success or error).
+    // Use a local closure so it also runs if this Task is cancelled.
+    defer {
+      if let sk = sessionKey {
+        sessionContinuations.removeValue(forKey: sk)
+        sessionPendingMessages.removeValue(forKey: sk)
+        sessionMessageGenerations.removeValue(forKey: sk)
+        sessionInterrupted.removeValue(forKey: sk)
+        sessionAcpToolsRunning.removeValue(forKey: sk)
+      }
+    }
+
     // Inactivity timeout: if no message arrives from the bridge for 3 minutes,
     // consider the query stuck (e.g., a hung Bash command that bypassed the SDK's
     // own 120s timeout). ChatProvider catches BridgeError.timeout and sends
@@ -686,7 +698,9 @@ actor ACPBridge {
     var messageCount = 0
     var lastMessageTime = Date()
     while true {
-      let message = try await waitForMessage(timeout: inactivityTimeout)
+      let message = try await (sessionKey != nil
+        ? waitForMessage(sessionKey: sessionKey!, timeout: inactivityTimeout)
+        : waitForMessage(timeout: inactivityTimeout))
       messageCount += 1
       let gapMs = Int(Date().timeIntervalSince(lastMessageTime) * 1000)
       lastMessageTime = Date()
@@ -702,8 +716,9 @@ actor ACPBridge {
         onTextDelta(text)
 
       case .toolUse(let callId, let name, let input):
-        // If already interrupted, skip this tool call entirely
-        if isInterrupted {
+        // Per-session interrupt flag takes precedence; fall back to legacy global
+        let interrupted = sessionKey.flatMap { sessionInterrupted[$0] } ?? isInterrupted
+        if interrupted {
           log("ACPBridge: skipping tool call \(name) (interrupted)")
           continue
         }
@@ -718,12 +733,21 @@ actor ACPBridge {
           sendLine(resultString)
         }
 
-        // If interrupted during tool execution, skip remaining tool calls
-        // and drain messages to find the result (already sent by the bridge).
-        if isInterrupted {
+        let interruptedAfter = sessionKey.flatMap { sessionInterrupted[$0] } ?? isInterrupted
+        if interruptedAfter {
           log("ACPBridge: interrupted during tool call, draining for result")
-          while !pendingMessages.isEmpty {
-            let pending = pendingMessages.removeFirst()
+          // Drain per-session queue if available, else legacy
+          var drainQueue: [InboundMessage] = {
+            if let sk = sessionKey, let q = sessionPendingMessages[sk] {
+              sessionPendingMessages[sk] = nil
+              return q
+            }
+            let q = pendingMessages
+            pendingMessages.removeAll()
+            return q
+          }()
+          while !drainQueue.isEmpty {
+            let pending = drainQueue.removeFirst()
             switch pending {
             case .result(
               let text, let sessionId, let costUsd, let inputTokens, let outputTokens,
@@ -740,7 +764,9 @@ actor ACPBridge {
             }
           }
           while true {
-            let msg = try await waitForMessage()
+            let msg = try await (sessionKey != nil
+              ? waitForMessage(sessionKey: sessionKey!)
+              : waitForMessage())
             switch msg {
             case .result(
               let text, let sessionId, let costUsd, let inputTokens, let outputTokens,
@@ -858,7 +884,22 @@ actor ACPBridge {
   func interrupt() {
     guard isRunning else { return }
     isInterrupted = true
+    // Also mark every active per-session query as interrupted (legacy: interrupt all)
+    for key in sessionContinuations.keys {
+      sessionInterrupted[key] = true
+    }
     sendLine("{\"type\":\"interrupt\"}")
+  }
+
+  /// Interrupt a specific session only. Other concurrent sessions continue running.
+  func interrupt(sessionKey: String) {
+    guard isRunning else { return }
+    sessionInterrupted[sessionKey] = true
+    let dict: [String: Any] = ["type": "interrupt", "sessionKey": sessionKey]
+    if let data = try? JSONSerialization.data(withJSONObject: dict),
+       let json = String(data: data, encoding: .utf8) {
+      sendLine(json)
+    }
   }
 
   /// Cancel any active OAuth flow so the next attempt starts fresh.
