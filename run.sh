@@ -409,7 +409,7 @@ else
 fi
 
 step "Removing quarantine attributes..."
-xattr -cr "$APP_BUNDLE"
+xattr -cr "$APP_BUNDLE" 2>/dev/null || true
 
 step "Installing to /Applications/..."
 # Install to /Applications/ so "Quit & Reopen" (after granting screen recording
