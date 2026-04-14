@@ -404,7 +404,13 @@ actor ACPBridge {
     stderr.fileHandleForReading.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
       if !data.isEmpty, let text = String(data: data, encoding: .utf8) {
-        log("ACPBridge stderr: \(text.trimmingCharacters(in: .whitespacesAndNewlines))")
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Tool timeouts are real anomalies — capture in Sentry as errors, not just breadcrumbs
+        if text.contains("Tool TIMEOUT") {
+          logError("ACPBridge stderr: \(trimmed)")
+        } else {
+          log("ACPBridge stderr: \(trimmed)")
+        }
         // Track ACP tool activity so waitForMessage doesn't time out
         // while tools are actively running inside ACP (Terminal, text_editor, etc.)
         if text.contains("Tool started") {
