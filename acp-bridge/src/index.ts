@@ -69,6 +69,99 @@ const googleWorkspaceMcpPython = join(googleWorkspaceMcpDir, ".venv", "bin", "py
 const googleWorkspaceMcpMain = join(googleWorkspaceMcpDir, "main.py");
 
 
+// --- Tool timeout watchdog ---
+// Tracks running tools and enforces per-tool wall-clock limits.
+// When a tool exceeds its timeout, a synthetic "completed" (with error) is
+// emitted so the model can recover and the Swift bridge unblocks.
+
+const TOOL_TIMEOUT_INTERNAL_MS = 10_000;   // ToolSearch and similar: 10s
+const TOOL_TIMEOUT_MCP_MS = 120_000;       // MCP tools: 2 min
+const TOOL_TIMEOUT_DEFAULT_MS = 300_000;   // Everything else: 5 min
+
+// User-configurable override (seconds) via Settings > Advanced > Tool Timeout
+const toolTimeoutOverrideSec = process.env.FAZM_TOOL_TIMEOUT_SECONDS
+  ? parseInt(process.env.FAZM_TOOL_TIMEOUT_SECONDS, 10)
+  : 0;
+
+interface TrackedTool {
+  toolCallId: string;
+  title: string;
+  isInternal: boolean;
+  sessionId: string | undefined;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const activeToolTimers = new Map<string, TrackedTool>();
+
+function getToolTimeoutMs(title: string, isInternal: boolean): number {
+  // User override applies to all tools (converted from seconds)
+  if (toolTimeoutOverrideSec > 0) return toolTimeoutOverrideSec * 1000;
+  if (isInternal) return TOOL_TIMEOUT_INTERNAL_MS;
+  if (title.startsWith("mcp__")) return TOOL_TIMEOUT_MCP_MS;
+  return TOOL_TIMEOUT_DEFAULT_MS;
+}
+
+function startToolTimer(
+  toolCallId: string,
+  title: string,
+  isInternal: boolean,
+  sessionId: string | undefined,
+  pendingTools: string[],
+): void {
+  // Clear any existing timer for this tool (shouldn't happen, but be safe)
+  clearToolTimer(toolCallId);
+
+  const timeoutMs = getToolTimeoutMs(title, isInternal);
+  const timer = setTimeout(() => {
+    activeToolTimers.delete(toolCallId);
+
+    logErr(`Tool TIMEOUT: ${title} (id=${toolCallId}) exceeded ${timeoutMs / 1000}s — synthesizing failure`);
+
+    // Remove from pendingTools (same as normal completion path)
+    const idx = pendingTools.indexOf(title);
+    if (idx >= 0) pendingTools.splice(idx, 1);
+
+    // Emit tool_activity completion so UI stops the spinner
+    if (!isInternal) {
+      sendWithSession(sessionId, {
+        type: "tool_activity",
+        name: title,
+        status: "completed",
+        toolUseId: toolCallId,
+      });
+    }
+
+    // Emit a visible error so the user knows what happened
+    const settingsHint = "Adjust timeout: fazm://settings/tool-timeouts";
+    sendWithSession(sessionId, {
+      type: "tool_result_display",
+      toolUseId: toolCallId,
+      name: title,
+      output: `Tool "${title}" timed out after ${timeoutMs / 1000}s.\n${settingsHint}`,
+    });
+
+    // Log "Tool completed" so the Swift side decrements acpToolsRunning
+    logErr(`Tool completed: ${title} (id=${toolCallId}) output=TIMEOUT after ${timeoutMs / 1000}s`);
+  }, timeoutMs);
+
+  activeToolTimers.set(toolCallId, { toolCallId, title, isInternal, sessionId, timer });
+}
+
+function clearToolTimer(toolCallId: string): void {
+  const tracked = activeToolTimers.get(toolCallId);
+  if (tracked) {
+    clearTimeout(tracked.timer);
+    activeToolTimers.delete(toolCallId);
+  }
+}
+
+function clearAllToolTimers(): void {
+  for (const [, tracked] of activeToolTimers) {
+    clearTimeout(tracked.timer);
+  }
+  activeToolTimers.clear();
+}
+
 // --- Helpers ---
 
 function send(msg: OutboundMessage): void {
@@ -1811,6 +1904,9 @@ function handleSessionUpdate(
           return `${k}=${s && s.length > 120 ? s.slice(0, 120) + "…" : s}`;
         }).join(", ") : "";
         logErr(`Tool started: ${title} (id=${toolCallId}, kind=${kind})${inputSummary ? ` [${inputSummary}]` : ""}`);
+
+        // Start timeout watchdog for this tool
+        startToolTimer(toolCallId, title, isInternalTool, sid, pendingTools);
       }
       break;
     }
