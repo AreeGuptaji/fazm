@@ -12,6 +12,12 @@ use crate::firestore;
 const GITHUB_REPO: &str = "mediar-ai/fazm";
 const GITHUB_API: &str = "https://api.github.com";
 
+/// Minimum supported app version. Clients below this see the latest update marked as
+/// a Sparkle critical update (non-skippable prompt, aggressive re-prompt on relaunch).
+/// Raise this when a newly shipped enforcement (paywall, auth gate, etc.) must not be
+/// bypassable by running an older binary. Clients at or above this version are unaffected.
+const MIN_SUPPORTED_VERSION: &str = "2.1.0";
+
 #[derive(Deserialize)]
 struct GitHubRelease {
     tag_name: String,
@@ -198,7 +204,8 @@ async fn generate_appcast(
       <pubDate>{pub_date}</pubDate>
       <sparkle:version>{build_number}</sparkle:version>
       <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>{channel_tag}{description_block}
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:criticalUpdate sparkle:version="{MIN_SUPPORTED_VERSION}"/>{channel_tag}{description_block}
       <enclosure {enclosure_attrs}/>
     </item>"#,
             ));
