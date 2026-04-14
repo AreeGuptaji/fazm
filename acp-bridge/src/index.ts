@@ -1929,6 +1929,9 @@ function handleSessionUpdate(
       const isInternalTool = title === "ToolSearch";
 
       if (status === "completed" || status === "failed" || status === "cancelled") {
+        // Cancel the timeout watchdog (tool finished normally)
+        clearToolTimer(toolCallId);
+
         // Remove from pending
         const idx = pendingTools.indexOf(title);
         if (idx >= 0) pendingTools.splice(idx, 1);
