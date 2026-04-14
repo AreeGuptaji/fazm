@@ -373,6 +373,12 @@ actor ACPBridge {
       env["ANTHROPIC_BASE_URL"] = customEndpoint
     }
 
+    // Tool timeout override (user-configurable in Settings > Advanced)
+    let toolTimeout = defaults.integer(forKey: "toolTimeoutSeconds")
+    if toolTimeout > 0 {
+      env["FAZM_TOOL_TIMEOUT_SECONDS"] = String(toolTimeout)
+    }
+
     // Pass app bundle path so acp-bridge can find bundled binaries/resources
     // (Node may run from /tmp due to NodeBinaryHelper, so process.execPath is unreliable)
     if let resourcePath = Bundle.main.resourcePath {
