@@ -1443,7 +1443,6 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
           staleTaskNotificationCount = 0;
           currentTurnTaskIds.clear();
           pendingTools.length = 0;
-        clearAllToolTimers();
           clearAllToolTimers();
           // Re-send the same prompt; the stale task notification is now consumed
           promptStartTime = Date.now();
@@ -1460,7 +1459,6 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
             sendWithSession(sessionId, { type: "tool_activity", name, status: "completed" });
           }
           pendingTools.length = 0;
-        clearAllToolTimers();
           clearAllToolTimers();
 
           if (sessionKey !== "observer" && sessions.has("observer")) {
@@ -1545,7 +1543,6 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
             sendWithSession(sessionId, { type: "tool_activity", name, status: "completed" });
           }
           pendingTools.length = 0;
-        clearAllToolTimers();
           clearAllToolTimers();
 
           if (sessionKey !== "observer" && sessions.has("observer")) {
@@ -1583,7 +1580,6 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
             sendWithSession(sessionId, { type: "tool_activity", name, status: "completed" });
           }
           pendingTools.length = 0;
-        clearAllToolTimers();
           clearAllToolTimers();
           logErr(
             `Query interrupted by user, sending partial result (${fullText.length} chars)`
