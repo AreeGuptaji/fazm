@@ -1024,7 +1024,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "settings":
             // Deep link to a specific settings page, e.g. fazm://settings/tool-timeouts
             NSApp.activate(ignoringOtherApps: true)
-            openFazmFromMenu()
+            for window in NSApp.windows where window.title.hasPrefix("Fazm") {
+                window.makeKeyAndOrderFront(nil)
+            }
             let settingPath = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             if !settingPath.isEmpty {
                 // Map URL path to settingId for scroll-to-highlight
