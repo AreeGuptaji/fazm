@@ -38,6 +38,10 @@ struct AIResponseView: View {
         chatHistory.filter { $0.question.isEmpty }
     }
 
+    /// When set, the model dropdown in this view reads/writes this binding instead of the global setting.
+    /// Pass nil (the default) for the floating bar; pass the per-window binding for popout windows.
+    var localModel: Binding<String>?
+
     var onClose: (() -> Void)?
     var onNewChat: (() -> Void)?
     var onSendFollowUp: ((String) -> Void)?
@@ -344,7 +348,7 @@ struct AIResponseView: View {
 
             Spacer()
 
-            ModelToggleButton()
+            ModelToggleButton(localModel: localModel)
 
             VoiceMuteButton()
 
@@ -1084,14 +1088,28 @@ struct MessageWithCopyButton<Content: View>: View {
 
 struct ModelToggleButton: View {
     @ObservedObject private var shortcutSettings = ShortcutSettings.shared
+    /// When provided, reads and writes model selection to this binding instead of the global setting.
+    var localModel: Binding<String>?
+
+    private var selectedModelId: String {
+        localModel?.wrappedValue ?? shortcutSettings.selectedModel
+    }
+
+    private var selectedModelShortLabel: String {
+        ShortcutSettings.availableModels.first(where: { $0.id == selectedModelId })?.shortLabel ?? "Smart"
+    }
 
     var body: some View {
         Menu {
             ForEach(ShortcutSettings.availableModels, id: \.id) { model in
                 Button {
-                    shortcutSettings.selectedModel = model.id
+                    if let localModel {
+                        localModel.wrappedValue = model.id
+                    } else {
+                        shortcutSettings.selectedModel = model.id
+                    }
                 } label: {
-                    if shortcutSettings.selectedModel == model.id {
+                    if selectedModelId == model.id {
                         Label(model.label, systemImage: "checkmark")
                     } else {
                         Text(model.label)
@@ -1100,7 +1118,7 @@ struct ModelToggleButton: View {
             }
         } label: {
             HStack(spacing: 2) {
-                Text(shortcutSettings.selectedModelShortLabel)
+                Text(selectedModelShortLabel)
                     .scaledFont(size: 11, weight: .medium)
                 Image(systemName: "chevron.down")
                     .scaledFont(size: 7, weight: .medium)
