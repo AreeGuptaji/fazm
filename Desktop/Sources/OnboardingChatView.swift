@@ -896,7 +896,7 @@ struct OnboardingChatView: View {
                 let result = try await bridge.query(
                     prompt: "Begin exploration. \(fileCount) files have been indexed in the indexed_files table.",
                     systemPrompt: systemPrompt,
-                    model: "claude-opus-4-6",
+                    model: "claude-sonnet-4-6",
                     onTextDelta: { @Sendable _ in },
                     onToolCall: { @Sendable _, name, input in
                         let toolCall = ToolCall(name: name, arguments: input, thoughtSignature: nil)
@@ -943,7 +943,7 @@ struct OnboardingChatView: View {
                 let result = try await bridge.query(
                     prompt: "Begin exploration. \(fileCount) files have been indexed in the indexed_files table.",
                     systemPrompt: systemPrompt,
-                    model: "claude-opus-4-6",
+                    model: "claude-sonnet-4-6",
                     onTextDelta: { @Sendable delta in
                         let insertBoundary = needsBoundary.value
                         if insertBoundary { needsBoundary.value = false }
