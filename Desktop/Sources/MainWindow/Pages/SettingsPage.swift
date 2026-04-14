@@ -225,6 +225,22 @@ struct SettingsContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToFloatingBarSettings)) { _ in
             selectedSection = .shortcuts
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("navigateToSetting"))) { notification in
+            guard let settingId = notification.userInfo?["settingId"] as? String else { return }
+            // Find the search item to determine section + subsection
+            if let item = SettingsSearchItem.allSearchableItems.first(where: { $0.settingId == settingId }) {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    selectedSection = item.section
+                    if let sub = item.advancedSubsection {
+                        selectedAdvancedSubsection = sub
+                    }
+                }
+                // Highlight the specific card after navigation settles
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    highlightedSettingId = settingId
+                }
+            }
+        }
     }
 
     // MARK: - Remote Control Section
