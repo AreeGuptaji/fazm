@@ -476,6 +476,9 @@ class DetachedChatWindowController {
         // Skip if reopening an existing detached session (messages already persisted).
         if !skipPersist {
             let context = "__\(sessionKey)__"
+            // Carry over the ACP session ID from the source conversation (e.g. floating bar)
+            // so this detached session can be resumed from history later.
+            let sourceSessionId = UserDefaults.standard.string(forKey: "acpSessionId_floating_\(chatProvider.bridgeMode)")
             Task {
                 for exchange in chatHistory {
                     // Skip empty AI placeholder messages (from unpaired consecutive user messages)
@@ -483,22 +486,22 @@ class DetachedChatWindowController {
                         // Still save the user message
                         let userDate = exchange.aiMessage.createdAt.addingTimeInterval(-0.1)
                         let userMsg = ChatMessage(text: exchange.question, createdAt: userDate, sender: .user, sessionKey: sessionKey)
-                        await ChatMessageStore.saveMessage(userMsg, context: context)
+                        await ChatMessageStore.saveMessage(userMsg, context: context, sessionId: sourceSessionId)
                         continue
                     }
                     // Use a timestamp just before the AI message so ordering is correct
                     let userDate = exchange.aiMessage.createdAt.addingTimeInterval(-0.1)
                     let userMsg = ChatMessage(text: exchange.question, createdAt: userDate, sender: .user, sessionKey: sessionKey)
-                    await ChatMessageStore.saveMessage(userMsg, context: context)
-                    await ChatMessageStore.saveMessage(exchange.aiMessage, context: context)
+                    await ChatMessageStore.saveMessage(userMsg, context: context, sessionId: sourceSessionId)
+                    await ChatMessageStore.saveMessage(exchange.aiMessage, context: context, sessionId: sourceSessionId)
                 }
                 if !displayedQuery.isEmpty {
                     let userDate = currentAIMessage?.createdAt.addingTimeInterval(-0.1) ?? Date()
                     let userMsg = ChatMessage(text: displayedQuery, createdAt: userDate, sender: .user, sessionKey: sessionKey)
-                    await ChatMessageStore.saveMessage(userMsg, context: context)
+                    await ChatMessageStore.saveMessage(userMsg, context: context, sessionId: sourceSessionId)
                 }
                 if let aiMsg = currentAIMessage, !aiMsg.text.isEmpty {
-                    await ChatMessageStore.saveMessage(aiMsg, context: context)
+                    await ChatMessageStore.saveMessage(aiMsg, context: context, sessionId: sourceSessionId)
                 }
             }
         }
