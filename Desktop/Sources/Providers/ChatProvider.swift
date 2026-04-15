@@ -2353,7 +2353,8 @@ class ChatProvider: ObservableObject {
                 UserDefaults.standard.removeObject(forKey: Self.floatingChatClearedKey)
             } else if let key = sessionKey, key.hasPrefix("detached-") {
                 let msg = userMessage
-                Task { await ChatMessageStore.saveMessage(msg, context: "__\(key)__") }
+                let sid = UserDefaults.standard.string(forKey: "acpSessionId_\(key)_\(bridgeMode)")
+                Task { await ChatMessageStore.saveMessage(msg, context: "__\(key)__", sessionId: sid) }
             }
         }
 
@@ -2636,7 +2637,8 @@ class ChatProvider: ObservableObject {
                         let sid = floatingChatSessionId
                         Task { await ChatMessageStore.saveMessage(msg, context: "__floating__", sessionId: sid) }
                     } else if let key = sessionKey, key.hasPrefix("detached-") {
-                        Task { await ChatMessageStore.saveMessage(msg, context: "__\(key)__") }
+                        let sid = queryResult.sessionId.isEmpty ? nil : queryResult.sessionId
+                        Task { await ChatMessageStore.saveMessage(msg, context: "__\(key)__", sessionId: sid) }
                     }
                 }
 
