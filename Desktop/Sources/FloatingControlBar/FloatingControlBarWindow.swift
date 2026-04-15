@@ -70,7 +70,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     var onPlayPause: (() -> Void)?
     var onAskAI: (() -> Void)?
     var onHide: (() -> Void)?
-    var onSendQuery: ((String) -> Void)?
+    var onSendQuery: ((String, [ChatAttachment]) -> Void)?
     var onInterruptAndFollowUp: ((String) -> Void)?
     var onStopAgent: (() -> Void)?
     var onPopOut: (() -> Void)?
@@ -225,7 +225,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             onPlayPause: { [weak self] in self?.onPlayPause?() },
             onAskAI: { [weak self] in self?.handleAskAI() },
             onHide: { [weak self] in self?.hideBar() },
-            onSendQuery: { [weak self] message in self?.onSendQuery?(message) },
+            onSendQuery: { [weak self] message, attachments in self?.onSendQuery?(message, attachments) },
             onCloseAI: { [weak self] in self?.closeAIConversation() },
             onNewChat: { [weak self] in self?.startNewChat() },
             onInterruptAndFollowUp: { [weak self] message in self?.onInterruptAndFollowUp?(message) },
@@ -1123,10 +1123,10 @@ class FloatingControlBarManager {
             provider: chatProvider, state: barWindow.state, sessionKey: "floating"
         )
 
-        barWindow.onSendQuery = { [weak self, weak barWindow, weak chatProvider] message in
+        barWindow.onSendQuery = { [weak self, weak barWindow, weak chatProvider] message, attachments in
             guard let self = self, let barWindow = barWindow, let provider = chatProvider else { return }
             Task { @MainActor in
-                await self.sendAIQuery(message, barWindow: barWindow, provider: provider)
+                await self.sendAIQuery(message, attachments: attachments, barWindow: barWindow, provider: provider)
             }
         }
 
@@ -1681,10 +1681,10 @@ class FloatingControlBarManager {
 
         // Re-wire onSendQuery for the shared provider
         if let provider = self.chatProvider {
-            window.onSendQuery = { [weak self, weak window, weak provider] message in
+            window.onSendQuery = { [weak self, weak window, weak provider] message, attachments in
                 guard let self = self, let window = window, let provider = provider else { return }
                 Task { @MainActor in
-                    await self.sendAIQuery(message, barWindow: window, provider: provider)
+                    await self.sendAIQuery(message, attachments: attachments, barWindow: window, provider: provider)
                 }
             }
         }
