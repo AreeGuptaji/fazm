@@ -85,6 +85,25 @@ enum ChatMessageStore {
         }
     }
 
+    /// Get the most recent ACP session ID stored for a conversation context.
+    static func loadSessionId(context: String) async -> String? {
+        guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return nil }
+        do {
+            return try await dbQueue.read { db in
+                let row = try Row.fetchOne(db, sql: """
+                    SELECT session_id FROM chat_messages
+                    WHERE taskId = ? AND session_id IS NOT NULL AND session_id != ''
+                    ORDER BY createdAt DESC
+                    LIMIT 1
+                """, arguments: [context])
+                return row?["session_id"] as? String
+            }
+        } catch {
+            logError("ChatMessageStore: Failed to load session ID", error: error)
+            return nil
+        }
+    }
+
     static func clearMessages(context: String) async {
         guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
         do {
