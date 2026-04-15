@@ -44,7 +44,7 @@ struct AIResponseView: View {
 
     var onClose: (() -> Void)?
     var onNewChat: (() -> Void)?
-    var onSendFollowUp: ((String) -> Void)?
+    var onSendFollowUp: ((String, [ChatAttachment]) -> Void)?
     var onEnqueueMessage: ((String) -> Void)?
     var onSendNow: ((QueuedMessage) -> Void)?
     var onDeleteQueued: ((QueuedMessage) -> Void)?
@@ -805,7 +805,7 @@ struct AIResponseView: View {
             onSelect: { reply in
                 suggestedReplies = []
                 suggestedReplyQuestion = ""
-                onSendFollowUp?(reply)
+                onSendFollowUp?(reply, [])
             }
         )
     }
