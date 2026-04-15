@@ -6,7 +6,7 @@ struct AskAIInputView: View {
     @EnvironmentObject var state: FloatingControlBarState
     @Binding var userInput: String
     @State private var localInput: String = ""
-    @State private var textHeight: CGFloat = 40
+    @State private var textHeight: CGFloat = 34
 
     var onSend: ((String, [ChatAttachment]) -> Void)?
     var onCancel: (() -> Void)?
@@ -14,7 +14,7 @@ struct AskAIInputView: View {
 
     @State private var sendPulse: Bool = false
 
-    private let minHeight: CGFloat = 40
+    private let minHeight: CGFloat = 34
     private let maxHeight: CGFloat = 200
 
     var body: some View {
