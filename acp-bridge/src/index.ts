@@ -31,7 +31,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
 import { tmpdir, homedir } from "os";
-import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, readFileSync } from "fs";
+import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, readFileSync, statSync } from "fs";
 import type {
   InboundMessage,
   OutboundMessage,
@@ -1367,6 +1367,9 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
       const promptBlocks: Array<Record<string, unknown>> = [];
 
       // Add user-attached files as native content blocks (images, PDFs, text)
+      // Max file size: 20MB for images/PDFs (base64 encoded), 10MB for text
+      const MAX_BINARY_SIZE = 20 * 1024 * 1024;
+      const MAX_TEXT_SIZE = 10 * 1024 * 1024;
       if (msg.attachments && msg.attachments.length > 0) {
         for (const att of msg.attachments) {
           try {
@@ -1374,9 +1377,24 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
               logErr(`[ATTACH] File not found: ${att.path}`);
               continue;
             }
+            const stats = statSync(att.path);
+            const mime = att.mimeType.toLowerCase();
+            const isBinary = mime.startsWith("image/") || mime === "application/pdf";
+            const sizeLimit = isBinary ? MAX_BINARY_SIZE : MAX_TEXT_SIZE;
+
+            if (stats.size > sizeLimit) {
+              const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
+              const limitMB = (sizeLimit / 1024 / 1024).toFixed(0);
+              logErr(`[ATTACH] File too large (${sizeMB}MB > ${limitMB}MB limit), sending path only: ${att.name}`);
+              promptBlocks.push({
+                type: "text",
+                text: `[Attached file: ${att.name} (${sizeMB}MB, ${mime}) at path: ${att.path}]\nNote: File is too large to inline. The file path is provided so you can reference it in tool calls if needed.`,
+              });
+              continue;
+            }
+
             const fileData = readFileSync(att.path);
             const base64Data = fileData.toString("base64");
-            const mime = att.mimeType.toLowerCase();
 
             if (mime.startsWith("image/")) {
               // Native image content block
@@ -1389,6 +1407,13 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
               promptBlocks.push({
                 type: "document",
                 source: { type: "base64", media_type: mime, data: base64Data },
+              });
+            } else if (mime === "application/octet-stream" || !mime.startsWith("text/")) {
+              // Unknown/binary files: just send the path, don't try to read content
+              const sizeMB = (fileData.length / 1024 / 1024).toFixed(1);
+              promptBlocks.push({
+                type: "text",
+                text: `[Attached file: ${att.name} (${sizeMB}MB, ${mime}) at path: ${att.path}]`,
               });
             } else {
               // Text-based files: read as UTF-8 and inline as text block
