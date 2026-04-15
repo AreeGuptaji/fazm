@@ -14,6 +14,7 @@ SHORTCUTS="Desktop/Sources/MainWindow/Pages/ShortcutsSettingsSection.swift"
 SECTION_LEVEL_IDS=(
     "permissions.permissions"
     "dictionary.dictionary"
+    "conversationhistory.list"
 )
 
 # Extract settingIds from the search index

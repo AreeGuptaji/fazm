@@ -630,6 +630,7 @@ actor ACPBridge {
     mode: String? = nil,
     model: String? = nil,
     resume: String? = nil,
+    attachments: [[String: String]]? = nil,
     onTextDelta: @escaping TextDeltaHandler,
     onToolCall: @escaping ToolCallHandler,
     onToolActivity: @escaping ToolActivityHandler,
@@ -664,6 +665,9 @@ actor ACPBridge {
     }
     if let resume = resume {
       queryDict["resume"] = resume
+    }
+    if let attachments = attachments, !attachments.isEmpty {
+      queryDict["attachments"] = attachments
     }
     let jsonData = try JSONSerialization.data(withJSONObject: queryDict)
     guard let jsonString = String(data: jsonData, encoding: .utf8) else {
