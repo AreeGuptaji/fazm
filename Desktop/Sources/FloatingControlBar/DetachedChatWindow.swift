@@ -307,7 +307,7 @@ struct DetachedChatView: View {
                         } else if let url = item as? URL, let data = try? Data(contentsOf: url) {
                             imageData = data
                         } else {
-                            AppLog.shared.log("[Attachment] Drop failed: could not resolve image data (item=\(type(of: item)), error=\(String(describing: error)))")
+                            NSLog("[Attachment] Drop failed: could not resolve image data (item=%@, error=%@)", "\(type(of: item))", "\(String(describing: error))")
                             imageData = nil
                         }
                         guard let data = imageData else { return }
