@@ -166,7 +166,7 @@ struct ConversationHistorySection: View {
             guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
 
             do {
-                let results = try dbQueue.read { db -> [ConversationSummary] in
+                let results = try await dbQueue.read { db -> [ConversationSummary] in
                     let rows = try Row.fetchAll(db, sql: """
                         SELECT
                             cm.taskId,
