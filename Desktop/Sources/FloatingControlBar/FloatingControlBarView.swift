@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Main floating control bar SwiftUI view composing all sub-views.
 struct FloatingControlBarView: View {
@@ -38,6 +39,34 @@ struct FloatingControlBarView: View {
                     } else {
                         aiInputView
                     }
+                }
+                .overlay {
+                    if state.isDragOverChat {
+                        ChatDragOverlay()
+                            .padding(4)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .onDrop(of: [.fileURL, .image], isTargeted: $state.isDragOverChat) { providers in
+                    for provider in providers {
+                        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { data, _ in
+                                guard let data = data as? Data, let urlStr = String(data: data, encoding: .utf8),
+                                      let url = URL(string: urlStr) else { return }
+                                DispatchQueue.main.async {
+                                    ChatAttachmentHelper.addFiles(from: [url], to: &state.pendingAttachments)
+                                }
+                            }
+                        } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                            provider.loadItem(forTypeIdentifier: UTType.png.identifier, options: nil) { data, _ in
+                                guard let data = data as? Data else { return }
+                                DispatchQueue.main.async {
+                                    ChatAttachmentHelper.addPastedImage(data, to: &state.pendingAttachments)
+                                }
+                            }
+                        }
+                    }
+                    return true
                 }
                 .padding(.top, 12)
                 .overlay(alignment: .topLeading) {
@@ -385,7 +414,7 @@ struct FloatingControlBarView: View {
             ),
             onClose: onCloseAI,
             onNewChat: onNewChat,
-            onSendFollowUp: { message in
+            onSendFollowUp: { message, attachments in
                 state.suggestedReplies = []
                 state.suggestedReplyQuestion = ""
                 // Archive current exchange to chat history
@@ -404,7 +433,7 @@ struct FloatingControlBarView: View {
                     state.isAILoading = true
                     state.currentAIMessage = nil
                 }
-                onSendQuery(message, [])
+                onSendQuery(message, attachments)
             },
             onEnqueueMessage: { message in
                 guard state.messageQueue.count < FloatingControlBarState.maxQueueSize else { return }
