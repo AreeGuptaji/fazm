@@ -478,7 +478,9 @@ struct OnboardingChatView: View {
                 withAnimation { onboardingError = .claudeAuthRequired }
             } else if chatProvider.showCreditExhaustedAlert {
                 chatProvider.showCreditExhaustedAlert = false
-                withAnimation { onboardingError = .creditExhausted }
+                if !chatProvider.isClaudeConnected {
+                    withAnimation { onboardingError = .creditExhausted }
+                }
             } else if let errorText = chatProvider.errorMessage {
                 withAnimation { onboardingError = .general(errorText) }
             } else {
