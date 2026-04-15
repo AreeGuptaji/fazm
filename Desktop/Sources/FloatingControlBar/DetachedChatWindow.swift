@@ -207,7 +207,7 @@ struct DetachedChatView: View {
             ),
             onClose: nil,
             onNewChat: onNewChat,
-            onSendFollowUp: { message in
+            onSendFollowUp: { message, attachments in
                 state.suggestedReplies = []
                 state.suggestedReplyQuestion = ""
                 let currentQuery = state.displayedQuery
@@ -225,7 +225,7 @@ struct DetachedChatView: View {
                     state.isAILoading = true
                     state.currentAIMessage = nil
                 }
-                onSendFollowUp(message)
+                onSendFollowUp(message, attachments)
             },
             onEnqueueMessage: { message in
                 guard state.messageQueue.count < FloatingControlBarState.maxQueueSize else { return }
@@ -271,6 +271,34 @@ struct DetachedChatView: View {
             onChatObserverCardAction: onChatObserverCardAction,
             onChangeWorkspace: onChangeWorkspace
         )
+        .overlay {
+            if state.isDragOverChat {
+                ChatDragOverlay()
+                    .padding(4)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [.fileURL, .image], isTargeted: $state.isDragOverChat) { providers in
+            for provider in providers {
+                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { data, _ in
+                        guard let data = data as? Data, let urlStr = String(data: data, encoding: .utf8),
+                              let url = URL(string: urlStr) else { return }
+                        DispatchQueue.main.async {
+                            ChatAttachmentHelper.addFiles(from: [url], to: &state.pendingAttachments)
+                        }
+                    }
+                } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    provider.loadItem(forTypeIdentifier: UTType.png.identifier, options: nil) { data, _ in
+                        guard let data = data as? Data else { return }
+                        DispatchQueue.main.async {
+                            ChatAttachmentHelper.addPastedImage(data, to: &state.pendingAttachments)
+                        }
+                    }
+                }
+            }
+            return true
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .floatingBackground(cornerRadius: 0)
     }
@@ -572,9 +600,9 @@ class DetachedChatWindowController {
 
     /// Wire up all callbacks for a detached window. Shared between show() and restoreWindows().
     private func wireUpCallbacks(win: DetachedChatWindow, detachedState: FloatingControlBarState, chatProvider: ChatProvider) {
-        win.onSendFollowUp = { [weak self, weak win] message in
+        win.onSendFollowUp = { [weak self, weak win] message, attachments in
             guard let win else { return }
-            self?.sendQuery(message, for: win)
+            self?.sendQuery(message, attachments: attachments, for: win)
         }
 
         win.onNewChat = { [weak self, weak win, weak detachedState, weak chatProvider] in
@@ -709,7 +737,7 @@ class DetachedChatWindowController {
     }
 
     /// Send a follow-up query from a specific detached window.
-    private func sendQuery(_ message: String, for win: DetachedChatWindow) {
+    private func sendQuery(_ message: String, attachments: [ChatAttachment] = [], for win: DetachedChatWindow) {
         let winId = ObjectIdentifier(win)
         guard let sessionKey = entries[winId]?.sessionKey else { return }
         let state = win.state
@@ -778,11 +806,11 @@ class DetachedChatWindowController {
             return
         }
 
-        startQuery(message: message, for: win, winId: winId, sessionKey: sessionKey, state: state, provider: provider)
+        startQuery(message: message, attachments: attachments, for: win, winId: winId, sessionKey: sessionKey, state: state, provider: provider)
     }
 
     /// Start sending a query immediately (provider is not busy).
-    private func startQuery(message: String, for win: DetachedChatWindow, winId: ObjectIdentifier, sessionKey: String, state: FloatingControlBarState, provider: ChatProvider) {
+    private func startQuery(message: String, attachments: [ChatAttachment] = [], for win: DetachedChatWindow, winId: ObjectIdentifier, sessionKey: String, state: FloatingControlBarState, provider: ChatProvider) {
         let messageCountBefore = provider.messages.count
         log("[DetachedChat] startQuery: messageCountBefore=\(messageCountBefore) session=\(sessionKey) chatHistory=\(state.chatHistory.count)")
 
