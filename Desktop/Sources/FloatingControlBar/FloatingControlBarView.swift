@@ -8,7 +8,7 @@ struct FloatingControlBarView: View {
     var onPlayPause: () -> Void
     var onAskAI: () -> Void
     var onHide: () -> Void
-    var onSendQuery: (String) -> Void
+    var onSendQuery: (String, [ChatAttachment]) -> Void
     var onCloseAI: () -> Void
     var onNewChat: () -> Void
     var onInterruptAndFollowUp: ((String) -> Void)?
