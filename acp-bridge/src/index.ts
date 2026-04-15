@@ -1366,10 +1366,10 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
     const sendPrompt = async (): Promise<void> => {
       const promptBlocks: Array<Record<string, unknown>> = [];
 
-      // Add user-attached files as native content blocks (images, PDFs, text)
-      // Max file size: 20MB for images/PDFs (base64 encoded), 10MB for text
-      const MAX_BINARY_SIZE = 20 * 1024 * 1024;
-      const MAX_TEXT_SIZE = 10 * 1024 * 1024;
+      // Add user-attached files as native content blocks (images, PDFs, text).
+      // Binary/unknown types are never read into memory; only their path is sent.
+      const MAX_INLINE_SIZE = 20 * 1024 * 1024; // 20 MB for images/PDFs
+      const MAX_TEXT_SIZE = 10 * 1024 * 1024;    // 10 MB for text files
       if (msg.attachments && msg.attachments.length > 0) {
         for (const att of msg.attachments) {
           try {
@@ -1379,11 +1379,22 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
             }
             const stats = statSync(att.path);
             const mime = att.mimeType.toLowerCase();
-            const isBinary = mime.startsWith("image/") || mime === "application/pdf";
-            const sizeLimit = isBinary ? MAX_BINARY_SIZE : MAX_TEXT_SIZE;
+            const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
 
+            // 1) Unknown/binary types: send path only, never read the file
+            if (mime === "application/octet-stream" || (!mime.startsWith("image/") && !mime.startsWith("text/") && mime !== "application/pdf")) {
+              logErr(`[ATTACH] Binary file, sending path only: ${att.name} (${sizeMB}MB, ${mime})`);
+              promptBlocks.push({
+                type: "text",
+                text: `[Attached file: ${att.name} (${sizeMB}MB, ${mime}) at path: ${att.path}]`,
+              });
+              continue;
+            }
+
+            // 2) Size gate: reject files too large to inline
+            const isInlineBinary = mime.startsWith("image/") || mime === "application/pdf";
+            const sizeLimit = isInlineBinary ? MAX_INLINE_SIZE : MAX_TEXT_SIZE;
             if (stats.size > sizeLimit) {
-              const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
               const limitMB = (sizeLimit / 1024 / 1024).toFixed(0);
               logErr(`[ATTACH] File too large (${sizeMB}MB > ${limitMB}MB limit), sending path only: ${att.name}`);
               promptBlocks.push({
@@ -1393,37 +1404,27 @@ async function handleQuery(msg: QueryMessage, _retryDepth = 0): Promise<void> {
               continue;
             }
 
+            // 3) Read the file (only images, PDFs, and text reach here, all within size limits)
             const fileData = readFileSync(att.path);
-            const base64Data = fileData.toString("base64");
 
             if (mime.startsWith("image/")) {
-              // Native image content block
               promptBlocks.push({
                 type: "image",
-                source: { type: "base64", media_type: mime, data: base64Data },
+                source: { type: "base64", media_type: mime, data: fileData.toString("base64") },
               });
             } else if (mime === "application/pdf") {
-              // Native PDF/document content block
               promptBlocks.push({
                 type: "document",
-                source: { type: "base64", media_type: mime, data: base64Data },
-              });
-            } else if (mime === "application/octet-stream" || !mime.startsWith("text/")) {
-              // Unknown/binary files: just send the path, don't try to read content
-              const sizeMB = (fileData.length / 1024 / 1024).toFixed(1);
-              promptBlocks.push({
-                type: "text",
-                text: `[Attached file: ${att.name} (${sizeMB}MB, ${mime}) at path: ${att.path}]`,
+                source: { type: "base64", media_type: mime, data: fileData.toString("base64") },
               });
             } else {
-              // Text-based files: read as UTF-8 and inline as text block
-              const textContent = fileData.toString("utf-8");
+              // text/* files: inline as UTF-8
               promptBlocks.push({
                 type: "text",
-                text: `[File: ${att.name}]\n${textContent}`,
+                text: `[File: ${att.name}]\n${fileData.toString("utf-8")}`,
               });
             }
-            logErr(`[ATTACH] Added ${mime} attachment: ${att.name} (${fileData.length} bytes)`);
+            logErr(`[ATTACH] Added ${mime} attachment: ${att.name} (${stats.size} bytes)`);
           } catch (err) {
             logErr(`[ATTACH] Failed to read attachment ${att.path}: ${err}`);
           }
