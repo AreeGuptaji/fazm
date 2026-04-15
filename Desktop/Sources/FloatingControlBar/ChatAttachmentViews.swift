@@ -32,50 +32,6 @@ enum ChatAttachmentHelper {
         }
     }
 
-    /// Handle NSItemProvider drop (drag & drop or paste).
-    static func handleDrop(_ providers: [NSItemProvider], to attachments: inout [ChatAttachment]) {
-        // Capture a reference we can use across async callbacks
-        var result = attachments
-        let group = DispatchGroup()
-
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                group.enter()
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { data, _ in
-                    defer { group.leave() }
-                    guard let data = data as? Data, let urlStr = String(data: data, encoding: .utf8),
-                          let url = URL(string: urlStr) else { return }
-                    DispatchQueue.main.async {
-                        ChatAttachmentHelper.addFiles(from: [url], to: &attachments)
-                    }
-                }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                group.enter()
-                provider.loadItem(forTypeIdentifier: UTType.png.identifier, options: nil) { data, _ in
-                    defer { group.leave() }
-                    guard let data = data as? Data else { return }
-                    let tempDir = FileManager.default.temporaryDirectory
-                    let filename = "paste-\(UUID().uuidString.prefix(8)).png"
-                    let tempURL = tempDir.appendingPathComponent(filename)
-                    try? data.write(to: tempURL)
-                    DispatchQueue.main.async {
-                        var thumbnail: Data?
-                        if let img = NSImage(data: data) {
-                            thumbnail = generateThumbnail(from: img, maxSize: 80)
-                        }
-                        let att = ChatAttachment(
-                            path: tempURL.path,
-                            name: filename,
-                            mimeType: "image/png",
-                            thumbnailData: thumbnail
-                        )
-                        attachments.append(att)
-                    }
-                }
-            }
-        }
-    }
-
     /// Add a pasted image (raw data) to pending attachments.
     static func addPastedImage(_ data: Data, to attachments: inout [ChatAttachment]) {
         let tempDir = FileManager.default.temporaryDirectory
